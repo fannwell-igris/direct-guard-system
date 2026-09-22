@@ -15,6 +15,7 @@ export interface AuthTokenPayload {
   userId: string;
   email: string;
   role: string;
+  departmentId?: string | null;
 }
 
 export function signToken(payload: AuthTokenPayload): string {
