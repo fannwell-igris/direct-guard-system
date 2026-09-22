@@ -14,10 +14,11 @@
  * thread fills the viewport (back button returns to the rail).
  */
 
-import { useState, useRef, useEffect, FormEvent } from "react";
+import { useState, useRef, useEffect } from "react";
+import type { FormEvent } from "react";
 import {
   MessageSquare, Send, Search, Plus, X, ChevronLeft,
-  User, Clock, Circle, CheckCheck,
+  Circle, CheckCheck,
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { cn } from "../../lib/utils";

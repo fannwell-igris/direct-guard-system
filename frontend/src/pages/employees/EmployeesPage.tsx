@@ -1,4 +1,5 @@
-import { useEffect, useState, FormEvent, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
+import type { FormEvent } from "react";
 import {
   Pencil,
   Camera,
@@ -36,8 +37,8 @@ interface Employee {
   nhimaRegistered: boolean;
   notes: string | null;
   photoFilename: string | null;
-  assignedClient?: { id: string; name: string };
-  assignedSite?: { id: string; siteName: string };
+  assignedClient?: { id: string; name: string } | null;
+  assignedSite?: { id: string; siteName: string } | null;
   _count?: { employeeContracts: number };
 }
 

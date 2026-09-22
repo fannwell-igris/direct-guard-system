@@ -1,4 +1,5 @@
-import { useEffect, useState, FormEvent } from "react";
+import { useEffect, useState } from "react";
+import type { FormEvent } from "react";
 import {
   Plus,
   Pencil,
@@ -8,7 +9,6 @@ import {
   Building2,
   MapPin,
   Calendar,
-  DollarSign,
   FileText,
   CreditCard,
   CheckCircle2,
@@ -231,7 +231,7 @@ export default function InvoicesPage() {
 
   // ─── Scope form sites to form's client ───────────────────────────────────
   useEffect(() => {
-    setFormSites(form_clientId => allSites.filter((s) => !invoiceForm.clientId || s.clientId === invoiceForm.clientId));
+    setFormSites(allSites.filter((s) => !invoiceForm.clientId || s.clientId === invoiceForm.clientId));
     setInvoiceForm((f) => ({ ...f, siteId: "" }));
   }, [invoiceForm.clientId, allSites]);
 

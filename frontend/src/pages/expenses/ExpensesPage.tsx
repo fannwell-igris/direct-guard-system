@@ -1,4 +1,5 @@
-import { useEffect, useState, FormEvent } from "react";
+import { useEffect, useState } from "react";
+import type { FormEvent } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 import {
   Plus,
@@ -82,11 +83,6 @@ function formatMonth(dateStr: string): string {
   return d.toLocaleDateString("en-ZM", { year: "numeric", month: "long" });
 }
 
-/** Returns the current month as "YYYY-MM-01" for the API */
-function thisMonthValue(): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
-}
 
 /** Returns "YYYY-MM" string for an <input type="month"> from a date string */
 function toMonthInput(dateStr: string): string {

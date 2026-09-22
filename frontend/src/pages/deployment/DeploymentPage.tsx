@@ -11,7 +11,7 @@
  * a print-specific style that renders the table cleanly. No extra library needed.
  */
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   FileText, Download, Search, ChevronLeft, ChevronRight,
   RefreshCw, X, ClipboardList,
@@ -19,7 +19,7 @@ import {
 import { useAuth } from "../../contexts/AuthContext";
 import { useToast } from "../../contexts/ToastContext";
 
-const API = "http://localhost:3000/api";
+const API = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
 
 // ─── types ───────────────────────────────────────────────────────────────────
 
@@ -182,7 +182,7 @@ const PAGE_SIZE = 25;
 
 export default function DeploymentPage() {
   const { token } = useAuth();
-  const { showToast } = useToast();
+  const { toast } = useToast();
 
   // Filter state
   const [clientId, setClientId] = useState("");
@@ -252,11 +252,11 @@ export default function DeploymentPage() {
       setEntries(Array.isArray(json.data) ? json.data : []);
       setTotal(json.total ?? 0);
     } catch (err) {
-      showToast({ variant: "error", title: "Failed to load deployment records", message: String(err) });
+      toast("error", "Failed to load deployment records", String(err));
     } finally {
       setLoading(false);
     }
-  }, [token, clientId, siteId, dateFrom, dateTo, statusFilter, page, headers, showToast]);
+  }, [token, clientId, siteId, dateFrom, dateTo, statusFilter, page, headers, toast]);
 
   useEffect(() => { fetchEntries(); }, [fetchEntries]);
 
@@ -294,12 +294,12 @@ export default function DeploymentPage() {
       const json: PaginatedResponse = await res.json();
       const all = Array.isArray(json.data) ? json.data : [];
       if (all.length === 0) {
-        showToast({ variant: "warning", title: "No records to export", message: "Adjust your filters and try again." });
+        toast("warning", "No records to export", "Adjust your filters and try again.");
         return;
       }
       printDeploymentReport(all, { clientName, siteName, dateFrom, dateTo, status: statusFilter });
     } catch (err) {
-      showToast({ variant: "error", title: "Export failed", message: String(err) });
+      toast("error", "Export failed", String(err));
     } finally {
       setExporting(false);
     }

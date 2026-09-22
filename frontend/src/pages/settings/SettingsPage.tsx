@@ -1,4 +1,5 @@
-import { useEffect, useState, FormEvent } from "react";
+import { useEffect, useState } from "react";
+import type { FormEvent } from "react";
 import {
   Settings, Clock, Gift, Minus, ShieldCheck, Plus, ToggleLeft, ToggleRight,
 } from "lucide-react";

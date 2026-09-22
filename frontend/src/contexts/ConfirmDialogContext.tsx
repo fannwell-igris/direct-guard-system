@@ -4,8 +4,8 @@ import {
   useState,
   useCallback,
   useRef,
-  ReactNode,
 } from "react";
+import type { ReactNode } from "react";
 import { CheckCircle, AlertTriangle, Info, X } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────────────

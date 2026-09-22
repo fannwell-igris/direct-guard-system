@@ -107,6 +107,11 @@ export default function AlertsPage() {
                 <AlertCircle size={13} /> {criticalCount} critical
               </span>
             )}
+            {highCount > 0 && (
+              <span className="ml-2 inline-flex items-center gap-1 text-orange-700 font-medium">
+                <AlertTriangle size={13} /> {highCount} high
+              </span>
+            )}
           </p>
         </div>
         <button

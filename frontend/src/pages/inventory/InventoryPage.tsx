@@ -1,4 +1,5 @@
-import { useEffect, useState, FormEvent } from "react";
+import { useEffect, useState } from "react";
+import type { FormEvent } from "react";
 import api from "../../api/client";
 
 interface Employee { id: string; fullName: string; }
@@ -45,7 +46,7 @@ const EQUIPMENT_CATS = ["equipment", "baton", "taser", "radio", "torch", "handcu
 
 type TabKey = "company" | "personal" | "consumable" | "uniform" | "equipment";
 
-function getItemTab(item: InventoryItem): TabKey {
+function getItemTab(item: Pick<InventoryItem, "category" | "itemType">): TabKey {
   if (item.itemType === "CONSUMABLE") return "consumable";
   const cat = item.category.toLowerCase();
   if (UNIFORM_CATS.some((u) => cat.includes(u))) return "uniform";
@@ -180,7 +181,7 @@ export default function InventoryPage() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault(); setFormError(null); setIsSaving(true);
-    const isCompany = getItemTab({ ...EMPTY_FORM, category: form.category, itemType: form.itemType as any } as InventoryItem) === "company";
+    const isCompany = getItemTab({ category: form.category, itemType: form.itemType as InventoryItem["itemType"] }) === "company";
     const payload: Record<string, unknown> = {
       name: form.name.trim(), category: form.category.trim(), itemType: form.itemType,
       condition: form.condition, canTakeHome: isCompany ? false : form.canTakeHome,

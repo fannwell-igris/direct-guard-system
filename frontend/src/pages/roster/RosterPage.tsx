@@ -1,4 +1,5 @@
-import { useEffect, useState, useMemo, FormEvent } from "react";
+import { useEffect, useState, useMemo } from "react";
+import type { FormEvent } from "react";
 import { Pencil, X, Calendar } from "lucide-react";
 import api from "../../api/client";
 
