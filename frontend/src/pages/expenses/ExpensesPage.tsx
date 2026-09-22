@@ -52,7 +52,7 @@ interface Pagination {
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const API = "http://localhost:3000/api";
+const API = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
 const PAGE_SIZE = 20;
 
 // Suggested categories — user can type their own since it's free text on backend
