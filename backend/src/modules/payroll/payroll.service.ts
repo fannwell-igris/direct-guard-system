@@ -1,3 +1,4 @@
+import { PayrollStatus } from "@prisma/client";
 import { prisma } from "../../lib/prisma";
 import { ApiError } from "../../middleware/errorHandler";
 import { calculateShiftPay } from "../../lib/shiftPayCalculator";
@@ -305,7 +306,7 @@ export async function createPayrollRun(input: PayrollRunCreateInput) {
 export async function listPayrollRuns(query: PayrollRunListQuery) {
   return prisma.payrollRun.findMany({
     where: {
-      ...(query.status ? { status: query.status } : {}),
+      ...(query.status ? { status: query.status as PayrollStatus } : {}),
       ...(query.clientId ? { clientId: query.clientId } : {}),
       ...(query.siteId ? { siteId: query.siteId } : {}),
     },
@@ -706,7 +707,7 @@ export async function getPayslip(payslipId: string) {
     where: { id: payslipId },
     include: {
       employee: { select: { id: true, fullName: true, position: true } },
-      payrollRun: { select: { id: true, period: true, status: true, scope: true } },
+      payrollRun: { select: { id: true, period: true, status: true, clientId: true, siteId: true } },
       lineItem: {
         include: {
           allowances: { include: { allowanceType: { select: { name: true } } } },

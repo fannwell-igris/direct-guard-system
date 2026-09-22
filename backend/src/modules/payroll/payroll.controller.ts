@@ -1,3 +1,4 @@
+import { Request, Response } from "express";
 import { asyncHandler, ApiError } from "../../middleware/errorHandler";
 import * as service from "./payroll.service";
 import {

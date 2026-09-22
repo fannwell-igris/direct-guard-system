@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "../../lib/prisma";
 import { ApiError } from "../../middleware/errorHandler";
 import { SETTINGS_DEFAULTS, VALID_SECTIONS } from "./settings.defaults";
@@ -51,8 +52,8 @@ export async function updateSection(
 
   await prisma.systemSetting.upsert({
     where: { section },
-    create: { section, value: merged, updatedBy },
-    update: { value: merged, updatedBy },
+    create: { section, value: merged as Prisma.InputJsonValue, updatedBy },
+    update: { value: merged as Prisma.InputJsonValue, updatedBy },
   });
 
   // Return the full merged result (defaults + saved)

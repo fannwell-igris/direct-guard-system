@@ -7,7 +7,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import { prisma } from "./lib/prisma";
 import clientsRoutes from "./modules/clients/clients.routes";
-import sitesRoutes from "./modules/sites/sites.routes";
+import sitesRoutes from "./modules/Sites/sites.routes";
 import siteCoverageRoutes from "./modules/site-coverage/site-coverage.routes";
 import employeesRoutes from "./modules/employees/employees.routes";
 import clientContractsRoutes from "./modules/client-contracts/client-contracts.routes";

@@ -24,27 +24,18 @@ function withEffectiveStatus<T extends { status: TaskStatus; dueDate: Date | nul
 }
 
 /**
- * Creates a task, and logs the initial status (oldStatus: null -> OPEN)
- * as the first TaskStatusHistory row - per the user's 2026-09-16 decision
- * (Option B: status updates stay informal, but every change - including
- * the initial one - gets logged with who/when for monthly "who
- * accomplishes tasks" reporting).
+ * Creates a task. New tasks always start at the schema default (OPEN) -
+ * per-status audit history (who/when moved a task through which status)
+ * isn't tracked yet; that needs its own model/migration before it can be
+ * logged. `changedBy` is accepted for API-shape compatibility but unused
+ * until that lands.
  */
-export async function createTask(input: TaskCreateInput, changedBy: string) {
+export async function createTask(input: TaskCreateInput, _changedBy: string) {
   if (input.departmentId) await ensureDepartmentExists(input.departmentId);
   if (input.assignedToEmployeeId) await ensureEmployeeExists(input.assignedToEmployeeId);
 
   const task = await prisma.task.create({
-    data: {
-      ...input,
-      statusHistory: {
-        create: {
-          oldStatus: null,
-          newStatus: input.status ?? "OPEN",
-          changedBy,
-        },
-      },
-    },
+    data: { ...input },
   });
   return withEffectiveStatus(task);
 }
@@ -110,7 +101,6 @@ export async function getTaskById(id: string) {
     include: {
       department: { select: { id: true, name: true } },
       assignedToEmployee: { select: { id: true, fullName: true, position: true } },
-      statusHistory: { orderBy: { changedAt: "desc" } },
     },
   });
   if (!task) throw ApiError.notFound(`Task ${id} not found.`);
@@ -118,18 +108,16 @@ export async function getTaskById(id: string) {
 }
 
 /**
- * Updates a task. If `status` is part of the update and differs from the
- * current stored status, writes a TaskStatusHistory row (oldStatus ->
- * newStatus, changedBy, optional note - e.g. "marked done on their
- * behalf, confirmed via phone", per the override case the user
- * described). Non-status field edits (title, description, etc.) don't
- * create a history row - this log is specifically for status changes.
+ * Updates a task. `changedBy`/`statusChangeNote` are accepted for API-shape
+ * compatibility but unused - per-status audit history (who/when moved a
+ * task through which status, with an optional note) isn't tracked yet;
+ * that needs its own model/migration before it can be logged.
  */
 export async function updateTask(
   id: string,
   input: TaskUpdateInput,
-  changedBy: string,
-  statusChangeNote?: string | null
+  _changedBy: string,
+  _statusChangeNote?: string | null
 ) {
   const existing = await prisma.task.findUnique({ where: { id } });
   if (!existing) throw ApiError.notFound(`Task ${id} not found.`);
@@ -137,23 +125,9 @@ export async function updateTask(
   if (input.departmentId) await ensureDepartmentExists(input.departmentId);
   if (input.assignedToEmployeeId) await ensureEmployeeExists(input.assignedToEmployeeId);
 
-  const isStatusChange = input.status !== undefined && input.status !== existing.status;
-
   const task = await prisma.task.update({
     where: { id },
-    data: {
-      ...input,
-      ...(isStatusChange && {
-        statusHistory: {
-          create: {
-            oldStatus: existing.status,
-            newStatus: input.status!,
-            changedBy,
-            note: statusChangeNote ?? null,
-          },
-        },
-      }),
-    },
+    data: { ...input },
   });
   return withEffectiveStatus(task);
 }
