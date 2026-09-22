@@ -1,0 +1,210 @@
+@import "tailwindcss";
+
+/*
+ * Magen Security brand colors - REAL values, extracted directly from the
+ * actual logo file (Management_system_UI.svg, provided 2026-09-15),
+ * replacing the earlier hand-estimated approximation. The logo uses 4
+ * near-identical greens (#08A94B, #08A94C, #09AA4C, #0AAB4B) - close
+ * enough to be a single intended brand green with minor render variance;
+ * standardized here to one value (#09AA4C, roughly their average).
+ */
+@theme {
+  --color-magen-navy: #003770;
+  --color-magen-navy-light: #0a4a8f;
+  --color-magen-green: #09aa4c;
+  --color-magen-green-dark: #077a37;
+  --color-magen-green-light: #e7f7ed;
+}
+
+/* ── Page transition ─────────────────────────────────────────────────────── */
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: scale(0.985) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.page-transition {
+  /* fill-mode intentionally left at its default ("none") so the transform
+     this animation applies is fully released once it finishes — a lingering
+     transform (or `will-change: transform`) on this wrapper would make any
+     `position: fixed` element rendered inside it (modals, popups) position
+     itself relative to this div instead of the real viewport, clipping it
+     and breaking its backdrop blur. Do not add "forwards"/"both" or
+     `will-change: transform` back here without portaling modals instead. */
+  animation: page-in 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-transition {
+    animation: none;
+  }
+}
+
+/* ── Toast slide-in ──────────────────────────────────────────────────────── */
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(24px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+.animate-fade-in {
+  animation: toast-in 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ── Modal popup (overlay + pop-in card) ─────────────────────────────────── */
+@keyframes modal-backdrop-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes modal-card-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92) translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(2px);
+  animation: modal-backdrop-in 180ms ease-out both;
+}
+
+.modal-card {
+  width: 100%;
+  background: #fff;
+  border-radius: 1rem;
+  box-shadow: 0 20px 60px -10px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(0, 0, 0, 0.04);
+  animation: modal-card-in 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: 40ms;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modal-overlay,
+  .modal-card {
+    animation: none;
+  }
+}
+
+/*
+ * Global visual distinction layer
+ * --------------------------------
+ * The page background is gray-50. Cards, panels, and tables are white.
+ * Without a shadow or border, white-on-white elements are invisible.
+ * These @layer component rules add a consistent lifted look to every
+ * white surface and a clear outline to every interactive control.
+ */
+@layer components {
+
+  /* --- Cards / panels --- */
+  .card {
+    @apply bg-white border border-gray-200 rounded-xl shadow-sm;
+  }
+
+  /* --- Buttons --- */
+  /* Primary: scale down on press, smooth shadow lift on hover */
+  .btn-primary {
+    @apply inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium
+           bg-magen-green text-white shadow-sm
+           hover:bg-magen-green-dark hover:shadow-md
+           active:scale-[0.96] active:shadow-sm
+           disabled:opacity-50 disabled:cursor-not-allowed
+           transition-all duration-150 ease-out;
+  }
+
+  /* Secondary: subtle press, border darkens on hover */
+  .btn-secondary {
+    @apply inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium
+           bg-white text-gray-700 border border-gray-300 shadow-sm
+           hover:bg-gray-50 hover:border-gray-400 hover:shadow
+           active:scale-[0.96] active:shadow-none
+           disabled:opacity-50 disabled:cursor-not-allowed
+           transition-all duration-150 ease-out;
+  }
+
+  /* Danger button */
+  .btn-danger {
+    @apply inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium
+           bg-red-600 text-white shadow-sm
+           hover:bg-red-700 hover:shadow-md
+           active:scale-[0.96] active:shadow-sm
+           disabled:opacity-50 disabled:cursor-not-allowed
+           transition-all duration-150 ease-out;
+  }
+
+  /* --- Form controls --- */
+  /* Focus ring animates in with a gentle scale — defined via ring-offset and
+     transition so it doesn't jump, just blooms into place */
+  .input {
+    @apply w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm
+           text-gray-900 shadow-sm placeholder:text-gray-400
+           focus:border-magen-green focus:ring-2 focus:ring-magen-green/20 focus:outline-none
+           disabled:bg-gray-50 disabled:text-gray-400
+           transition-shadow duration-150;
+  }
+
+  .select {
+    @apply w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm
+           text-gray-900 shadow-sm
+           focus:border-magen-green focus:ring-2 focus:ring-magen-green/20 focus:outline-none
+           disabled:bg-gray-50 disabled:text-gray-400
+           transition-shadow duration-150;
+  }
+
+  /* --- Tables --- */
+  .table-container {
+    @apply rounded-xl border border-gray-200 overflow-hidden shadow-sm;
+  }
+
+  .table-container table thead {
+    @apply bg-gray-50;
+  }
+
+  .table-container table thead th {
+    @apply px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide;
+  }
+
+  .table-container table tbody tr {
+    @apply border-t border-gray-100 hover:bg-gray-50 transition-colors duration-100;
+  }
+
+  .table-container table tbody td {
+    @apply px-4 py-3 text-sm text-gray-700;
+  }
+
+  /* --- Page section header --- */
+  .page-header {
+    @apply flex items-center justify-between mb-6;
+  }
+
+  .page-title {
+    @apply text-2xl font-semibold text-gray-900;
+  }
+
+  .page-subtitle {
+    @apply text-sm text-gray-500 mt-1;
+  }
+}

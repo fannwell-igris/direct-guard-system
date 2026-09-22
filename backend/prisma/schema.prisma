@@ -1,0 +1,1271 @@
+// Company Management & Tracking System
+// Database schema
+// Covers: Clients, Sites, Employees, Contracts (Client + Employee),
+// Invoices, Payments, Operational Costs, the Payroll schema (models only —
+// Payroll API/frontend NOT YET BUILT), and Phase 1 Operations models
+// (Shift Types, Site Requirements, Roster) — see PROJECT_HANDOFF.md.
+// NOT yet included: Users & Permissions, Audit Log (non-payroll), Alerts
+// config, Settings. These are deferred to a later module per the
+// module-by-module build rule.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
+}
+
+// ---------- ENUMS ----------
+
+enum RecordStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum ContractStatus {
+  ACTIVE
+  EXPIRING_SOON
+  EXPIRED
+  INACTIVE
+}
+
+enum EmploymentStatus {
+  ACTIVE
+  INACTIVE
+  TERMINATED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum BillingFrequency {
+  MONTHLY
+  QUARTERLY
+  ANNUALLY
+  ONE_OFF
+}
+
+enum PayrollStatus {
+  DRAFT
+  REVIEWED
+  FINALIZED
+  PAID
+}
+
+enum PayrollPaymentStatus {
+  PENDING
+  PAID
+}
+
+// PERCENTAGE: rate is a fraction (e.g. 0.05 = 5%) applied to relevant pay.
+// FIXED: rate is a flat currency amount.
+// BRACKETED: progressive/tiered rule (e.g. PAYE); the `config` JSON field on
+// StatutoryRule holds the bracket definitions. Kept generic so a rate-table
+// engine can be built later without another schema change.
+enum StatutoryRuleType {
+  PERCENTAGE
+  FIXED
+  BRACKETED
+}
+
+// How an employee's contract compensates them. Determines which fields on
+// EmployeeContract / PayrollLineItem are used — see those models below.
+// Security officers are paid per shift/day, NOT per hour: there is
+// deliberately no hourly-rate or overtime-hours concept anywhere in this
+// schema for SHIFT-paid employees.
+enum PayType {
+  SHIFT
+  MONTHLY
+}
+
+// SCHEDULED: normal roster entry. CANCELLED: the shift was removed from the
+// roster after being scheduled (e.g. site closed that day) — kept instead
+// of deleting the row, so the roster history isn't silently rewritten.
+enum RosterEntryStatus {
+  SCHEDULED
+  CANCELLED
+}
+
+// Review workflow for a daily OperationsRecord (Section 3/19 of the
+// 2026-09-10 scope document — operations staff submit, a reviewer
+// approves/rejects, same shape as the Payroll Draft->Reviewed workflow).
+enum OperationsReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// Per-employee, per-shift attendance outcome (Section 6 of the 2026-09-10
+// scope document). Deliberately does NOT include an "unpaid"/"paid"
+// concept here — payroll treatment of each status is a configurable
+// company rule (Section 6: "Do not automatically assume every absence is
+// unpaid"), decided in the Payroll module, not baked into this enum.
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LEAVE
+  APPROVED_ABSENCE
+  REPLACEMENT
+  EXTRA_SHIFT
+  OTHER
+}
+
+enum Priority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+  CRITICAL
+}
+
+enum TaskStatus {
+  OPEN
+  IN_PROGRESS
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+  OVERDUE
+}
+
+enum DepartmentRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  FULFILLED
+}
+// ---------- CORE MODELS ----------
+
+model Client {
+  id          String   @id @default(uuid())
+  name        String
+  location    String?
+  phone       String?
+  email       String?
+  address     String?
+  notes       String?
+  status      RecordStatus @default(ACTIVE)
+  dateAdded   DateTime @default(now())
+  lastUpdated DateTime @updatedAt
+
+  sites             Site[]
+  employees         Employee[]
+  clientContracts   ClientContract[]
+  invoices          Invoice[]
+  payments          Payment[]
+   operationalCosts  OperationalCost[]
+  payrollRuns       PayrollRun[]
+  rosterEntries     RosterEntry[]
+  operationsRecords OperationsRecord[]
+
+  @@map("clients")
+}
+
+model Site {
+  id          String   @id @default(uuid())
+  clientId    String
+  client      Client   @relation(fields: [clientId], references: [id], onDelete: Restrict)
+    siteCoverage  SiteCoverage[]
+
+  siteName    String
+  location    String?
+  status      RecordStatus @default(ACTIVE)
+  notes       String?
+  dateAdded   DateTime @default(now())
+  lastUpdated DateTime @updatedAt
+
+  employees         Employee[]
+  clientContracts   ClientContract[]
+  invoices          Invoice[]
+  operationalCosts  OperationalCost[]
+  inventoryItems    InventoryItem[]
+  payrollRuns       PayrollRun[]
+  siteRequirements  SiteRequirement[]
+  rosterEntries     RosterEntry[]
+  operationsRecords OperationsRecord[]
+
+  @@map("sites")
+}
+
+model Employee {
+  id                String   @id @default(uuid())
+  fullName          String
+  // Human-facing staff/payroll reference number (e.g. "MSL0043"), as printed
+  // on payslips. Free-text, not auto-formatted — the four group companies
+  // use different prefixes (Magen Security, Direct Guard, Cheetah Logistics,
+  // Ancient Builders), so no single scheme is enforced here. Optional
+  // because existing employees won't have one until assigned.
+  employeeNumber    String?  @unique
+  position          String?
+  phone             String?
+  salary            Decimal? @db.Decimal(12, 2)
+
+  // Filename only (e.g. "3f2a...-1726400000000.jpg"), NOT the file bytes
+  // and NOT a full path - the actual file lives on disk under
+  // backend/uploads/employee-photos/, served through the authenticated
+  // GET /api/employees/:id/photo endpoint rather than a public static
+  // folder, so it inherits the same Employees permission rule as
+  // everything else (see middleware/permissions.ts). Added 2026-09-15.
+  photoFilename     String?
+
+  contractStartDate DateTime?
+  contractEndDate   DateTime?
+
+  assignedClientId  String?
+  assignedClient    Client?  @relation(fields: [assignedClientId], references: [id], onDelete: SetNull)
+  departmentId      String?
+  department        Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+
+  assignedSiteId    String?
+  assignedSite      Site?    @relation(fields: [assignedSiteId], references: [id], onDelete: SetNull)
+
+  employmentStatus  EmploymentStatus @default(ACTIVE)
+
+  // Statutory registration flags, informed by a real wage-bill example
+  // (2026-09-10) — NAPSA/NHIMA deductions only apply to registered
+  // employees ("Y reg. only" per that sheet). Person-level attributes,
+  // not contract-level — registration status doesn't change per contract.
+  napsaRegistered   Boolean  @default(false)
+  nhimaRegistered   Boolean  @default(false)
+
+  notes             String?
+  dateAdded         DateTime @default(now())
+  lastUpdated       DateTime @updatedAt
+
+  employeeContracts EmployeeContract[]
+  payrollLineItems  PayrollLineItem[]
+  rosterEntries     RosterEntry[]
+  attendanceRecords AttendanceRecord[] @relation("AttendanceRecordEmployee")
+  replacementFor    AttendanceRecord[] @relation("AttendanceRecordReplacementFor")
+    payrollProfile  EmployeePayrollProfile?
+  salaryAdvances  SalaryAdvance[]
+  employeeLoans   EmployeeLoan[]
+  payslipRecords  PayslipRecord[]
+
+  tasks             Task[]
+    inventoryItems       InventoryItem[]
+  stockMovementsIssued StockMovement[]
+  takeHomeLogs         ItemTakeHomeLog[]
+
+  // Back-relation for the optional User.employeeId link (RBAC row-level
+  // filtering). Optional 1:1 - most Employees will NOT have a User account.
+  user                 User?
+  @@map("employees")
+}
+
+model ClientContract {
+  id            String   @id @default(uuid())
+  clientId      String
+  client        Client   @relation(fields: [clientId], references: [id], onDelete: Restrict)
+
+  siteId        String?
+  site          Site?    @relation(fields: [siteId], references: [id], onDelete: SetNull)
+
+  startDate     DateTime
+  endDate       DateTime
+  amount        Decimal  @db.Decimal(12, 2)
+  billingFrequency BillingFrequency @default(MONTHLY)
+
+  // Status is calculated by the application layer from startDate/endDate
+  // and configurable thresholds (see Settings, not yet built). Stored here
+  // as a cached value so it can be indexed/queried efficiently.
+  status        ContractStatus @default(ACTIVE)
+
+  notes         String?
+  dateCreated   DateTime @default(now())
+  lastUpdated   DateTime @updatedAt
+
+  @@map("client_contracts")
+}
+
+model EmployeeContract {
+  id            String   @id @default(uuid())
+  employeeId    String
+  employee      Employee @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+
+  startDate     DateTime
+  endDate       DateTime
+
+  // How this contract pays the employee. Validation (in the application
+  // layer, not the DB) enforces: MONTHLY requires `salary`; SHIFT requires
+  // `shiftRate` (and treats `extraShiftRate` as optional, defaulting to
+  // `shiftRate` when null). Deliberately no hourly-rate field anywhere.
+  payType        PayType  @default(MONTHLY)
+  salary         Decimal? @db.Decimal(12, 2) // required when payType = MONTHLY
+  shiftRate      Decimal? @db.Decimal(12, 2) // required when payType = SHIFT
+  extraShiftRate Decimal? @db.Decimal(12, 2) // optional override; defaults to shiftRate
+
+  status        ContractStatus @default(ACTIVE)
+
+  notes         String?
+  dateCreated   DateTime @default(now())
+  lastUpdated   DateTime @updatedAt
+
+  payrollLineItems PayrollLineItem[]
+
+  @@map("employee_contracts")
+}
+
+model Invoice {
+  id             String   @id @default(uuid())
+  invoiceNumber  String   @unique
+
+  clientId       String
+  client         Client   @relation(fields: [clientId], references: [id], onDelete: Restrict)
+
+  siteId         String?
+  site           Site?    @relation(fields: [siteId], references: [id], onDelete: SetNull)
+
+  invoiceDate    DateTime
+  billingPeriod  String?
+  dueDate        DateTime
+
+  amount         Decimal  @db.Decimal(12, 2)
+
+  // amountPaid and outstandingBalance are derived from the related Payments
+  // and should be recalculated by the application layer whenever a payment
+  // is recorded/edited/deleted. Cached here for fast reads/reporting.
+  amountPaid          Decimal @default(0) @db.Decimal(12, 2)
+  outstandingBalance  Decimal @db.Decimal(12, 2)
+
+  status         InvoiceStatus @default(DRAFT)
+  notes          String?
+  dateCreated    DateTime @default(now())
+  lastUpdated    DateTime @updatedAt
+
+  payments       Payment[]
+
+  @@map("invoices")
+}
+
+model Payment {
+  id            String   @id @default(uuid())
+
+  invoiceId     String
+  invoice       Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+
+  clientId      String
+  client        Client   @relation(fields: [clientId], references: [id], onDelete: Restrict)
+
+  paymentDate   DateTime
+  amount        Decimal  @db.Decimal(12, 2)
+  paymentMethod String?
+  reference     String?
+  notes         String?
+  dateCreated   DateTime @default(now())
+
+  @@map("payments")
+}
+
+model OperationalCost {
+  id           String   @id @default(uuid())
+
+  clientId     String
+  client       Client   @relation(fields: [clientId], references: [id], onDelete: Restrict)
+
+  siteId       String
+  site         Site     @relation(fields: [siteId], references: [id], onDelete: Restrict)
+
+  month        DateTime // stored as the 1st day of the relevant month
+  costCategory String   // free text for now; move to a lookup table when Settings module is built
+  amount       Decimal  @db.Decimal(12, 2)
+  description  String?
+  date         DateTime @default(now())
+  notes        String?
+
+  @@map("operational_costs")
+}
+
+// ---------- PAYROLL MODELS ----------
+// Added to the schema ahead of the Payroll API/frontend so the Employee and
+// EmployeeContract models don't need to be re-shaped later. NOT YET BUILT —
+// see PROJECT_HANDOFF.md "Not Yet Built". Build order: this module depends
+// on Employees existing as a working API, so it comes after Employees, not
+// necessarily after every other module.
+//
+// Design notes:
+// - PayrollLineItem is a SNAPSHOT of an employee's pay for one month, not a
+//   live join against Employee/EmployeeContract. If an employee's salary
+//   changes next month, past payroll runs must NOT change retroactively.
+// - Allowances/deductions are itemized in their own tables (rather than one
+//   JSON blob) so the "Deductions" and per-type breakdowns in the Excel
+//   workbook/reports can be queried directly.
+// - Statutory rates (PAYE/NAPSA/NHIMA) are configurable via StatutoryRule
+//   rather than hard-coded, per the "rules engine" requirement — the
+//   `config` JSON field allows a bracketed/progressive rule (like PAYE)
+//   without needing a schema change if brackets are added later.
+// - clientId/siteId on PayrollRun are optional: a payroll run can be
+//   company-wide, or scoped to a single client/site for wage-cost-vs-margin
+//   reporting. The app layer (not a DB constraint) should prevent creating
+//   two runs for the same period + client + site combination, consistent
+//   with this project's "validation done by hand" decision.
+// - Shift-based pay fields (below) are all optional and only populated for
+//   SHIFT-paid employees. `basicSalary` still holds the base pay figure for
+//   both pay types (salary for MONTHLY, computed normal-shift pay for
+//   SHIFT) so no existing field had to be made nullable. The pre-existing
+//   `overtime` field is never used for SHIFT employees — extra-shift pay is
+//   tracked separately in `extraShiftPay`, per the "no overtime hours"
+//   business rule.
+
+model AllowanceType {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  isActive    Boolean  @default(true)
+  dateCreated DateTime @default(now())
+  lastUpdated DateTime @updatedAt
+
+  allowances  PayrollAllowance[]
+
+  @@map("allowance_types")
+}
+
+model DeductionType {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  isActive    Boolean  @default(true)
+  dateCreated DateTime @default(now())
+  lastUpdated DateTime @updatedAt
+
+  deductions  PayrollDeduction[]
+  statutoryRules StatutoryRule[]
+
+  @@map("deduction_types")
+}
+
+// Configurable statutory contribution rules (PAYE, NAPSA, NHIMA, or any
+// future statutory requirement) with an effective date range, so a rate
+// change doesn't overwrite the rate that applied to already-finalized
+// payroll runs.
+model StatutoryRule {
+  id            String            @id @default(uuid())
+  name          String            // e.g. "NAPSA", "NHIMA", "PAYE"
+  description   String?
+  ruleType      StatutoryRuleType
+
+  // Which DeductionType this rule posts amounts against when applied to a
+  // payroll run. Also used by the eligibility check (isEligibleForRule) to
+  // identify NAPSA/NHIMA rules by their linked DeductionType's name, since
+  // there's no separate category enum here.
+  deductionTypeId String
+  deductionType   DeductionType @relation(fields: [deductionTypeId], references: [id], onDelete: Restrict)
+
+  // Used when ruleType is PERCENTAGE or FIXED. Null when BRACKETED (use
+  // `config` instead). Percentage stored as a fraction (0.05 = 5%).
+  employeeRate  Decimal? @db.Decimal(9, 6)
+  employerRate  Decimal? @db.Decimal(9, 6)
+
+  // Bracket/tier definitions for BRACKETED rules (e.g. PAYE tax bands).
+  // Left as freeform JSON so bracket structure can evolve without a
+  // migration; the calculation engine that reads this is part of the
+  // (not yet built) Payroll module, not the schema.
+  config        Json?
+
+  effectiveFrom DateTime
+  effectiveTo   DateTime?
+  isActive      Boolean  @default(true)
+  notes         String?
+  dateCreated   DateTime @default(now())
+  lastUpdated   DateTime @updatedAt
+
+  @@map("statutory_rules")
+}
+
+model PayrollRun {
+  id       String   @id @default(uuid())
+
+  // Stored as the 1st day of the relevant month, matching the convention
+  // already used by OperationalCost.month.
+  period   DateTime
+
+  clientId String?
+  client   Client?  @relation(fields: [clientId], references: [id], onDelete: SetNull)
+
+  siteId   String?
+  site     Site?    @relation(fields: [siteId], references: [id], onDelete: SetNull)
+
+  status   PayrollStatus @default(DRAFT)
+
+  // Cached totals recalculated by the application layer whenever a line
+  // item changes, same pattern as Invoice.amountPaid/outstandingBalance.
+  totalGrossPay      Decimal @default(0) @db.Decimal(14, 2)
+  totalDeductions    Decimal @default(0) @db.Decimal(14, 2)
+  totalNetPay        Decimal @default(0) @db.Decimal(14, 2)
+
+  // Who did what, for the Draft -> Reviewed -> Finalized -> Paid trail.
+  // Free-text user identifier for now since Users & Permissions doesn't
+  // exist yet; revisit as a proper relation once that module is built.
+  createdBy    String?
+  reviewedBy   String?
+  finalizedBy  String?
+  paidBy       String?
+
+  reviewedAt   DateTime?
+  finalizedAt  DateTime?
+  paidAt       DateTime?
+
+  notes        String?
+  dateCreated  DateTime @default(now())
+  lastUpdated  DateTime @updatedAt
+
+  lineItems    PayrollLineItem[]
+  auditLogs    PayrollAuditLog[]
+  payslipRecords  PayslipRecord[]
+
+  @@map("payroll_runs")
+}
+
+model PayrollLineItem {
+  id               String   @id @default(uuid())
+  payslipRecord   PayslipRecord?
+
+  payrollRunId     String
+  payrollRun       PayrollRun @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
+
+  employeeId       String
+  // Restrict, not Cascade: an employee with payroll history can't be
+  // hard-deleted, consistent with the project's financial-history rule
+  // (Section 19) already applied to EmployeeContract/Invoice/Payment.
+  employee         Employee @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+
+  // Which contract the salary/rate snapshot was sourced from, kept for
+  // traceability. Optional + SetNull because the contract itself may later
+  // be edited/superseded without invalidating this historical line item.
+  employeeContractId String?
+  employeeContract    EmployeeContract? @relation(fields: [employeeContractId], references: [id], onDelete: SetNull)
+
+  // Snapshotted at the time the run is generated, so a later name/position
+  // change on the Employee record doesn't rewrite historical payslips.
+  fullNameSnapshot String
+  positionSnapshot String?
+
+  // Base pay for the period: the salary snapshot for MONTHLY employees, or
+  // the computed normal-shift pay (shiftsScheduled × shiftRate) for SHIFT
+  // employees. Always populated regardless of payType.
+  basicSalary      Decimal @db.Decimal(12, 2)
+  // Never used for SHIFT employees — kept only for MONTHLY employees who
+  // may have a legitimate hourly-overtime arrangement. Extra shifts for
+  // SHIFT employees use extraShiftPay below instead.
+  overtime         Decimal @default(0) @db.Decimal(12, 2)
+  bonuses          Decimal @default(0) @db.Decimal(12, 2)
+  advances         Decimal @default(0) @db.Decimal(12, 2)
+  otherAdjustments Decimal @default(0) @db.Decimal(12, 2)
+
+  // Cached sums of the related PayrollAllowance / PayrollDeduction rows,
+  // recalculated by the application layer — same cached-total pattern used
+  // elsewhere in this schema (Invoice, PayrollRun).
+  totalAllowances  Decimal @default(0) @db.Decimal(12, 2)
+  totalDeductions  Decimal @default(0) @db.Decimal(12, 2)
+
+  grossPay         Decimal @db.Decimal(12, 2)
+  netPay           Decimal @db.Decimal(12, 2)
+
+  paymentStatus    PayrollPaymentStatus @default(PENDING)
+
+  // ---- Shift-based pay snapshot (SHIFT employees only; all null for MONTHLY) ----
+  payType          PayType? // snapshot of the contract's payType at run time
+  shiftsScheduled  Int?     // from the roster for this pay period
+  shiftsCovered    Int?     // approved worked shifts, from Operations (Phase 3+)
+  shiftsExtra      Int?     // approved extra shifts, from Operations (Phase 3+)
+  shiftRate        Decimal? @db.Decimal(12, 2)
+  extraShiftRate   Decimal? @db.Decimal(12, 2)
+  normalShiftPay   Decimal? @db.Decimal(12, 2) // shiftsScheduled x shiftRate; mirrored into basicSalary
+  extraShiftPay    Decimal? @db.Decimal(12, 2) // shiftsExtra x extraShiftRate; NOT "overtime"
+
+  notes            String?
+  dateCreated      DateTime @default(now())
+  lastUpdated      DateTime @updatedAt
+
+  allowances       PayrollAllowance[]
+  deductions       PayrollDeduction[]
+
+  // One line item per employee per run.
+  @@unique([payrollRunId, employeeId])
+  @@map("payroll_line_items")
+}
+
+model PayrollAllowance {
+  id                String   @id @default(uuid())
+
+  payrollLineItemId String
+  payrollLineItem   PayrollLineItem @relation(fields: [payrollLineItemId], references: [id], onDelete: Cascade)
+
+  allowanceTypeId   String
+  allowanceType     AllowanceType @relation(fields: [allowanceTypeId], references: [id], onDelete: Restrict)
+
+  amount            Decimal @db.Decimal(12, 2)
+  notes             String?
+
+  @@map("payroll_allowances")
+}
+
+model PayrollDeduction {
+  id                String   @id @default(uuid())
+
+  payrollLineItemId String
+  payrollLineItem   PayrollLineItem @relation(fields: [payrollLineItemId], references: [id], onDelete: Cascade)
+
+  deductionTypeId   String
+  deductionType     DeductionType @relation(fields: [deductionTypeId], references: [id], onDelete: Restrict)
+
+  // True for rows created/updated by POST .../apply-statutory-deductions,
+  // false for anything a human entered by hand via the plain add-deduction
+  // endpoint. Lets the auto-apply action safely update/replace its own
+  // rows on re-run without ever touching a manually-entered deduction of
+  // the same type.
+  isStatutory       Boolean @default(false)
+
+  amount            Decimal @db.Decimal(12, 2)
+  notes             String?
+
+  @@map("payroll_deductions")
+}
+
+// "What was changed, by whom, when" — kept as its own append-only table
+// rather than fields on PayrollRun, since multiple edits can happen before
+// finalization and management may want the full history, not just the
+// latest actor at each stage.
+model PayrollAuditLog {
+  id           String   @id @default(uuid())
+
+  payrollRunId String
+  payrollRun   PayrollRun @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
+
+  action       String   // e.g. "CREATED", "STATUS_CHANGED", "LINE_ITEM_EDITED"
+  performedBy  String
+  performedAt  DateTime @default(now())
+  details      String?  // free-text description of what changed
+
+  @@map("payroll_audit_logs")
+}
+
+// ---------- OPERATIONS MODELS (Phase 1) ----------
+// Phase 1 of the Operations/shift-payroll build: configurable shift types,
+// per-site staffing requirements, and the roster (who is SUPPOSED to work).
+// Daily attendance, coverage calculation, extra-shift recording, and the
+// Operations-to-Payroll connection are Phase 2/3, not built yet — see
+// PROJECT_HANDOFF.md. Building this in small verified phases, same as every
+// other module in this project.
+
+// Configurable, not hard-coded — a site might run Day/Night, or a different
+// arrangement entirely. Same "don't hard-code business categories" approach
+// already used for AllowanceType/DeductionType.
+model ShiftType {
+  id          String   @id @default(uuid())
+  name        String   @unique // "Day", "Night", etc.
+  isActive    Boolean  @default(true)
+  dateCreated DateTime @default(now())
+  lastUpdated DateTime @updatedAt
+
+  siteRequirements SiteRequirement[]
+  rosterEntries    RosterEntry[]
+  operationsRecords OperationsRecord[]
+  siteCoverages    SiteCoverage[]
+
+  @@map("shift_types")
+}
+
+// "How many officers does this site need, for this shift type?" Has an
+// effective date range so a requirement change doesn't rewrite history —
+// same pattern as StatutoryRule.
+model SiteRequirement {
+  id               String    @id @default(uuid())
+
+  siteId           String
+  site             Site      @relation(fields: [siteId], references: [id], onDelete: Restrict)
+
+  shiftTypeId      String
+  shiftType        ShiftType @relation(fields: [shiftTypeId], references: [id], onDelete: Restrict)
+
+  requiredOfficers Int
+
+  effectiveFrom    DateTime  @default(now())
+  effectiveTo      DateTime?
+
+  notes            String?
+  dateCreated      DateTime  @default(now())
+  lastUpdated      DateTime  @updatedAt
+
+  @@map("site_requirements")
+}
+
+// "Who is SUPPOSED to work?" — the roster. Answers a different question
+// than Operations/Attendance (Phase 2), which answers "who ACTUALLY
+// worked?"
+model RosterEntry {
+  id           String   @id @default(uuid())
+
+  employeeId   String
+  employee     Employee @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+
+  siteId       String
+  site         Site     @relation(fields: [siteId], references: [id], onDelete: Restrict)
+
+  // Snapshot, not derived from site.clientId. A site's client assignment
+  // can be reassigned later (the Sites API supports this) — historical
+  // roster entries must not silently show a different client afterward.
+  // Same snapshot principle already used throughout Payroll.
+  clientId     String
+  client       Client   @relation(fields: [clientId], references: [id], onDelete: Restrict)
+
+  date         DateTime
+
+  shiftTypeId  String
+  shiftType    ShiftType @relation(fields: [shiftTypeId], references: [id], onDelete: Restrict)
+
+  status       RosterEntryStatus @default(SCHEDULED)
+
+  notes        String?
+  dateCreated  DateTime @default(now())
+  lastUpdated  DateTime @updatedAt
+
+  attendanceRecords AttendanceRecord[]
+
+  // One roster entry per employee, per site, per date, per shift type.
+  @@unique([employeeId, siteId, date, shiftTypeId])
+  @@map("roster_entries")
+}
+
+// ---------- OPERATIONS MODELS (Phase 3) ----------
+// Phase 3: Daily Operations, Attendance, Coverage. Answers "who ACTUALLY
+// worked?" (as opposed to Roster/Phase 1, which answers "who was SUPPOSED
+// to work?"). See PROJECT_HANDOFF.md "Important Decisions" (2026-09-10)
+// for the design reasoning behind this split.
+//
+// Design principle carried over from ContractStatus: required officers,
+// scheduled officers, officers present/absent/on-leave, and coverage % are
+// NEVER stored directly on these models — they are always CALCULATED by
+// the application layer (required <- SiteRequirement, scheduled <-
+// RosterEntry count, present/absent/etc <- AttendanceRecord counts,
+// coverage % <- present/required). Storing them as separate fields would
+// duplicate data that already exists elsewhere and could silently drift
+// out of sync — the exact "duplicate functionality" the 2026-09-10 scope
+// document's Section 37 warns against.
+
+// One "daily site report" per site + date + shift type. The record itself
+// holds only genuinely new information (issues/incidents/notes/review
+// workflow) — everything else is derived, see comment above.
+model OperationsRecord {
+  id          String   @id @default(uuid())
+
+  siteId      String
+  site        Site     @relation(fields: [siteId], references: [id], onDelete: Restrict)
+
+  // Snapshot of the site's client at creation time — same reasoning as
+  // RosterEntry.clientId (a site can be reassigned to a different client
+  // later; historical operations records must not silently change which
+  // client they show).
+  clientId    String
+  client      Client   @relation(fields: [clientId], references: [id], onDelete: Restrict)
+
+  date        DateTime
+
+  shiftTypeId String
+  shiftType   ShiftType @relation(fields: [shiftTypeId], references: [id], onDelete: Restrict)
+
+  siteIssues        String?
+  incidents         String?
+  operationalReport String?
+  notes             String?
+
+  // Free-text for now, consistent with PayrollRun.reviewedBy — no real
+  // User table yet (see "Important Decisions", 2026-09-10).
+  submittedBy  String?
+
+  reviewStatus OperationsReviewStatus @default(PENDING)
+  reviewedBy   String?
+  reviewedAt   DateTime?
+
+  dateCreated  DateTime @default(now())
+  lastUpdated  DateTime @updatedAt
+
+  attendanceRecords AttendanceRecord[]
+
+  // One operations record per site, per date, per shift type — matches
+  // the same granularity as RosterEntry.
+  @@unique([siteId, date, shiftTypeId])
+  @@map("operations_records")
+}
+
+// Per-employee attendance outcome for one OperationsRecord. Optionally
+// linked to the RosterEntry it corresponds to — nullable because an
+// EXTRA_SHIFT can be an employee who worked WITHOUT being pre-scheduled
+// on the roster at all (walk-in coverage), which must still be recordable.
+model AttendanceRecord {
+  id                 String   @id @default(uuid())
+
+  operationsRecordId String
+  operationsRecord   OperationsRecord @relation(fields: [operationsRecordId], references: [id], onDelete: Cascade)
+
+  employeeId         String
+  employee           Employee @relation("AttendanceRecordEmployee", fields: [employeeId], references: [id], onDelete: Restrict)
+
+  // Null if this attendance wasn't tied to a pre-existing roster entry
+  // (e.g. an unscheduled extra shift). SetNull, not Restrict: the roster
+  // entry itself can still be edited/cancelled independently later
+  // without invalidating the historical attendance record.
+  rosterEntryId      String?
+  rosterEntry        RosterEntry? @relation(fields: [rosterEntryId], references: [id], onDelete: SetNull)
+
+  status             AttendanceStatus
+
+  // Used only when status = REPLACEMENT: which employee this person
+  // covered for. Self-relation to Employee, per Section 39's explicit
+  // "Officer A = Absent, Officer B = Replacement/Worked" test case.
+  replacementForEmployeeId String?
+  replacementForEmployee   Employee? @relation("AttendanceRecordReplacementFor", fields: [replacementForEmployeeId], references: [id], onDelete: SetNull)
+
+  notes              String?
+  dateCreated        DateTime @default(now())
+  lastUpdated        DateTime @updatedAt
+
+  // One attendance record per employee, per operations record.
+  @@unique([operationsRecordId, employeeId])
+  @@map("attendance_records")
+}
+
+// ---------- DEPARTMENT & TASK MODELS ----------
+
+model Department {
+
+  id               String       @id @default(uuid())
+  name             String       @unique
+  description      String?
+  headOfDepartment String?
+  status           RecordStatus @default(ACTIVE)
+  dateCreated      DateTime     @default(now())
+  lastUpdated      DateTime     @updatedAt
+    users  User[]
+
+  employees           Employee[]
+  tasks               Task[]
+  departmentRequests  DepartmentRequest[]
+  generalExpenses     GeneralExpense[]
+    inventoryItems       InventoryItem[]
+  stockMovementsIssued StockMovement[]
+
+  @@map("departments")
+}
+
+model Task {
+  id           String     @id @default(uuid())
+  title        String
+  description  String?
+
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+
+  assignedToEmployeeId String?
+  assignedToEmployee   Employee? @relation(fields: [assignedToEmployeeId], references: [id], onDelete: SetNull)
+
+  assignedBy   String?
+  dueDate      DateTime?
+  priority     Priority   @default(NORMAL)
+  status       TaskStatus @default(OPEN)
+  completedAt  DateTime?
+  notes        String?
+  dateCreated  DateTime   @default(now())
+  lastUpdated  DateTime   @updatedAt
+
+  @@map("tasks")
+}
+
+model SiteCoverage {
+  id            String   @id @default(uuid())
+
+  siteId        String
+  site          Site     @relation(fields: [siteId], references: [id], onDelete: Restrict)
+
+  // One tick per site/date/shift — added 2026-09-21 to replace the earlier
+  // single-tick-per-day design, which had no way to record Day and Night
+  // coverage separately and silently let the second tick of the day
+  // overwrite the first.
+  shiftTypeId   String
+  shiftType     ShiftType @relation(fields: [shiftTypeId], references: [id], onDelete: Restrict)
+
+  date          DateTime
+  isCovered     Boolean  @default(false)
+
+  markedByUserId String?
+  notes         String?
+
+  dateCreated   DateTime @default(now())
+  lastUpdated   DateTime @updatedAt
+
+  @@unique([siteId, date, shiftTypeId])
+  @@map("site_coverage")
+}
+
+model DepartmentRequest {
+  id           String                  @id @default(uuid())
+
+  departmentId String
+  department   Department              @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+
+  title        String
+  description  String?
+  priority     Priority                @default(NORMAL)
+  status       DepartmentRequestStatus @default(PENDING)
+
+  submittedBy   String?
+  reviewedBy    String?
+  reviewedAt    DateTime?
+  estimatedCost Decimal? @db.Decimal(12, 2)
+  notes         String?
+  dateCreated   DateTime @default(now())
+  lastUpdated   DateTime @updatedAt
+
+  generalExpenses GeneralExpense[]
+
+  @@map("department_requests")
+}
+
+model GeneralExpense {
+  id                  String   @id @default(uuid())
+  expenseDate         DateTime
+  category            String
+  amount              Decimal  @db.Decimal(12, 2)
+  description         String?
+
+  departmentId        String?
+  department          Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+
+  departmentRequestId String?
+  departmentRequest   DepartmentRequest? @relation(fields: [departmentRequestId], references: [id], onDelete: SetNull)
+
+  paidBy           String?
+  approvedBy       String?
+  receiptReference String?
+  notes            String?
+  dateCreated      DateTime @default(now())
+  lastUpdated      DateTime @updatedAt
+
+  @@map("general_expenses")
+}// ---------- INVENTORY & ASSETS ----------
+
+enum ItemType {
+  ASSET
+  CONSUMABLE
+}
+
+enum ItemCondition {
+  NEW
+  GOOD
+  FAIR
+  POOR
+  CONDEMNED
+}
+
+enum MovementType {
+  PURCHASE
+  ISSUE
+  WRITE_OFF
+  ADJUSTMENT
+}
+
+enum TakeHomeAction {
+  TAKEN_HOME
+  RETURNED
+}
+
+model InventoryItem {
+  id              String        @id @default(uuid())
+  name            String
+  category        String
+  itemType        ItemType
+  quantity        Int           @default(0)
+  unitOfMeasure   String?
+  condition       ItemCondition @default(GOOD)
+  serialNumber    String?
+  purchaseDate    DateTime?
+  purchasePrice   Decimal?      @db.Decimal(12, 2)
+
+  assignedToEmployeeId   String?
+  assignedToEmployee     Employee?   @relation(fields: [assignedToEmployeeId], references: [id], onDelete: SetNull)
+  assignedToDepartmentId String?
+  assignedToDepartment   Department? @relation(fields: [assignedToDepartmentId], references: [id], onDelete: SetNull)
+  assignedToSiteId       String?
+  assignedToSite         Site?       @relation(fields: [assignedToSiteId], references: [id], onDelete: SetNull)
+  assignedAt             DateTime?
+
+  canTakeHome  Boolean   @default(false)
+  takenHome    Boolean   @default(false)
+  takenHomeAt  DateTime?
+
+  notes       String?
+  status      RecordStatus @default(ACTIVE)
+  dateCreated DateTime     @default(now())
+  lastUpdated DateTime     @updatedAt
+
+  stockMovements   StockMovement[]
+  takeHomeLogs     ItemTakeHomeLog[]
+
+  @@map("inventory_items")
+}
+
+model StockMovement {
+  id              String        @id @default(uuid())
+
+  inventoryItemId String
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Restrict)
+
+  movementType    MovementType
+  quantity        Int
+  movementDate    DateTime
+
+  issuedToDepartmentId String?
+  issuedToDepartment   Department? @relation(fields: [issuedToDepartmentId], references: [id], onDelete: SetNull)
+  issuedToEmployeeId   String?
+  issuedToEmployee     Employee?   @relation(fields: [issuedToEmployeeId], references: [id], onDelete: SetNull)
+
+  reference   String?
+  notes       String?
+  recordedBy  String?
+  dateCreated DateTime @default(now())
+
+  @@map("stock_movements")
+}
+
+model ItemTakeHomeLog {
+  id              String        @id @default(uuid())
+
+  inventoryItemId String
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Restrict)
+
+  employeeId  String?
+  employee    Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+
+  action        TakeHomeAction
+  actionDate    DateTime
+  authorisedBy  String?
+  notes         String?
+  dateCreated   DateTime @default(now())
+
+  @@map("item_take_home_logs")
+}
+
+// ---------- USERS & AUTH (minimal scope — see PROJECT_HANDOFF.md) ----------
+// Role is captured but NOT enforced per-module yet, except for User
+// management itself (ADMIN only). Every other existing route just
+// requires "logged in", nothing more, until real usage informs a
+// proper permission matrix. Existing free-text actor fields elsewhere
+// (PayrollRun.createdBy, OperationsRecord.submittedBy, etc.) are
+// deliberately left as plain strings for now, not migrated to a real
+// User relation — that's a separate, later decision, not bundled into
+// this minimal auth rollout.
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  PAYROLL
+  OPERATIONS
+  STAFF
+  HR
+  MARKETING
+}
+
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String
+  fullName     String
+  role         UserRole  @default(STAFF)
+  isActive     Boolean   @default(true)
+  lastLoginAt  DateTime?
+  dateCreated  DateTime  @default(now())
+  lastUpdated  DateTime  @updatedAt
+  departmentId  String?
+  department    Department? @relation(fields: [departmentId], references: [id])
+
+  // Optional link to a specific Employee record, added for RBAC row-level
+  // filtering ("my tasks", "my roster", future "My Payslips") - NOT every
+  // User maps to an Employee (e.g. an office ADMIN account may not).
+  // @unique because a given Employee should be claimed by at most one
+  // User account.
+  employeeId    String?   @unique
+  employee      Employee? @relation(fields: [employeeId], references: [id])
+
+  @@map("users")
+}
+// ---------- SYSTEM SETTINGS ----------
+
+model SystemSetting {
+  id          String   @id @default(uuid())
+  section     String   @unique
+  value       Json
+  updatedBy   String?
+  dateCreated DateTime @default(now())
+  lastUpdated DateTime @updatedAt
+
+  @@map("system_settings")
+}
+
+// ---------- PAYROLL ENHANCEMENTS ----------
+
+// Extended payroll profile per employee — bank details, statutory IDs,
+// salary history. One record per employee, created on first payroll setup.
+model EmployeePayrollProfile {
+  id         String   @id @default(uuid())
+  employeeId String   @unique
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+
+  // Bank / payment details
+  bankName      String?
+  accountNumber String?
+  branchName    String?
+  mobileMoneyProvider String?
+  mobileMoneyNumber   String?
+  paymentMethod String? // BANK_TRANSFER | MOBILE_MONEY | CASH
+
+  // Statutory IDs
+  tpin        String?
+  napsaNumber String?
+  nhimaNumber String?
+  nrcNumber   String?
+
+  notes       String?
+  dateCreated DateTime @default(now())
+  lastUpdated DateTime @updatedAt
+
+  salaryHistory SalaryHistory[]
+
+  @@map("employee_payroll_profiles")
+}
+
+// Immutable log of every salary change — never updated, only appended.
+model SalaryHistory {
+  id        String   @id @default(uuid())
+  profileId String
+  profile   EmployeePayrollProfile @relation(fields: [profileId], references: [id], onDelete: Restrict)
+
+  previousSalary Decimal? @db.Decimal(12, 2)
+  newSalary      Decimal  @db.Decimal(12, 2)
+  effectiveDate  DateTime
+  reason         String?
+  changedBy      String?  // free-text for now
+  approvedBy     String?
+  dateCreated    DateTime @default(now())
+
+  @@map("salary_history")
+}
+
+// Salary advance — short-term, repaid via monthly payroll deductions.
+model SalaryAdvance {
+  id         String   @id @default(uuid())
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+
+  advanceDate      DateTime
+  amount           Decimal  @db.Decimal(12, 2)
+  reason           String?
+  repaymentMonths  Int      // number of months to repay
+  monthlyDeduction Decimal  @db.Decimal(12, 2)
+  amountRepaid     Decimal  @default(0) @db.Decimal(12, 2)
+  outstandingBalance Decimal @db.Decimal(12, 2) // updated on each deduction
+  status           String   @default("ACTIVE") // ACTIVE | FULLY_REPAID | CANCELLED
+  approvedBy       String?
+  notes            String?
+  dateCreated      DateTime @default(now())
+  lastUpdated      DateTime @updatedAt
+
+  @@map("salary_advances")
+}
+
+// Employee loan — longer-term, structured repayment.
+model EmployeeLoan {
+  id         String   @id @default(uuid())
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+
+  loanAmount       Decimal  @db.Decimal(12, 2)
+  dateIssued       DateTime
+  monthlyRepayment Decimal  @db.Decimal(12, 2)
+  numberOfInstallments Int
+  amountPaid       Decimal  @default(0) @db.Decimal(12, 2)
+  outstandingBalance Decimal @db.Decimal(12, 2)
+  startDate        DateTime
+  endDate          DateTime?
+  status           String   @default("ACTIVE") // ACTIVE | FULLY_REPAID | DEFAULTED | CANCELLED
+  approvedBy       String?
+  notes            String?
+  dateCreated      DateTime @default(now())
+  lastUpdated      DateTime @updatedAt
+
+  @@map("employee_loans")
+}
+
+// Structured payslip record — snapshot of earnings/deductions at run time.
+// Immutable once created — historical payslips never change.
+model PayslipRecord {
+  id            String   @id @default(uuid())
+  payrollRunId  String
+  payrollRun    PayrollRun @relation(fields: [payrollRunId], references: [id], onDelete: Restrict)
+  lineItemId    String   @unique
+  lineItem      PayrollLineItem @relation(fields: [lineItemId], references: [id], onDelete: Restrict)
+  employeeId    String
+  employee      Employee @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+
+  // Snapshot fields — copied at generation time, never recalculated
+  employeeName  String
+  position      String?
+  department    String?
+  period        DateTime
+  payslipNumber String   @unique
+
+  basicSalary   Decimal  @db.Decimal(12, 2)
+  shiftEarnings Decimal  @default(0) @db.Decimal(12, 2)
+  // Per-type breakdown (e.g. [{"name":"Housing Allowance","amount":400}]),
+  // snapshotted at generation time. Json rather than a relation to
+  // AllowanceType so a historical payslip stays accurate even if an
+  // allowance type is later renamed, deactivated, or deleted.
+  allowanceBreakdown Json?
+  allowances    Decimal  @default(0) @db.Decimal(12, 2)
+  overtime      Decimal  @default(0) @db.Decimal(12, 2)
+  bonuses       Decimal  @default(0) @db.Decimal(12, 2)
+  otherEarnings Decimal  @default(0) @db.Decimal(12, 2)
+  grossPay      Decimal  @db.Decimal(12, 2)
+
+  paye          Decimal  @default(0) @db.Decimal(12, 2)
+  napsa         Decimal  @default(0) @db.Decimal(12, 2)
+  nhima         Decimal  @default(0) @db.Decimal(12, 2)
+  loanDeduction Decimal  @default(0) @db.Decimal(12, 2)
+  advanceDeduction Decimal @default(0) @db.Decimal(12, 2)
+  otherDeductions Decimal @default(0) @db.Decimal(12, 2)
+  totalDeductions Decimal @db.Decimal(12, 2)
+  netPay        Decimal  @db.Decimal(12, 2)
+
+  // Employer-side statutory contributions (never deducted from the
+  // employee) — computed from each StatutoryRule's employerRate at
+  // generation time, same eligibility gating (napsaRegistered/
+  // nhimaRegistered) as the employee-side deductions above.
+  napsaEmployer Decimal  @default(0) @db.Decimal(12, 2)
+  nhimaEmployer Decimal  @default(0) @db.Decimal(12, 2)
+  totalEmployerContributions Decimal @default(0) @db.Decimal(12, 2)
+
+  // Reference-info snapshots — copied from Employee/EmployeePayrollProfile
+  // at generation time so a historical payslip stays accurate even if the
+  // employee's record changes later.
+  employeeNumber String?
+  nrcNumber      String?
+  contractStartDate DateTime?
+  // No leave-tracking module exists yet (no balance/accrual data anywhere
+  // in the system), so this stays null until one is built — never
+  // fabricated at generation time.
+  leaveDaysTaken Int?
+
+  paymentMethod String?
+  paymentDate   DateTime?
+  generatedAt   DateTime @default(now())
+
+  @@map("payslip_records")
+}
