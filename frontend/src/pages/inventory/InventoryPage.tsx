@@ -348,7 +348,7 @@ export default function InventoryPage() {
 
       <div className="flex gap-4">
         {/* Table */}
-        <div className="flex-1 bg-white border border-gray-200 rounded-lg overflow-hidden">
+        <div className="flex-1 bg-white border border-gray-200 rounded-lg overflow-x-auto">
           {isLoading ? <div className="p-6 text-sm text-gray-400">Loading...</div>
             : tabItems.length === 0 ? <div className="p-6 text-sm text-gray-400">No {currentTab.label.toLowerCase()} items yet.</div>
             : (

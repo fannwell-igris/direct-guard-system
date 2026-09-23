@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
-  LayoutDashboard, ChevronDown, ChevronLeft, ChevronRight,
+  LayoutDashboard, ChevronDown, ChevronLeft, ChevronRight, X,
   Bell, Activity, Building2, MapPin, Users, FileText, CalendarDays,
   ClipboardList, CheckSquare, Inbox, Wallet, Receipt, DollarSign,
   Package, UserCog, Settings as SettingsIcon, TrendingUp, MessageSquare,
@@ -77,12 +77,30 @@ const NAV_GROUPS: NavGroup[] = [
 const COLLAPSE_STORAGE_KEY = "cms_sidebar_collapsed";
 const GROUPS_STORAGE_KEY = "cms_sidebar_groups";
 
-export default function Sidebar() {
+interface SidebarProps {
+  /** On phone/tablet widths the sidebar is an off-canvas drawer — this controls whether it's open. Ignored at md+ widths, where it's always visible. */
+  mobileOpen: boolean;
+  /** Called when the drawer should close (backdrop tap, nav link tap, or Escape) — mobile only. */
+  onCloseMobile: () => void;
+}
+
+export default function Sidebar({ mobileOpen, onCloseMobile }: SidebarProps) {
   const location = useLocation();
   const { user } = useAuth();
   const role = user?.role ?? "STAFF";
 
-  // Rail collapsed — default true (icon-only rail)
+  // Close the mobile drawer automatically whenever the route changes, so
+  // tapping a nav link takes you to the page instead of leaving the menu
+  // open over it.
+  useEffect(() => {
+    onCloseMobile();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
+
+  // Rail collapsed — default true (icon-only rail). This is a desktop-only
+  // preference; on phone/tablet the drawer always shows full labels
+  // regardless of this setting (see `effectiveCollapsed` below) — an
+  // icon-only sidebar makes no sense inside a full-width mobile drawer.
   const [railCollapsed, setRailCollapsed] = useState(() => {
     const stored = localStorage.getItem(COLLAPSE_STORAGE_KEY);
     return stored === null ? true : stored === "true";
@@ -91,6 +109,22 @@ export default function Sidebar() {
   useEffect(() => {
     localStorage.setItem(COLLAPSE_STORAGE_KEY, String(railCollapsed));
   }, [railCollapsed]);
+
+  // Track whether we're below the md breakpoint (Tailwind's md = 768px) so
+  // the collapse/expand behavior can differ between the desktop rail and
+  // the mobile drawer, in JS (needed for layout branching, not just CSS).
+  const [isMobile, setIsMobile] = useState(
+    () => typeof window !== "undefined" && window.innerWidth < 768
+  );
+  useEffect(() => {
+    function onResize() {
+      setIsMobile(window.innerWidth < 768);
+    }
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  const effectiveCollapsed = railCollapsed && !isMobile;
 
   // All groups collapsed by default
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>(() => {
@@ -142,26 +176,49 @@ export default function Sidebar() {
   const visibleGroups = NAV_GROUPS.filter((g) => !g.roles || g.roles.includes(role));
 
   return (
-    <nav
-      className={cn(
-        "h-full flex-shrink-0 py-4 overflow-y-auto transition-all duration-200 flex flex-col",
-        "bg-magen-navy",
-        railCollapsed ? "w-16" : "w-56"
+    <>
+      {/* Mobile backdrop — tapping it closes the drawer. Desktop never renders this. */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 bg-black/40 z-30 md:hidden"
+          onClick={onCloseMobile}
+          aria-hidden="true"
+        />
       )}
-    >
-      {/* Logo + collapse toggle */}
-      <div className={cn("flex items-center mb-6", railCollapsed ? "justify-center px-2" : "justify-between px-4")}>
-        {!railCollapsed && (
-          <div className="text-white font-bold text-sm tracking-wide">MAGEN</div>
+
+      <nav
+        className={cn(
+          "py-4 overflow-y-auto transition-all duration-200 flex flex-col bg-magen-navy",
+          // Mobile: fixed off-canvas drawer, slides in/out over the page.
+          "fixed inset-y-0 left-0 z-40 w-64 -translate-x-full",
+          mobileOpen && "translate-x-0",
+          // Desktop (md+): back to the normal static rail in the flex layout.
+          "md:static md:inset-auto md:h-full md:flex-shrink-0 md:translate-x-0",
+          effectiveCollapsed ? "md:w-16" : "md:w-56"
         )}
-        <button
-          onClick={() => setRailCollapsed((v) => !v)}
-          className="w-7 h-7 flex items-center justify-center rounded-md text-white/50 hover:bg-white/10 hover:text-white flex-shrink-0 transition-colors"
-          title={railCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-        >
-          {railCollapsed ? <ChevronRight size={15} /> : <ChevronLeft size={15} />}
-        </button>
-      </div>
+      >
+        {/* Logo + close (mobile) / collapse toggle (desktop) */}
+        <div className={cn("flex items-center mb-6 px-4 justify-between", effectiveCollapsed && "md:justify-center md:px-2")}>
+          <div className={cn("text-white font-bold text-sm tracking-wide", effectiveCollapsed && "md:hidden")}>
+            MAGEN
+          </div>
+          {/* Mobile: closes the drawer */}
+          <button
+            onClick={onCloseMobile}
+            className="w-7 h-7 flex items-center justify-center rounded-md text-white/50 hover:bg-white/10 hover:text-white flex-shrink-0 transition-colors md:hidden"
+            title="Close menu"
+          >
+            <X size={16} />
+          </button>
+          {/* Desktop: collapses/expands the rail */}
+          <button
+            onClick={() => setRailCollapsed((v) => !v)}
+            className="hidden md:flex w-7 h-7 items-center justify-center rounded-md text-white/50 hover:bg-white/10 hover:text-white flex-shrink-0 transition-colors"
+            title={railCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            {railCollapsed ? <ChevronRight size={15} /> : <ChevronLeft size={15} />}
+          </button>
+        </div>
 
       {/* Dashboard */}
       <ul className="space-y-0.5 mb-2 px-1.5">
@@ -171,14 +228,14 @@ export default function Sidebar() {
             title="Dashboard"
             className={cn(
               "flex items-center gap-2 py-2 text-sm rounded-lg font-medium transition-colors",
-              railCollapsed ? "justify-center px-2" : "px-3",
+              effectiveCollapsed ? "justify-center px-2" : "px-3",
               isDashboardActive
                 ? "bg-magen-green text-white"
                 : "text-white/70 hover:bg-white/10 hover:text-white"
             )}
           >
             <LayoutDashboard size={16} />
-            {!railCollapsed && "Dashboard"}
+            {!effectiveCollapsed && "Dashboard"}
           </Link>
         </li>
       </ul>
@@ -188,7 +245,7 @@ export default function Sidebar() {
         const isGroupCollapsed = collapsedGroups[group.label] ?? true;
         return (
           <div key={group.label} className="mb-0.5 px-1.5">
-            {!railCollapsed && (
+            {!effectiveCollapsed && (
               <button
                 onClick={() => toggleGroup(group.label)}
                 className="w-full flex items-center justify-between px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-white/40 hover:text-white/60 transition-colors"
@@ -200,7 +257,7 @@ export default function Sidebar() {
                 />
               </button>
             )}
-            {(railCollapsed || !isGroupCollapsed) && (
+            {(effectiveCollapsed || !isGroupCollapsed) && (
               <ul className="space-y-0.5">
                 {group.items.map((item) => {
                   const isActive = location.pathname === item.to;
@@ -212,14 +269,14 @@ export default function Sidebar() {
                         title={item.label}
                         className={cn(
                           "flex items-center gap-2.5 py-2 text-sm rounded-lg transition-colors",
-                          railCollapsed ? "justify-center px-2" : "px-3",
+                          effectiveCollapsed ? "justify-center px-2" : "px-3",
                           isActive
                             ? "bg-magen-green text-white font-medium"
                             : "text-white/70 hover:bg-white/10 hover:text-white"
                         )}
                       >
                         <Icon size={16} />
-                        {!railCollapsed && item.label}
+                        {!effectiveCollapsed && item.label}
                       </Link>
                     </li>
                   );
@@ -230,8 +287,9 @@ export default function Sidebar() {
         );
       })}
 
-      {/* Spacer */}
-      <div className="flex-1" />
-    </nav>
+        {/* Spacer */}
+        <div className="flex-1" />
+      </nav>
+    </>
   );
 }

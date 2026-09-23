@@ -241,6 +241,7 @@ export default function UsersPage() {
             <button className="text-magen-green hover:underline" onClick={openCreate}>Add one</button>
           </div>
         ) : (
+          <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-50">
               <tr>
@@ -288,6 +289,7 @@ export default function UsersPage() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
     </div>

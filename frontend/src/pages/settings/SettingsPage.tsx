@@ -242,7 +242,7 @@ export default function SettingsPage() {
 
       {/* ── Lookup tab table ── */}
       {isLookupTab && (
-        <div className="card overflow-hidden p-0">
+        <div className="card overflow-x-auto p-0">
           {isLoading ? (
             <div className="p-6 text-sm text-gray-500">Loading…</div>
           ) : rows.length === 0 ? (
@@ -356,7 +356,7 @@ export default function SettingsPage() {
 
       {/* ── Statutory Rules table ── */}
       {tab === "statutoryRules" && (
-        <div className="card overflow-hidden p-0">
+        <div className="card overflow-x-auto p-0">
           {isLoading ? (
             <div className="p-6 text-sm text-gray-500">Loading…</div>
           ) : rules.length === 0 ? (

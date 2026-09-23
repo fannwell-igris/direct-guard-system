@@ -259,7 +259,7 @@ export default function DashboardPage() {
           ) : main ? (
             <div className="space-y-6">
               {/* Stat cards — visible to all roles */}
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <StatCard label="Active Clients" value={main.counts.activeClients} icon={Building2} bg="bg-emerald-50" iconBg="bg-emerald-600" />
                 <StatCard label="Active Sites" value={main.counts.activeSites} icon={MapPin} bg="bg-blue-50" iconBg="bg-blue-500" />
                 <StatCard label="Active Employees" value={main.counts.activeEmployees} icon={Users} bg="bg-amber-50" iconBg="bg-amber-500" />
@@ -335,13 +335,13 @@ export default function DashboardPage() {
 
               {/* Revenue chart + Recent invoices — finance roles only */}
               {canSeeFinance && main.monthlyRevenue && main.recentInvoices && (
-                <div className="grid grid-cols-5 gap-4">
-                  <div className="col-span-2 bg-white border border-gray-200 rounded-xl p-4 overflow-hidden min-w-0">
+                <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+                  <div className="lg:col-span-2 bg-white border border-gray-200 rounded-xl p-4 overflow-hidden min-w-0">
                     <p className="text-sm font-medium text-gray-700 mb-3">Revenue vs Expenses — last 3 months</p>
                     <RevenueChart data={main.monthlyRevenue} />
                   </div>
 
-                  <div className="col-span-3 bg-white border border-gray-200 rounded-xl overflow-hidden">
+                  <div className="lg:col-span-3 bg-white border border-gray-200 rounded-xl overflow-x-auto">
                     <p className="text-sm font-medium text-gray-700 px-4 py-3 border-b border-gray-100">Recent Invoices</p>
                     {main.recentInvoices.length === 0 ? (
                       <p className="text-xs text-gray-400 p-4">No invoices yet.</p>
@@ -377,7 +377,7 @@ export default function DashboardPage() {
 
               {/* Recent payments — finance roles only */}
               {canSeeFinance && main.recentPayments && main.recentPayments.length > 0 && (
-                <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                <div className="bg-white border border-gray-200 rounded-xl overflow-x-auto">
                   <p className="text-sm font-medium text-gray-700 px-4 py-3 border-b border-gray-100">Recent Payments</p>
                   <table className="w-full text-xs">
                     <thead className="bg-gray-50 text-gray-400 uppercase">
@@ -494,7 +494,7 @@ export default function DashboardPage() {
           ) : hr ? (
             <div className="space-y-6">
               {/* Employee counts */}
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <StatCard label="Active Employees" value={hr.employees.active} icon={Users} bg="bg-emerald-50" iconBg="bg-emerald-600" />
                 <StatCard label="Inactive" value={hr.employees.inactive} icon={Users} bg="bg-gray-50" iconBg="bg-gray-400" />
                 <StatCard label="Terminated" value={hr.employees.terminated} icon={Users} bg="bg-red-50" iconBg="bg-red-400" />

@@ -176,7 +176,9 @@
 
   /* --- Tables --- */
   .table-container {
-    @apply rounded-xl border border-gray-200 overflow-hidden shadow-sm;
+    /* overflow-x-auto so wide tables scroll horizontally on narrow
+       screens instead of clipping/breaking the layout. */
+    @apply rounded-xl border border-gray-200 overflow-x-auto shadow-sm;
   }
 
   .table-container table thead {

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Search, Bell, ChevronDown, LogOut } from "lucide-react";
+import { Search, Bell, ChevronDown, LogOut, Menu } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 
 function initials(fullName: string): string {
@@ -20,24 +20,39 @@ function initials(fullName: string): string {
  * doesn't have (GET /api/alerts today just returns everything currently
  * true, with no read/unread state to count).
  */
-export default function Header() {
+interface HeaderProps {
+  /** Opens the mobile sidebar drawer. The hamburger button that calls this only renders below the md breakpoint. */
+  onMenuClick: () => void;
+}
+
+export default function Header({ onMenuClick }: HeaderProps) {
   const { user, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 flex-shrink-0">
-      <div className="relative w-80 max-w-full">
-        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-        <input
-          type="text"
-          placeholder="Search..."
-          disabled
-          title="Search isn't wired up to any endpoint yet"
-          className="w-full pl-9 pr-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg text-gray-400 placeholder:text-gray-400 cursor-not-allowed"
-        />
+    <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-3 sm:px-6 gap-3 flex-shrink-0">
+      <div className="flex items-center gap-2 min-w-0 flex-1">
+        <button
+          onClick={onMenuClick}
+          className="w-9 h-9 flex items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-magen-navy flex-shrink-0 md:hidden"
+          title="Open menu"
+        >
+          <Menu size={20} />
+        </button>
+
+        <div className="relative w-full max-w-80 hidden sm:block">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search..."
+            disabled
+            title="Search isn't wired up to any endpoint yet"
+            className="w-full pl-9 pr-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg text-gray-400 placeholder:text-gray-400 cursor-not-allowed"
+          />
+        </div>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
         <Link
           to="/alerts"
           className="w-9 h-9 flex items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 hover:text-magen-navy"

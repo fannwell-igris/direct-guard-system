@@ -407,7 +407,7 @@ export default function OperationsPage() {
           </div>
         )}
 
-        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+        <div className="bg-white border border-gray-200 rounded-lg overflow-x-auto">
           {isLoading ? (
             <div className="p-6 text-sm text-gray-500">Loading...</div>
           ) : records.length === 0 ? (

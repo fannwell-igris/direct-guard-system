@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import Sidebar from "./Sidebar";
@@ -17,6 +18,7 @@ function AnimatedOutlet() {
 
 export default function AppLayout() {
   const { user, isLoading } = useAuth();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   if (isLoading) {
     return (
@@ -37,10 +39,10 @@ export default function AppLayout() {
     <ToastProvider>
       <ConfirmDialogProvider>
         <div className="flex h-screen bg-gray-50">
-          <Sidebar />
+          <Sidebar mobileOpen={mobileNavOpen} onCloseMobile={() => setMobileNavOpen(false)} />
           <div className="flex-1 flex flex-col min-w-0">
-            <Header />
-            <main className="flex-1 p-8 overflow-y-auto">
+            <Header onMenuClick={() => setMobileNavOpen(true)} />
+            <main className="flex-1 p-4 sm:p-6 md:p-8 overflow-y-auto overflow-x-hidden">
               <AnimatedOutlet />
             </main>
           </div>
