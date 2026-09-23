@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import type { FormEvent } from "react";
 import {
@@ -334,18 +334,27 @@ export default function ClientsPage() {
   }
 
   // Global search (Header search bar) links here as /clients?q=<term> — pick
-  // that up once on mount and seed the page's own search box with it.
+  // that up once on mount and seed the page's own search box with it. This
+  // and the statusFilter effect below both fire on initial mount; without
+  // didInitRef, the statusFilter effect's unfiltered loadClients(1) call
+  // would race the q-driven filtered one and silently clobber it, which is
+  // why clicking a global-search result used to look like it did nothing.
+  const didInitRef = useRef(false);
   useEffect(() => {
     const q = searchParams.get("q");
     if (q) {
       setSearch(q);
       setPage(1);
       loadClients(1, q);
+    } else {
+      loadClients(1);
     }
+    didInitRef.current = true;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
+    if (!didInitRef.current) return;
     loadClients(1);
     setPage(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps

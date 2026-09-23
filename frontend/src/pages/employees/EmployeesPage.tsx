@@ -579,17 +579,26 @@ export default function EmployeesPage() {
 
   // Global search (Header search bar) links here as /employees?q=<term> —
   // pick that up once on mount and seed the page's own search box with it.
+  // This and the filters effect below both fire on initial mount; without
+  // didInitRef, that effect's unfiltered loadEmployees(1) call would race
+  // the q-driven filtered one and silently clobber it, which is why
+  // clicking a global-search result used to look like it did nothing.
+  const didInitRef = useRef(false);
   useEffect(() => {
     const q = searchParams.get("q");
     if (q) {
       setSearch(q);
       setPage(1);
       loadEmployees(1, q);
+    } else {
+      loadEmployees(1);
     }
+    didInitRef.current = true;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
+    if (!didInitRef.current) return;
     setPage(1);
     loadEmployees(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
