@@ -200,7 +200,7 @@ export default function Sidebar({ mobileOpen, onCloseMobile }: SidebarProps) {
         {/* Logo + close (mobile) / collapse toggle (desktop) */}
         <div className={cn("flex items-center mb-6 px-4 justify-between", effectiveCollapsed && "md:justify-center md:px-2")}>
           <div className={cn("text-white font-bold text-sm tracking-wide", effectiveCollapsed && "md:hidden")}>
-            MAGEN
+            Magen Security System
           </div>
           {/* Mobile: closes the drawer */}
           <button
