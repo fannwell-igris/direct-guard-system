@@ -130,7 +130,9 @@ function blankForm(): FormState {
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function OperationalCostsPage() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
+  // Only Admin and Payroll (this system's Finance role) can create/edit operational costs.
+  const canEdit = user?.role === "ADMIN" || user?.role === "PAYROLL";
   const authHeader = { Authorization: `Bearer ${token}` };
   const jsonHeaders = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
 
@@ -353,10 +355,12 @@ export default function OperationalCostsPage() {
             Track per-site expenses by month and category
           </p>
         </div>
-        <button className="btn-primary flex items-center gap-2" onClick={openAddPanel}>
-          <Plus size={16} />
-          Add Cost Entry
-        </button>
+        {canEdit && (
+          <button className="btn-primary flex items-center gap-2" onClick={openAddPanel}>
+            <Plus size={16} />
+            Add Cost Entry
+          </button>
+        )}
       </div>
 
       <div className="flex gap-6 mt-6">
@@ -544,13 +548,15 @@ export default function OperationalCostsPage() {
 
                         {/* Edit */}
                         <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                          <button
-                            className="p-1.5 rounded-lg text-gray-400 hover:text-magen-green hover:bg-magen-green-light transition-colors"
-                            title="Edit"
-                            onClick={() => openEditPanel(cost)}
-                          >
-                            <Pencil size={14} />
-                          </button>
+                          {canEdit && (
+                            <button
+                              className="p-1.5 rounded-lg text-gray-400 hover:text-magen-green hover:bg-magen-green-light transition-colors"
+                              title="Edit"
+                              onClick={() => openEditPanel(cost)}
+                            >
+                              <Pencil size={14} />
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))}

@@ -367,6 +367,9 @@ function OverviewTab({ invoices, payrollRuns, opCosts, genExpenses, accounts }: 
 // ── Cash & Accounts Tab ───────────────────────────────────────────────────────
 
 function AccountsTab({ accounts, onChange }: { accounts: AccountEntry[]; onChange: (a: AccountEntry[]) => void }) {
+  const { user } = useAuth();
+  // Only Admin and Payroll (this system's Finance role) can create/edit/delete accounts.
+  const canEdit = user?.role === "ADMIN" || user?.role === "PAYROLL";
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ label: "", type: "bank" as "cash" | "bank", balance: "", notes: "" });
   const [adding, setAdding] = useState(false);
@@ -413,9 +416,11 @@ function AccountsTab({ accounts, onChange }: { accounts: AccountEntry[]; onChang
           <h2 className="text-base font-semibold text-gray-800">Cash &amp; Accounts</h2>
           <p className="text-xs text-gray-500 mt-0.5">Manually record cash on hand and bank account balances. Balances are saved to this browser.</p>
         </div>
-        <button className="btn-primary flex items-center gap-1.5 text-sm" onClick={() => setAdding(true)}>
-          <Plus size={14} /> Add Account
-        </button>
+        {canEdit && (
+          <button className="btn-primary flex items-center gap-1.5 text-sm" onClick={() => setAdding(true)}>
+            <Plus size={14} /> Add Account
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-3 gap-3">
@@ -433,7 +438,7 @@ function AccountsTab({ accounts, onChange }: { accounts: AccountEntry[]; onChang
         </div>
       </div>
 
-      {adding && (
+      {canEdit && adding && (
         <div className="card border-2 border-magen-green/30">
           <h3 className="text-sm font-semibold text-gray-700 mb-3">New Account</h3>
           <div className="grid grid-cols-2 gap-3 mb-3">
@@ -467,7 +472,7 @@ function AccountsTab({ accounts, onChange }: { accounts: AccountEntry[]; onChang
       <div className="space-y-2">
         {accounts.map((a) => (
           <div key={a.id} className="card">
-            {editingId === a.id ? (
+            {canEdit && editingId === a.id ? (
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">Name</label>
@@ -509,14 +514,16 @@ function AccountsTab({ accounts, onChange }: { accounts: AccountEntry[]; onChang
                     <p className="font-bold text-gray-900">{fmt(a.balance)}</p>
                     <p className="text-xs text-gray-400">Updated {fmtDate(a.updatedAt)}</p>
                   </div>
-                  <div className="flex gap-1">
-                    <button onClick={() => startEdit(a)} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600">
-                      <Edit2 size={13} />
-                    </button>
-                    <button onClick={() => removeAccount(a.id)} className="w-7 h-7 flex items-center justify-center rounded hover:bg-red-50 text-gray-400 hover:text-red-500">
-                      <Trash2 size={13} />
-                    </button>
-                  </div>
+                  {canEdit && (
+                    <div className="flex gap-1">
+                      <button onClick={() => startEdit(a)} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600">
+                        <Edit2 size={13} />
+                      </button>
+                      <button onClick={() => removeAccount(a.id)} className="w-7 h-7 flex items-center justify-center rounded hover:bg-red-50 text-gray-400 hover:text-red-500">
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

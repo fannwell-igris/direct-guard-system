@@ -161,9 +161,11 @@ function blankPaymentForm(): PaymentForm {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function InvoicesPage() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const authHeader = { Authorization: `Bearer ${token}` };
   const jsonHeaders = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+  // Only Admin and Payroll (this system's Finance role) can create/edit/act on invoices & payments.
+  const canEdit = user?.role === "ADMIN" || user?.role === "PAYROLL";
 
   // ── list state
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -451,10 +453,12 @@ export default function InvoicesPage() {
           <h1 className="text-2xl font-bold text-magen-navy">Invoices</h1>
           <p className="text-sm text-gray-500 mt-0.5">Billing, payment tracking and outstanding balances</p>
         </div>
-        <button className="btn-primary flex items-center gap-2" onClick={openAddPanel}>
-          <Plus size={16} />
-          New Invoice
-        </button>
+        {canEdit && (
+          <button className="btn-primary flex items-center gap-2" onClick={openAddPanel}>
+            <Plus size={16} />
+            New Invoice
+          </button>
+        )}
       </div>
 
       {/* Status tabs */}
@@ -813,45 +817,47 @@ export default function InvoicesPage() {
                     )}
 
                     {/* Quick actions */}
-                    <div className="flex gap-2 mb-4 flex-wrap">
-                      {selectedInvoice.status !== "CANCELLED" && (
-                        <button
-                          className="btn-secondary text-xs flex items-center gap-1"
-                          onClick={() => openEditPanel(selectedInvoice)}
-                        >
-                          <Pencil size={12} /> Edit
-                        </button>
-                      )}
-                      {selectedInvoice.status === "DRAFT" && (
-                        <button
-                          className="btn-primary text-xs flex items-center gap-1"
-                          onClick={handleIssue}
-                          disabled={actionLoading}
-                        >
-                          <Send size={12} /> Issue
-                        </button>
-                      )}
-                      {(selectedInvoice.status === "ISSUED" || selectedInvoice.status === "OVERDUE" || selectedInvoice.status === "PARTIALLY_PAID") && (
-                        <button
-                          className="btn-primary text-xs flex items-center gap-1"
-                          onClick={() => { setShowPaymentForm(true); setPaymentForm(f => ({ ...f, amount: String(Number(selectedInvoice.outstandingBalance)) })); }}
-                        >
-                          <CreditCard size={12} /> Record Payment
-                        </button>
-                      )}
-                      {(selectedInvoice.status === "DRAFT" || selectedInvoice.status === "ISSUED") && Number(selectedInvoice.amountPaid) === 0 && (
-                        <button
-                          className="btn-danger text-xs flex items-center gap-1"
-                          onClick={handleCancel}
-                          disabled={actionLoading}
-                        >
-                          <XCircle size={12} /> Cancel
-                        </button>
-                      )}
-                    </div>
+                    {canEdit && (
+                      <div className="flex gap-2 mb-4 flex-wrap">
+                        {selectedInvoice.status !== "CANCELLED" && (
+                          <button
+                            className="btn-secondary text-xs flex items-center gap-1"
+                            onClick={() => openEditPanel(selectedInvoice)}
+                          >
+                            <Pencil size={12} /> Edit
+                          </button>
+                        )}
+                        {selectedInvoice.status === "DRAFT" && (
+                          <button
+                            className="btn-primary text-xs flex items-center gap-1"
+                            onClick={handleIssue}
+                            disabled={actionLoading}
+                          >
+                            <Send size={12} /> Issue
+                          </button>
+                        )}
+                        {(selectedInvoice.status === "ISSUED" || selectedInvoice.status === "OVERDUE" || selectedInvoice.status === "PARTIALLY_PAID") && (
+                          <button
+                            className="btn-primary text-xs flex items-center gap-1"
+                            onClick={() => { setShowPaymentForm(true); setPaymentForm(f => ({ ...f, amount: String(Number(selectedInvoice.outstandingBalance)) })); }}
+                          >
+                            <CreditCard size={12} /> Record Payment
+                          </button>
+                        )}
+                        {(selectedInvoice.status === "DRAFT" || selectedInvoice.status === "ISSUED") && Number(selectedInvoice.amountPaid) === 0 && (
+                          <button
+                            className="btn-danger text-xs flex items-center gap-1"
+                            onClick={handleCancel}
+                            disabled={actionLoading}
+                          >
+                            <XCircle size={12} /> Cancel
+                          </button>
+                        )}
+                      </div>
+                    )}
 
                     {/* Record payment form */}
-                    {showPaymentForm && (
+                    {canEdit && showPaymentForm && (
                       <div className="border border-magen-green/20 bg-magen-green-light/30 rounded-xl p-4 mb-4">
                         <div className="flex items-center justify-between mb-3">
                           <p className="text-sm font-semibold text-magen-navy">Record Payment</p>

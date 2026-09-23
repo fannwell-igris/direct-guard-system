@@ -143,10 +143,14 @@ const REGISTRY: RouteRule[] = [
 
 
   // Finance cluster — Operations and Staff must NOT access, per the spec.
-  { prefix: "/api/invoices", methods: { GET: ADMIN_MANAGER_PAYROLL, POST: ADMIN_MANAGER_PAYROLL, PUT: ADMIN_MANAGER_PAYROLL, PATCH: ADMIN_MANAGER_PAYROLL, DELETE: ADMIN } },
-  { prefix: "/api/payments", methods: { GET: ADMIN_MANAGER_PAYROLL, POST: ADMIN_MANAGER_PAYROLL, PUT: ADMIN_MANAGER_PAYROLL, PATCH: ADMIN_MANAGER_PAYROLL, DELETE: ADMIN } },
-  { prefix: "/api/operational-costs", methods: { GET: ADMIN_MANAGER_PAYROLL, POST: ADMIN_MANAGER_PAYROLL, PUT: ADMIN_MANAGER_PAYROLL, PATCH: ADMIN_MANAGER_PAYROLL, DELETE: ADMIN } },
-  { prefix: "/api/general-expenses", methods: { GET: ADMIN_MANAGER_PAYROLL, POST: ADMIN_MANAGER_PAYROLL, PUT: ADMIN_MANAGER_PAYROLL, PATCH: ADMIN_MANAGER_PAYROLL, DELETE: ADMIN } },
+  // Write access (create/edit) restricted to ADMIN and PAYROLL (this
+  // system's Finance role) only, per explicit instruction (2026-09-23):
+  // "Only the Admin and Finance can edit things in Finance." MANAGER keeps
+  // GET/view access but lost POST/PUT/PATCH here.
+  { prefix: "/api/invoices", methods: { GET: ADMIN_MANAGER_PAYROLL, POST: ADMIN_PAYROLL, PUT: ADMIN_PAYROLL, PATCH: ADMIN_PAYROLL, DELETE: ADMIN } },
+  { prefix: "/api/payments", methods: { GET: ADMIN_MANAGER_PAYROLL, POST: ADMIN_PAYROLL, PUT: ADMIN_PAYROLL, PATCH: ADMIN_PAYROLL, DELETE: ADMIN } },
+  { prefix: "/api/operational-costs", methods: { GET: ADMIN_MANAGER_PAYROLL, POST: ADMIN_PAYROLL, PUT: ADMIN_PAYROLL, PATCH: ADMIN_PAYROLL, DELETE: ADMIN } },
+  { prefix: "/api/general-expenses", methods: { GET: ADMIN_MANAGER_PAYROLL, POST: ADMIN_PAYROLL, PUT: ADMIN_PAYROLL, PATCH: ADMIN_PAYROLL, DELETE: ADMIN } },
 
   // Inventory — no broad STAFF access. A future "My Assigned Assets"
   // endpoint with row-level filtering is explicitly out of scope here.
