@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import api from "../../api/client";
+import Modal from "../../components/ui/Modal";
 
 interface Lookup {
   id: string;
@@ -181,14 +182,15 @@ export default function TasksPage() {
       )}
 
       {editingId && (
+        <Modal
+          title={editingId === "new" ? "New Task" : "Edit Task"}
+          onClose={closeForm}
+          widthClass="max-w-lg"
+        >
         <form
           onSubmit={handleSubmit}
-          className="bg-white border border-gray-200 rounded-lg p-6 space-y-4 max-w-lg"
+          className="space-y-4"
         >
-          <h2 className="text-sm font-semibold text-gray-900">
-            {editingId === "new" ? "New Task" : "Edit Task"}
-          </h2>
-
           {formError && (
             <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded px-3 py-2">
               {formError}
@@ -289,6 +291,7 @@ export default function TasksPage() {
             </button>
           </div>
         </form>
+        </Modal>
       )}
 
       <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">

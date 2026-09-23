@@ -4,6 +4,7 @@ import {
   Settings, Clock, Gift, Minus, ShieldCheck, Plus, ToggleLeft, ToggleRight,
 } from "lucide-react";
 import api from "../../api/client";
+import Modal from "../../components/ui/Modal";
 
 interface LookupRow {
   id: string;
@@ -197,10 +198,11 @@ export default function SettingsPage() {
 
       {/* ── Lookup tab form ── */}
       {isLookupTab && showForm && (
-        <div className="card max-w-md border-2 border-magen-green/20">
-          <h3 className="text-sm font-semibold text-gray-800 mb-4">
-            New {TAB_CONFIG[tab].label.replace(/s$/, "")}
-          </h3>
+        <Modal
+          title={`New ${TAB_CONFIG[tab].label.replace(/s$/, "")}`}
+          onClose={() => setShowForm(false)}
+          widthClass="max-w-md"
+        >
           {formError && (
             <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-3">{formError}</div>
           )}
@@ -235,7 +237,7 @@ export default function SettingsPage() {
               </button>
             </div>
           </form>
-        </div>
+        </Modal>
       )}
 
       {/* ── Lookup tab table ── */}
@@ -299,8 +301,11 @@ export default function SettingsPage() {
 
       {/* ── Statutory Rules form ── */}
       {tab === "statutoryRules" && showRuleForm && (
-        <div className="card max-w-md border-2 border-magen-green/20">
-          <h3 className="text-sm font-semibold text-gray-800 mb-4">New Statutory Rule</h3>
+        <Modal
+          title="New Statutory Rule"
+          onClose={() => setShowRuleForm(false)}
+          widthClass="max-w-md"
+        >
           {formError && (
             <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-3">{formError}</div>
           )}
@@ -346,7 +351,7 @@ export default function SettingsPage() {
               <button type="button" onClick={() => setShowRuleForm(false)} className="btn-secondary">Cancel</button>
             </div>
           </form>
-        </div>
+        </Modal>
       )}
 
       {/* ── Statutory Rules table ── */}

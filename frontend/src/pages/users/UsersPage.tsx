@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { UserCog, Plus, KeyRound, X } from "lucide-react";
+import { UserCog, Plus } from "lucide-react";
 import api from "../../api/client";
+import Modal from "../../components/ui/Modal";
 
 interface User {
   id: string;
@@ -155,15 +156,11 @@ export default function UsersPage() {
 
       {/* Create / Edit form */}
       {editingId && (
-        <div className="card max-w-lg border-2 border-magen-green/20">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold text-gray-900">
-              {editingId === "new" ? "New User" : "Edit User"}
-            </h2>
-            <button onClick={closeForm} className="text-gray-400 hover:text-gray-600">
-              <X size={16} />
-            </button>
-          </div>
+        <Modal
+          title={editingId === "new" ? "New User" : "Edit User"}
+          onClose={closeForm}
+          widthClass="max-w-lg"
+        >
           {formError && (
             <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-3">{formError}</div>
           )}
@@ -204,20 +201,16 @@ export default function UsersPage() {
               <button type="button" onClick={closeForm} className="btn-secondary">Cancel</button>
             </div>
           </form>
-        </div>
+        </Modal>
       )}
 
       {/* Reset password form */}
       {resetUserId && (
-        <div className="card max-w-sm border-2 border-amber-200">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-              <KeyRound size={15} className="text-amber-600" /> Reset Password
-            </h2>
-            <button onClick={() => { setResetUserId(null); setNewPassword(""); setResetError(null); }} className="text-gray-400 hover:text-gray-600">
-              <X size={16} />
-            </button>
-          </div>
+        <Modal
+          title="Reset Password"
+          onClose={() => { setResetUserId(null); setNewPassword(""); setResetError(null); }}
+          widthClass="max-w-sm"
+        >
           {resetError && (
             <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-3">{resetError}</div>
           )}
@@ -235,7 +228,7 @@ export default function UsersPage() {
               </button>
             </div>
           </form>
-        </div>
+        </Modal>
       )}
 
       {/* Users table */}

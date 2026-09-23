@@ -19,6 +19,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
+import Modal from "../../components/ui/Modal";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -636,22 +637,13 @@ export default function InvoicesPage() {
           )}
         </div>
 
-        {/* ── Right panel ─────────────────────────────────────────────────── */}
-        {(invoicePanel !== "none" || selectedInvoice) && (
-          <div className="w-96 shrink-0">
-
-            {/* ── Invoice Form (Add / Edit) ── */}
-            {invoicePanel !== "none" && (
-              <div className="card p-5 mb-4 sticky top-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-base font-semibold text-magen-navy">
-                    {invoicePanel === "add" ? "New Invoice" : "Edit Invoice"}
-                  </h2>
-                  <button className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100" onClick={() => setInvoicePanel("none")}>
-                    <X size={16} />
-                  </button>
-                </div>
-
+        {/* ── Invoice Form (Add / Edit) — modal ─────────────────────────────── */}
+        {invoicePanel !== "none" && (
+          <Modal
+            title={invoicePanel === "add" ? "New Invoice" : "Edit Invoice"}
+            onClose={() => setInvoicePanel("none")}
+            widthClass="max-w-md"
+          >
                 {invoiceFormError && (
                   <div className="flex items-start gap-2 bg-red-50 text-red-600 border border-red-100 rounded-lg p-3 mb-4 text-sm">
                     <AlertCircle size={15} className="mt-0.5 shrink-0" /> {invoiceFormError}
@@ -734,11 +726,13 @@ export default function InvoicesPage() {
                     <button type="button" className="btn-secondary" onClick={() => setInvoicePanel("none")} disabled={invoiceSaving}>Cancel</button>
                   </div>
                 </form>
-              </div>
-            )}
+          </Modal>
+        )}
 
+        {/* ── Right panel: Invoice Detail ─────────────────────────────────── */}
+        {selectedInvoice && (
+          <div className="w-96 shrink-0">
             {/* ── Invoice Detail ── */}
-            {selectedInvoice && (
               <div className="card p-5 sticky top-6">
                 {detailLoading ? (
                   <div className="py-8 text-center text-gray-400 text-sm">Loading…</div>
@@ -955,10 +949,10 @@ export default function InvoicesPage() {
                   </>
                 )}
               </div>
-            )}
           </div>
         )}
       </div>
     </div>
   );
 }
+

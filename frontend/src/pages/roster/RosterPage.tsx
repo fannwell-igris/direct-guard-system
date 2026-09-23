@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from "react";
 import type { FormEvent } from "react";
 import { Pencil, X, Calendar } from "lucide-react";
 import api from "../../api/client";
+import Modal from "../../components/ui/Modal";
 
 interface Lookup {
   id: string;
@@ -234,14 +235,15 @@ export default function RosterPage() {
       )}
 
       {editingId && (
+        <Modal
+          title={editingId === "new" ? "Schedule Shift" : "Edit Roster Entry"}
+          onClose={closeForm}
+          widthClass="max-w-lg"
+        >
         <form
           onSubmit={handleSubmit}
-          className="bg-white border border-gray-200 rounded-2xl p-6 space-y-4 max-w-lg"
+          className="space-y-4"
         >
-          <h2 className="text-sm font-semibold text-gray-900">
-            {editingId === "new" ? "Schedule Shift" : "Edit Roster Entry"}
-          </h2>
-
           {formError && (
             <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
               {formError}
@@ -344,6 +346,7 @@ export default function RosterPage() {
             </button>
           </div>
         </form>
+        </Modal>
       )}
 
       {isLoading ? (

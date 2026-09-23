@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import api from "../../api/client";
+import Modal from "../../components/ui/Modal";
 
 interface Employee { id: string; fullName: string; }
 interface Department { id: string; name: string; }
@@ -270,8 +271,12 @@ export default function InventoryPage() {
 
       {/* Add/edit form */}
       {editingId && (
-        <form onSubmit={handleSubmit} className="bg-white border border-gray-200 rounded-lg p-5 space-y-4 max-w-2xl">
-          <h2 className="text-sm font-semibold">{editingId === "new" ? `Add ${currentTab.label} Item` : "Edit Item"}</h2>
+        <Modal
+          title={editingId === "new" ? `Add ${currentTab.label} Item` : "Edit Item"}
+          onClose={() => setEditingId(null)}
+          widthClass="max-w-2xl"
+        >
+        <form onSubmit={handleSubmit} className="space-y-4">
           {formError && <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded px-3 py-2">{formError}</div>}
           <div className="grid grid-cols-2 gap-4">
             <div><label className="text-xs font-medium text-gray-700 block mb-1">Name *</label>
@@ -338,6 +343,7 @@ export default function InventoryPage() {
             <button type="button" onClick={() => setEditingId(null)} className="text-sm border border-gray-300 rounded px-4 py-2 hover:bg-gray-100">Cancel</button>
           </div>
         </form>
+        </Modal>
       )}
 
       <div className="flex gap-4">

@@ -4,7 +4,6 @@ import { useAuth } from "../../contexts/AuthContext";
 import {
   Plus,
   Pencil,
-  X,
   ChevronLeft,
   ChevronRight,
   Building2,
@@ -15,6 +14,7 @@ import {
   FileText,
   AlertCircle,
 } from "lucide-react";
+import Modal from "../../components/ui/Modal";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -618,23 +618,13 @@ export default function OperationalCostsPage() {
           )}
         </div>
 
-        {/* ── Right: Add / Edit panel ──────────────────────────────────────── */}
+        {/* ── Add / Edit panel — modal ────────────────────────────────────── */}
         {panelMode !== "none" && (
-          <div className="w-96 shrink-0">
-            <div className="card p-5 sticky top-6">
-              {/* Panel header */}
-              <div className="flex items-center justify-between mb-5">
-                <h2 className="text-base font-semibold text-magen-navy">
-                  {panelMode === "add" ? "Add Cost Entry" : "Edit Cost Entry"}
-                </h2>
-                <button
-                  className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
-                  onClick={closePanel}
-                >
-                  <X size={16} />
-                </button>
-              </div>
-
+          <Modal
+            title={panelMode === "add" ? "Add Cost Entry" : "Edit Cost Entry"}
+            onClose={closePanel}
+            widthClass="max-w-md"
+          >
               {/* Selected cost summary (edit mode) */}
               {panelMode === "edit" && selectedCost && (
                 <div className="bg-gray-50 rounded-lg p-3 mb-5 text-sm">
@@ -794,8 +784,7 @@ export default function OperationalCostsPage() {
                   </button>
                 </div>
               </form>
-            </div>
-          </div>
+          </Modal>
         )}
       </div>
     </div>

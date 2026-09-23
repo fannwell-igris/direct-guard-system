@@ -275,24 +275,42 @@ export default function DeploymentPage() {
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
-  // Export: fetch ALL matching records (up to 1000) then print
+  // Export: fetch ALL matching records, paging through in batches of 100
+  // (the backend caps `pageSize` at 100 — see backend/src/modules/roster/roster.validation.ts),
+  // then print.
+  const EXPORT_PAGE_SIZE = 100;
+  const EXPORT_MAX_PAGES = 50; // safety cap: up to 5,000 records
   const [exporting, setExporting] = useState(false);
   async function handleExport() {
     setExporting(true);
     try {
-      const params = new URLSearchParams();
-      if (clientId) params.set("clientId", clientId);
-      if (siteId) params.set("siteId", siteId);
-      if (dateFrom) params.set("dateFrom", dateFrom);
-      if (dateTo) params.set("dateTo", dateTo);
-      if (statusFilter) params.set("status", statusFilter);
-      params.set("page", "1");
-      params.set("pageSize", "1000");
+      const baseParams = new URLSearchParams();
+      if (clientId) baseParams.set("clientId", clientId);
+      if (siteId) baseParams.set("siteId", siteId);
+      if (dateFrom) baseParams.set("dateFrom", dateFrom);
+      if (dateTo) baseParams.set("dateTo", dateTo);
+      if (statusFilter) baseParams.set("status", statusFilter);
+      baseParams.set("pageSize", String(EXPORT_PAGE_SIZE));
 
-      const res = await fetch(`${API}/roster?${params}`, { headers: headers() });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json: PaginatedResponse = await res.json();
-      const all = Array.isArray(json.data) ? json.data : [];
+      const all: RosterEntry[] = [];
+      let exportPage = 1;
+      let expectedTotal = Infinity;
+
+      while (all.length < expectedTotal && exportPage <= EXPORT_MAX_PAGES) {
+        const params = new URLSearchParams(baseParams);
+        params.set("page", String(exportPage));
+
+        const res = await fetch(`${API}/roster?${params}`, { headers: headers() });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json: PaginatedResponse = await res.json();
+        const batch = Array.isArray(json.data) ? json.data : [];
+        all.push(...batch);
+        expectedTotal = json.total ?? all.length;
+
+        if (batch.length === 0) break; // no more pages
+        exportPage += 1;
+      }
+
       if (all.length === 0) {
         toast("warning", "No records to export", "Adjust your filters and try again.");
         return;
