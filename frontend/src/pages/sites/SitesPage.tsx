@@ -802,7 +802,12 @@ export default function SitesPage() {
                 {/* Quick actions */}
                 <div className="flex gap-2 border-t border-gray-100 pt-3">
                   <button
-                    onClick={() => openEditForm(detailSite)}
+                    onClick={() => {
+                      // Close the detail panel first — otherwise it stays
+                      // open on top of the Edit modal.
+                      setDetailSite(null);
+                      openEditForm(detailSite);
+                    }}
                     className="btn-secondary flex-1 justify-center text-xs"
                   >
                     <Pencil size={13} /> Edit

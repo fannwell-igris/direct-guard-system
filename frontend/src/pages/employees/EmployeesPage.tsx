@@ -1052,7 +1052,13 @@ export default function EmployeesPage() {
                   {/* Quick actions */}
                   <div className="flex gap-2 border-t border-gray-100 pt-3">
                     <button
-                      onClick={() => openEditForm(detailEmployee)}
+                      onClick={() => {
+                        // Close the detail panel first — otherwise it stays
+                        // open on top of the Edit modal, since neither one
+                        // closes the other on its own.
+                        setDetailEmployee(null);
+                        openEditForm(detailEmployee);
+                      }}
                       className="btn-secondary flex-1 justify-center text-xs"
                     >
                       <Pencil size={13} /> Edit

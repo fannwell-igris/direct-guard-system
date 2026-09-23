@@ -800,7 +800,12 @@ export default function ClientsPage() {
                   {/* Quick actions */}
                   <div className="flex gap-2 border-t border-gray-100 pt-3">
                     <button
-                      onClick={() => openEditForm(detailClient)}
+                      onClick={() => {
+                        // Close the detail panel first — otherwise it stays
+                        // open on top of the Edit modal.
+                        setDetailClient(null);
+                        openEditForm(detailClient);
+                      }}
                       className="btn-secondary flex-1 justify-center text-xs"
                     >
                       <Pencil size={13} /> Edit
