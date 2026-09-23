@@ -41,8 +41,8 @@ let splashWindow;
 // staring at the splash forever).
 function createSplashWindow() {
   splashWindow = new BrowserWindow({
-    width: 420,
-    height: 280,
+    width: 460,
+    height: 300,
     frame: false,
     resizable: false,
     movable: false,
