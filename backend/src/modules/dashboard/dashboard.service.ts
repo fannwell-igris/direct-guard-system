@@ -1,4 +1,5 @@
 import { prisma } from "../../lib/prisma";
+import { syncOverdueInvoices } from "../invoices/invoices.service";
 
 // ---- helpers ----
 
@@ -35,6 +36,12 @@ const FINANCE_ROLES = new Set(["ADMIN", "MANAGER", "PAYROLL"]);
 // ---- Main Dashboard ----
 
 export async function getMainDashboard(role: string) {
+  // Invoice status (OVERDUE in particular) is only ever updated by a
+  // payment change or by this sweep — run it here too so dashboard counts
+  // reflect invoices that are overdue as of right now, not as of whenever
+  // a payment last touched them. See invoices.service.ts for the full
+  // explanation.
+  await syncOverdueInvoices();
   const now = new Date();
   const thisMonthStart = startOfMonth(now);
   const thisMonthEnd = endOfMonth(now);

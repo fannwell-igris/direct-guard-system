@@ -35,8 +35,30 @@ export async function createInvoice(input: InvoiceCreateInput) {
   });
 }
 
+/**
+ * Flips any ISSUED invoice whose due date has passed into OVERDUE.
+ *
+ * Invoice status was previously only ever recalculated by
+ * `recalculateInvoice` below, which only runs when a payment is
+ * created/edited/deleted — so an invoice sat at "Issued" forever once its
+ * due date passed, until someone happened to touch a payment on it. This
+ * sweep closes that gap: it's called at the top of every read path that
+ * surfaces invoice status (list/detail here, plus the dashboard's own
+ * invoice queries), so the status is always correct as of "now" rather
+ * than as of whenever a payment last changed. Safe to call as often as
+ * needed — it's a no-op once nothing is newly overdue. (2026-09-23: added
+ * after invoices past their due date were still showing as "Issued".)
+ */
+export async function syncOverdueInvoices(): Promise<void> {
+  await prisma.invoice.updateMany({
+    where: { status: "ISSUED", dueDate: { lt: new Date() } },
+    data: { status: "OVERDUE" },
+  });
+}
+
 /** Lists invoices with optional filters, paginated. */
 export async function listInvoices(query: InvoiceListQuery) {
+  await syncOverdueInvoices();
   const where = buildWhere(query);
 
   const [total, rows] = await Promise.all([
@@ -67,6 +89,7 @@ export async function listInvoices(query: InvoiceListQuery) {
 
 /** Fetches a single invoice with its payments. */
 export async function getInvoiceById(id: string) {
+  await syncOverdueInvoices();
   const invoice = await prisma.invoice.findUnique({
     where: { id },
     include: {
