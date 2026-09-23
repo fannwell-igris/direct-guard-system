@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import type { FormEvent } from "react";
 import {
   Pencil,
@@ -514,6 +515,7 @@ export default function EmployeesPage() {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ACTIVE");
   const [clientFilter, setClientFilter] = useState("");
@@ -546,16 +548,17 @@ export default function EmployeesPage() {
     }
   }
 
-  async function loadEmployees(overridePage?: number) {
+  async function loadEmployees(overridePage?: number, overrideSearch?: string) {
     setIsLoading(true);
     setError(null);
     const targetPage = overridePage ?? page;
+    const effectiveSearch = overrideSearch !== undefined ? overrideSearch : search;
     try {
       const params: Record<string, unknown> = {
         page: targetPage,
         pageSize: PAGE_SIZE,
       };
-      if (search.trim()) params.search = search.trim();
+      if (effectiveSearch.trim()) params.search = effectiveSearch.trim();
       if (statusFilter !== "ALL") params.employmentStatus = statusFilter;
       if (clientFilter) params.assignedClientId = clientFilter;
       if (siteFilter) params.assignedSiteId = siteFilter;
@@ -572,6 +575,18 @@ export default function EmployeesPage() {
 
   useEffect(() => {
     loadLookups();
+  }, []);
+
+  // Global search (Header search bar) links here as /employees?q=<term> —
+  // pick that up once on mount and seed the page's own search box with it.
+  useEffect(() => {
+    const q = searchParams.get("q");
+    if (q) {
+      setSearch(q);
+      setPage(1);
+      loadEmployees(1, q);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {

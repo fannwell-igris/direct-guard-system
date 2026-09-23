@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import type { FormEvent } from "react";
 import {
   Pencil,
@@ -291,6 +292,7 @@ export default function ClientsPage() {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ACTIVE");
   const [page, setPage] = useState(1);
@@ -308,16 +310,17 @@ export default function ClientsPage() {
 
   // ── Data loading ───────────────────────────────────────────────────────────
 
-  async function loadClients(overridePage?: number) {
+  async function loadClients(overridePage?: number, overrideSearch?: string) {
     setIsLoading(true);
     setError(null);
     const targetPage = overridePage ?? page;
+    const effectiveSearch = overrideSearch !== undefined ? overrideSearch : search;
     try {
       const params: Record<string, unknown> = {
         page: targetPage,
         pageSize: PAGE_SIZE,
       };
-      if (search.trim()) params.search = search.trim();
+      if (effectiveSearch.trim()) params.search = effectiveSearch.trim();
       if (statusFilter !== "ALL") params.status = statusFilter;
 
       const res = await api.get("/clients", { params });
@@ -329,6 +332,18 @@ export default function ClientsPage() {
       setIsLoading(false);
     }
   }
+
+  // Global search (Header search bar) links here as /clients?q=<term> — pick
+  // that up once on mount and seed the page's own search box with it.
+  useEffect(() => {
+    const q = searchParams.get("q");
+    if (q) {
+      setSearch(q);
+      setPage(1);
+      loadClients(1, q);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     loadClients(1);

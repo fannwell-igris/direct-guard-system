@@ -16,6 +16,7 @@ export interface UserCreateInput {
   fullName: string;
   role: string;
   departmentId?: string | null;
+  employeeId?: string | null;
 }
 
 export function parseUserCreate(body: unknown): UserCreateInput {
@@ -42,8 +43,9 @@ export function parseUserCreate(body: unknown): UserCreateInput {
   }
 
   const departmentId = parseOptionalNullableId(b.departmentId, "departmentId") ?? null;
+  const employeeId = parseOptionalNullableId(b.employeeId, "employeeId") ?? null;
 
-  return { email, password, fullName, role, departmentId };
+  return { email, password, fullName, role, departmentId, employeeId };
 }
 
 export interface UserUpdateInput {
@@ -51,6 +53,7 @@ export interface UserUpdateInput {
   role?: string;
   isActive?: boolean;
   departmentId?: string | null;
+  employeeId?: string | null;
 }
 
 export function parseUserUpdate(body: unknown): UserUpdateInput {
@@ -77,6 +80,9 @@ export function parseUserUpdate(body: unknown): UserUpdateInput {
   }
   if (b.departmentId !== undefined) {
     out.departmentId = parseOptionalNullableId(b.departmentId, "departmentId");
+  }
+  if (b.employeeId !== undefined) {
+    out.employeeId = parseOptionalNullableId(b.employeeId, "employeeId");
   }
 
   if (Object.keys(out).length === 0) {

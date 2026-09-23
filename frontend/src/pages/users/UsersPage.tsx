@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import type { FormEvent } from "react";
 import { UserCog, Plus } from "lucide-react";
 import api from "../../api/client";
@@ -12,11 +12,19 @@ interface User {
   isActive: boolean;
   departmentId: string | null;
   department?: { id: string; name: string };
+  lastLoginAt: string | null;
+  employeeId: string | null;
+  employee?: { id: string; fullName: string; photoFilename: string | null } | null;
 }
 
 interface Department {
   id: string;
   name: string;
+}
+
+interface EmployeeLookup {
+  id: string;
+  fullName: string;
 }
 
 interface FormState {
@@ -25,9 +33,81 @@ interface FormState {
   password: string;
   role: string;
   departmentId: string;
+  employeeId: string;
 }
 
-const EMPTY_FORM: FormState = { email: "", fullName: "", password: "", role: "STAFF", departmentId: "" };
+const EMPTY_FORM: FormState = { email: "", fullName: "", password: "", role: "STAFF", departmentId: "", employeeId: "" };
+
+/** "Never" for accounts that have never logged in; otherwise a short local date/time. */
+function formatLastLogin(iso: string | null): string {
+  if (!iso) return "Never";
+  return new Date(iso).toLocaleString(undefined, {
+    year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
+  });
+}
+
+function initials(fullName: string): string {
+  const parts = fullName.trim().split(/\s+/);
+  const first = parts[0]?.[0] ?? "";
+  const last = parts.length > 1 ? parts[parts.length - 1][0] : "";
+  return (first + last).toUpperCase();
+}
+
+/**
+ * Shows the linked Employee's photo for recognition (2026-09-24: added so
+ * an admin scanning the Users list can tell people apart by face, not just
+ * name). Read-only here — uploading/changing the photo is done from the
+ * Employees page. Falls back to initials when there's no linked Employee,
+ * or the Employee has no photo uploaded, or the photo fails to load.
+ */
+function UserAvatar({ user }: { user: User }) {
+  const [photoSrc, setPhotoSrc] = useState<string | null>(null);
+  const [imgError, setImgError] = useState(false);
+
+  const loadPhoto = useCallback(async () => {
+    if (!user.employee?.photoFilename) {
+      setPhotoSrc(null);
+      return;
+    }
+    try {
+      const res = await api.get(`/employees/${user.employee.id}/photo`, { responseType: "blob" });
+      setPhotoSrc((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return URL.createObjectURL(res.data as Blob);
+      });
+      setImgError(false);
+    } catch {
+      setImgError(true);
+    }
+  }, [user.employee?.id, user.employee?.photoFilename]);
+
+  useEffect(() => {
+    loadPhoto();
+    return () => {
+      setPhotoSrc((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return prev;
+      });
+    };
+  }, [loadPhoto]);
+
+  const showPhoto = user.employee?.photoFilename && photoSrc && !imgError;
+
+  return (
+    <div className="w-9 h-9 rounded-full bg-magen-green-light text-magen-green-dark text-xs font-semibold flex items-center justify-center overflow-hidden flex-shrink-0">
+      {showPhoto ? (
+        <img
+          src={photoSrc}
+          alt={user.fullName}
+          className="w-full h-full object-cover"
+          onError={() => setImgError(true)}
+        />
+      ) : (
+        initials(user.fullName)
+      )}
+    </div>
+  );
+}
 
 const ROLE_OPTIONS = ["ADMIN", "MANAGER", "HR", "PAYROLL", "OPERATIONS", "MARKETING", "STAFF"];
 
@@ -46,6 +126,7 @@ export default function UsersPage() {
   const [isLoading, setIsLoading]   = useState(true);
   const [error, setError]           = useState<string | null>(null);
   const [departments, setDepts]     = useState<Department[]>([]);
+  const [employees, setEmployees]   = useState<EmployeeLookup[]>([]);
 
   const [editingId, setEditingId]   = useState<string | "new" | null>(null);
   const [form, setForm]             = useState<FormState>(EMPTY_FORM);
@@ -64,6 +145,17 @@ export default function UsersPage() {
     } catch { /* non-fatal */ }
   }
 
+  async function loadEmployeeLookups() {
+    try {
+      // Only for the "Link to Employee" dropdown (recognition photo) — not
+      // every account needs one, and this list intentionally isn't
+      // filtered to Guards only, since office staff with logins are
+      // Employees too.
+      const res = await api.get("/employees", { params: { pageSize: 100, employmentStatus: "ACTIVE" } });
+      setEmployees(res.data.data);
+    } catch { /* non-fatal -- dropdown just shows no options */ }
+  }
+
   async function loadUsers() {
     setIsLoading(true);
     setError(null);
@@ -79,6 +171,7 @@ export default function UsersPage() {
 
   useEffect(() => {
     loadDepts();
+    loadEmployeeLookups();
     loadUsers();
   }, []);
 
@@ -86,7 +179,10 @@ export default function UsersPage() {
     setForm(EMPTY_FORM); setFormError(null); setEditingId("new");
   }
   function openEdit(u: User) {
-    setForm({ email: u.email, fullName: u.fullName, password: "", role: u.role, departmentId: u.departmentId ?? "" });
+    setForm({
+      email: u.email, fullName: u.fullName, password: "", role: u.role,
+      departmentId: u.departmentId ?? "", employeeId: u.employeeId ?? "",
+    });
     setFormError(null); setEditingId(u.id);
   }
   function closeForm() { setEditingId(null); setFormError(null); }
@@ -100,11 +196,13 @@ export default function UsersPage() {
           email: form.email.trim(), fullName: form.fullName.trim(),
           password: form.password, role: form.role,
           departmentId: form.departmentId || null,
+          employeeId: form.employeeId || null,
         });
       } else {
         await api.put(`/users/${editingId}`, {
           fullName: form.fullName.trim(), role: form.role,
           departmentId: form.departmentId || null,
+          employeeId: form.employeeId || null,
         });
       }
       closeForm(); await loadUsers();
@@ -194,6 +292,14 @@ export default function UsersPage() {
                 {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
               </select>
             </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Link to Employee</label>
+              <select value={form.employeeId} onChange={(e) => setForm({ ...form, employeeId: e.target.value })} className="select">
+                <option value="">None</option>
+                {employees.map((e) => <option key={e.id} value={e.id}>{e.fullName}</option>)}
+              </select>
+              <p className="text-xs text-gray-400 mt-1">Optional — shows the linked employee's photo here for recognition.</p>
+            </div>
             <div className="flex gap-2 pt-1">
               <button type="submit" disabled={isSaving} className="btn-primary">
                 {isSaving ? "Saving…" : "Save"}
@@ -245,17 +351,20 @@ export default function UsersPage() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50">
               <tr>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide"></th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Name</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Email</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Role</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Department</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Last Login</th>
                 <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {users.map((u) => (
                 <tr key={u.id} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-4 py-3"><UserAvatar user={u} /></td>
                   <td className="px-4 py-3 font-medium text-gray-900">{u.fullName}</td>
                   <td className="px-4 py-3 text-gray-500">{u.email}</td>
                   <td className="px-4 py-3">
@@ -269,6 +378,7 @@ export default function UsersPage() {
                       {u.isActive ? "Active" : "Inactive"}
                     </span>
                   </td>
+                  <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{formatLastLogin(u.lastLoginAt)}</td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-3">
                       <button onClick={() => openEdit(u)} className="text-xs text-magen-green hover:underline font-medium">

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import type { FormEvent } from "react";
 import {
   Pencil,
@@ -281,6 +282,7 @@ export default function SitesPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ACTIVE");
   const [clientFilter, setClientFilter] = useState("");
   const [page, setPage] = useState(1);
+  const [searchParams] = useSearchParams();
 
   // Form state
   const [editingId, setEditingId] = useState<string | "new" | null>(null);
@@ -304,16 +306,17 @@ export default function SitesPage() {
     }
   }
 
-  async function loadSites(overridePage?: number) {
+  async function loadSites(overridePage?: number, overrideSearch?: string) {
     setIsLoading(true);
     setError(null);
     const targetPage = overridePage ?? page;
+    const effectiveSearch = overrideSearch !== undefined ? overrideSearch : search;
     try {
       const params: Record<string, unknown> = {
         page: targetPage,
         pageSize: PAGE_SIZE,
       };
-      if (search.trim()) params.search = search.trim();
+      if (effectiveSearch.trim()) params.search = effectiveSearch.trim();
       if (statusFilter !== "ALL") params.status = statusFilter;
       if (clientFilter) params.clientId = clientFilter;
 
@@ -329,6 +332,18 @@ export default function SitesPage() {
 
   useEffect(() => {
     loadClients();
+  }, []);
+
+  // Global search (Header search bar) links here as /sites?q=<term> — pick
+  // that up once on mount and seed the page's own search box with it.
+  useEffect(() => {
+    const q = searchParams.get("q");
+    if (q) {
+      setSearch(q);
+      setPage(1);
+      loadSites(1, q);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {

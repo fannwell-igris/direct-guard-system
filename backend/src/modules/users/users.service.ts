@@ -14,6 +14,11 @@ const SAFE_SELECT = {
   lastUpdated: true,
   departmentId: true,
   department: { select: { id: true, name: true } },
+  // Optional link to an Employee record (e.g. so the account holder's
+  // guard/staff photo can be shown here for recognition) — not every User
+  // maps to an Employee, per the schema comment on User.employeeId.
+  employeeId: true,
+  employee: { select: { id: true, fullName: true, photoFilename: true } },
   // passwordHash deliberately excluded - never returned by any endpoint.
 };
 
@@ -26,8 +31,16 @@ async function ensureDepartmentExists(departmentId: string) {
   }
 }
 
+async function ensureEmployeeExists(employeeId: string) {
+  const exists = await prisma.employee.findUnique({ where: { id: employeeId }, select: { id: true } });
+  if (!exists) {
+    throw ApiError.badRequest(`Employee ${employeeId} does not exist.`);
+  }
+}
+
 export async function createUser(input: UserCreateInput) {
   if (input.departmentId) await ensureDepartmentExists(input.departmentId);
+  if (input.employeeId) await ensureEmployeeExists(input.employeeId);
 
   const passwordHash = await bcrypt.hash(input.password, BCRYPT_ROUNDS);
 
@@ -38,6 +51,7 @@ export async function createUser(input: UserCreateInput) {
       fullName: input.fullName,
       role: input.role as any,
       departmentId: input.departmentId,
+      employeeId: input.employeeId,
     },
     select: SAFE_SELECT,
   });
@@ -58,6 +72,7 @@ export async function updateUser(id: string, input: UserUpdateInput) {
   if (!existing) throw ApiError.notFound(`User ${id} not found.`);
 
   if (input.departmentId) await ensureDepartmentExists(input.departmentId);
+  if (input.employeeId) await ensureEmployeeExists(input.employeeId);
 
   return prisma.user.update({ where: { id }, data: input as any, select: SAFE_SELECT });
 }
