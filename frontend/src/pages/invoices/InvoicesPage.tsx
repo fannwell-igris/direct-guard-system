@@ -17,6 +17,7 @@ import {
   Send,
   Clock,
   AlertTriangle,
+  Printer,
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import Modal from "../../components/ui/Modal";
@@ -126,6 +127,162 @@ function paidPercent(inv: Invoice): number {
   const total = Number(inv.amount);
   if (!total) return 0;
   return Math.min(100, Math.round((Number(inv.amountPaid) / total) * 100));
+}
+
+// ─── PDF export ───────────────────────────────────────────────────────────────
+// Styled to match the existing print templates (printPayrollRun / printPayslip
+// in PayrollPage.tsx, printDeploymentReport in DeploymentPage.tsx) — same
+// navy/green header, same "open a blank tab, write HTML, trigger print"
+// approach, no extra dependency.
+//
+// NOTE: the header currently only carries the company name — there's no
+// stored company address/TPIN/bank-details record anywhere in this app yet
+// (checked: no such fields in Settings or any Client/Company model). Add
+// those lines into the `.company-details` block below once you decide what
+// exact text should appear on an invoice sent to a client.
+function printInvoice(inv: Invoice, payments: Payment[]) {
+  const generatedDate = new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" });
+  const cfg = statusConfigPlain(inv.status);
+
+  const paymentRows = payments
+    .slice()
+    .sort((a, b) => new Date(a.paymentDate).getTime() - new Date(b.paymentDate).getTime())
+    .map(
+      (p) => `
+    <tr>
+      <td>${formatDate(p.paymentDate)}</td>
+      <td>${p.paymentMethod ?? "—"}</td>
+      <td>${p.reference ?? "—"}</td>
+      <td class="num">${formatCurrency(p.amount)}</td>
+    </tr>`
+    )
+    .join("");
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<title>Invoice ${inv.invoiceNumber}</title>
+<style>
+  @page { size: A4 portrait; margin: 18mm; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; font-size: 12px; color: #1a1a1a; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 18px; border-bottom: 2px solid #003770; padding-bottom: 12px; }
+  .logo { font-size: 26px; font-weight: 900; color: #003770; letter-spacing: -0.5px; }
+  .logo span { color: #09aa4c; }
+  .company-details { font-size: 10.5px; color: #555; margin-top: 4px; }
+  .doc-title { text-align: right; }
+  .doc-title h1 { font-size: 20px; font-weight: 800; color: #003770; letter-spacing: 1px; }
+  .doc-title .num { font-size: 12px; color: #555; margin-top: 2px; }
+  .status-pill { display: inline-block; margin-top: 6px; padding: 3px 10px; border-radius: 999px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; background: ${cfg.bg}; color: ${cfg.fg}; }
+  .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+  .meta-box h3 { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #999; margin-bottom: 4px; }
+  .meta-box p { font-size: 12px; color: #1a1a1a; line-height: 1.5; }
+  .meta-box p.muted { color: #666; font-size: 11px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 4px; }
+  thead { background: #003770; color: #fff; }
+  thead th { padding: 8px 10px; text-align: left; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; }
+  thead th.num { text-align: right; }
+  tbody tr { border-bottom: 1px solid #e5e7eb; }
+  tbody td { padding: 8px 10px; font-size: 11.5px; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .totals { width: 260px; margin-left: auto; margin-top: 14px; }
+  .totals-row { display: flex; justify-content: space-between; padding: 5px 10px; font-size: 11.5px; }
+  .totals-row.due { background: #003770; color: #fff; font-weight: 700; border-radius: 4px; font-size: 12.5px; margin-top: 4px; }
+  .notes { margin-top: 24px; font-size: 11px; color: #555; }
+  .notes h3 { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #999; margin-bottom: 4px; }
+  .payments-section { margin-top: 24px; }
+  .payments-section h3 { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #999; margin-bottom: 6px; }
+  .footer { margin-top: 30px; font-size: 9.5px; color: #999; text-align: center; border-top: 1px solid #e5e7eb; padding-top: 8px; }
+  @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+</style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <div class="logo">MAGEN<span>.</span></div>
+      <div class="company-details">Magen Security Limited &middot; Lusaka, Zambia</div>
+    </div>
+    <div class="doc-title">
+      <h1>INVOICE</h1>
+      <div class="num">${inv.invoiceNumber}</div>
+      <div class="status-pill">${cfg.label}</div>
+    </div>
+  </div>
+
+  <div class="meta-grid">
+    <div class="meta-box">
+      <h3>Billed To</h3>
+      <p><strong>${inv.client?.name ?? "—"}</strong></p>
+      ${inv.site ? `<p class="muted">${inv.site.siteName}</p>` : ""}
+    </div>
+    <div class="meta-box">
+      <h3>Invoice Details</h3>
+      <p class="muted">Invoice Date: <strong style="color:#1a1a1a">${formatDate(inv.invoiceDate)}</strong></p>
+      <p class="muted">Due Date: <strong style="color:#1a1a1a">${formatDate(inv.dueDate)}</strong></p>
+      ${inv.billingPeriod ? `<p class="muted">Billing Period: <strong style="color:#1a1a1a">${inv.billingPeriod}</strong></p>` : ""}
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Description</th>
+        <th class="num">Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Security services${inv.billingPeriod ? ` — ${inv.billingPeriod}` : ""}${inv.site ? ` (${inv.site.siteName})` : ""}</td>
+        <td class="num">${formatCurrency(inv.amount)}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="totals">
+    <div class="totals-row"><span>Invoice Total</span><span>${formatCurrency(inv.amount)}</span></div>
+    <div class="totals-row"><span>Amount Paid</span><span>${formatCurrency(inv.amountPaid)}</span></div>
+    <div class="totals-row due"><span>Balance Due</span><span>${formatCurrency(inv.outstandingBalance)}</span></div>
+  </div>
+
+  ${inv.notes ? `<div class="notes"><h3>Notes</h3><p>${inv.notes}</p></div>` : ""}
+
+  ${payments.length > 0 ? `
+  <div class="payments-section">
+    <h3>Payment History</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Method</th>
+          <th>Reference</th>
+          <th class="num">Amount</th>
+        </tr>
+      </thead>
+      <tbody>${paymentRows}</tbody>
+    </table>
+  </div>` : ""}
+
+  <div class="footer">Generated ${generatedDate} &middot; Magen Security Limited</div>
+</body>
+</html>`;
+
+  const win = window.open("", "_blank");
+  if (!win) return;
+  win.document.write(html);
+  win.document.close();
+  setTimeout(() => win.print(), 400);
+}
+
+function statusConfigPlain(status: InvoiceStatus): { label: string; bg: string; fg: string } {
+  switch (status) {
+    case "DRAFT": return { label: "Draft", bg: "#f3f4f6", fg: "#4b5563" };
+    case "ISSUED": return { label: "Issued", bg: "#dbeafe", fg: "#1d4ed8" };
+    case "PARTIALLY_PAID": return { label: "Partially Paid", bg: "#fef3c7", fg: "#b45309" };
+    case "PAID": return { label: "Paid", bg: "#dcfce7", fg: "#15803d" };
+    case "OVERDUE": return { label: "Overdue", bg: "#fee2e2", fg: "#b91c1c" };
+    case "CANCELLED": return { label: "Cancelled", bg: "#f3f4f6", fg: "#9ca3af" };
+  }
 }
 
 // ─── Blank forms ──────────────────────────────────────────────────────────────
@@ -815,6 +972,16 @@ export default function InvoicesPage() {
                         <AlertCircle size={14} className="mt-0.5 shrink-0" /> {actionError}
                       </div>
                     )}
+
+                    {/* Print / export — read-only action, available to anyone who can view this invoice */}
+                    <div className="flex gap-2 mb-3 flex-wrap">
+                      <button
+                        className="btn-secondary text-xs flex items-center gap-1"
+                        onClick={() => printInvoice(selectedInvoice, payments)}
+                      >
+                        <Printer size={12} /> Print / Export PDF
+                      </button>
+                    </div>
 
                     {/* Quick actions */}
                     {canEdit && (
