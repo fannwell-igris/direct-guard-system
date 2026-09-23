@@ -31,6 +31,35 @@ function loadAppUrl() {
 }
 
 let mainWindow;
+let splashWindow;
+
+// Small branded splash shown the instant the app launches, while the main
+// window loads the live CMS URL over the network (which can take a couple
+// seconds). Frameless/undecorated so it reads as a loading screen, not a
+// second app window. Closed as soon as the main window is ready to show
+// (success) or fails to load (so a network hiccup never leaves the user
+// staring at the splash forever).
+function createSplashWindow() {
+  splashWindow = new BrowserWindow({
+    width: 420,
+    height: 280,
+    frame: false,
+    resizable: false,
+    movable: false,
+    show: true,
+    backgroundColor: "#003770",
+    alwaysOnTop: true,
+    skipTaskbar: true,
+  });
+  splashWindow.loadFile(path.join(__dirname, "splash.html"));
+}
+
+function closeSplashWindow() {
+  if (splashWindow && !splashWindow.isDestroyed()) {
+    splashWindow.close();
+  }
+  splashWindow = null;
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -39,13 +68,27 @@ function createWindow() {
     minWidth: 1024,
     minHeight: 640,
     title: "Magen CMS",
-    backgroundColor: "#0b1f3a",
+    backgroundColor: "#003770",
     autoHideMenuBar: true,
+    show: false,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
       nodeIntegration: false,
     },
+  });
+
+  mainWindow.once("ready-to-show", () => {
+    closeSplashWindow();
+    mainWindow.show();
+  });
+
+  // If the CMS URL fails to load (e.g. no internet on launch), don't leave
+  // the user stuck on the splash screen forever -- show the window anyway
+  // so Electron's own "can't reach this page" error is visible.
+  mainWindow.webContents.on("did-fail-load", () => {
+    closeSplashWindow();
+    mainWindow.show();
   });
 
   const appUrl = loadAppUrl();
@@ -102,6 +145,7 @@ function buildMenu() {
 
 app.whenReady().then(() => {
   buildMenu();
+  createSplashWindow();
   createWindow();
 
   app.on("activate", () => {
