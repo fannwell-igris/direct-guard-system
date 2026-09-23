@@ -297,7 +297,7 @@ export default function SitesPage() {
 
   async function loadClients() {
     try {
-      const res = await api.get("/clients", { params: { pageSize: 200, status: "ACTIVE" } });
+      const res = await api.get("/clients", { params: { pageSize: 100, status: "ACTIVE" } });
       setClients(res.data.data);
     } catch {
       // non-fatal — form dropdown just shows empty

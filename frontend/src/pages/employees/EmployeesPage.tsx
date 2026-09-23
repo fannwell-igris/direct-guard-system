@@ -536,8 +536,8 @@ export default function EmployeesPage() {
   async function loadLookups() {
     try {
       const [clientsRes, sitesRes] = await Promise.all([
-        api.get("/clients", { params: { pageSize: 200, status: "ACTIVE" } }),
-        api.get("/sites", { params: { pageSize: 200, status: "ACTIVE" } }),
+        api.get("/clients", { params: { pageSize: 100, status: "ACTIVE" } }),
+        api.get("/sites", { params: { pageSize: 100, status: "ACTIVE" } }),
       ]);
       setClients(clientsRes.data.data);
       setSites(sitesRes.data.data);
