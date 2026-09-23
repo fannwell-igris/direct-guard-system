@@ -17,7 +17,10 @@ import {
  */
 export async function createEmployee(input: EmployeeCreateInput) {
   if (input.assignedClientId) await ensureClientExists(input.assignedClientId);
-  if (input.assignedSiteId) await ensureSiteExists(input.assignedSiteId);
+  if (input.assignedSiteId) {
+    await ensureSiteExists(input.assignedSiteId);
+    ensurePositionIsGuard(input.position);
+  }
   if (input.employeeNumber) await ensureEmployeeNumberAvailable(input.employeeNumber);
 
   return prisma.employee.create({
@@ -119,10 +122,19 @@ export async function getEmployeeById(id: string) {
 
 /** Updates editable fields on an employee, including employmentStatus if provided. */
 export async function updateEmployee(id: string, input: EmployeeUpdateInput) {
-  await ensureEmployeeExists(id);
+  const existing = await prisma.employee.findUnique({ where: { id }, select: { id: true, position: true } });
+  if (!existing) {
+    throw ApiError.notFound(`Employee ${id} not found.`);
+  }
 
   if (input.assignedClientId) await ensureClientExists(input.assignedClientId);
-  if (input.assignedSiteId) await ensureSiteExists(input.assignedSiteId);
+  if (input.assignedSiteId) {
+    await ensureSiteExists(input.assignedSiteId);
+    // Position may not be part of this update — fall back to the
+    // employee's existing position if the caller isn't changing it.
+    const effectivePosition = input.position !== undefined ? input.position : existing.position;
+    ensurePositionIsGuard(effectivePosition);
+  }
   if (input.employeeNumber) await ensureEmployeeNumberAvailable(input.employeeNumber, id);
 
   return prisma.employee.update({
@@ -241,6 +253,19 @@ async function ensureSiteExists(siteId: string) {
   const exists = await prisma.site.findUnique({ where: { id: siteId }, select: { id: true } });
   if (!exists) {
     throw ApiError.badRequest(`Site ${siteId} does not exist.`);
+  }
+}
+
+// `position` is free-text (see schema comment), so this is a
+// case-insensitive substring match rather than an enum check — covers
+// "Guard", "Site Guard", "Security Guard", etc. (2026-09-23: only Guards
+// may be assigned to a site, per explicit instruction. Also enforced in
+// the Roster module, which is the other place a site assignment happens.)
+function ensurePositionIsGuard(position: string | null | undefined) {
+  if (!position || !/guard/i.test(position)) {
+    throw ApiError.badRequest(
+      `Only employees whose position is "Guard" can be assigned to a site (this employee's position is "${position ?? "not set"}").`
+    );
   }
 }
 

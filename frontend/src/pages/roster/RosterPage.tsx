@@ -9,6 +9,9 @@ interface Lookup {
   name?: string;
   fullName?: string;
   siteName?: string;
+  // Only present on employees — used to restrict the Schedule Shift form
+  // to Guards only (see `guardEmployees` below).
+  position?: string | null;
   // Only present on sites — the parent client's status, so we can hide
   // sites belonging to an archived client (a site's own status isn't
   // automatically changed when its client is archived).
@@ -99,6 +102,15 @@ export default function RosterPage() {
   // roster entry whose employeeId isn't in this set belongs to someone
   // who's since been terminated — hide those from the list below.
   const activeEmployeeIds = useMemo(() => new Set(employees.map((e) => e.id)), [employees]);
+
+  // Only Guards can be scheduled to a site (backend enforces this too —
+  // see roster.service.ts's ensureEmployeeIsGuard). `position` is free
+  // text, so this is a case-insensitive substring match, same as the
+  // backend's check.
+  const guardEmployees = useMemo(
+    () => employees.filter((e) => e.position && /guard/i.test(e.position)),
+    [employees]
+  );
 
   // A site's own status isn't changed when its client is archived, so we
   // filter sites here using the client status the backend now includes —
@@ -261,12 +273,13 @@ export default function RosterPage() {
               <option value="" disabled>
                 Select...
               </option>
-              {employees.map((e) => (
+              {guardEmployees.map((e) => (
                 <option key={e.id} value={e.id}>
                   {e.fullName}
                 </option>
               ))}
             </select>
+            <p className="text-xs text-gray-500">Only Guards can be scheduled to a site.</p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">

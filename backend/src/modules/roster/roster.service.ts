@@ -23,7 +23,7 @@ import {
  * surfaces as a clean 409 via the shared error handler's P2002 handling.
  */
 export async function createRosterEntry(input: RosterEntryCreateInput) {
-  await ensureEmployeeExists(input.employeeId);
+  await ensureEmployeeIsGuard(input.employeeId);
   const site = await ensureSiteExists(input.siteId);
   await ensureShiftTypeExists(input.shiftTypeId);
 
@@ -118,7 +118,7 @@ export async function updateRosterEntry(id: string, input: RosterEntryUpdateInpu
     throw ApiError.notFound(`Roster entry ${id} not found.`);
   }
 
-  if (input.employeeId) await ensureEmployeeExists(input.employeeId);
+  if (input.employeeId) await ensureEmployeeIsGuard(input.employeeId);
   if (input.shiftTypeId) await ensureShiftTypeExists(input.shiftTypeId);
 
   let clientId: string | undefined;
@@ -136,10 +136,28 @@ export async function updateRosterEntry(id: string, input: RosterEntryUpdateInpu
   });
 }
 
-async function ensureEmployeeExists(employeeId: string) {
-  const exists = await prisma.employee.findUnique({ where: { id: employeeId }, select: { id: true } });
-  if (!exists) {
+// Free-text on the Employee record (see schema comment on `position`), so
+// this is a case-insensitive substring match rather than an enum check —
+// covers "Guard", "Site Guard", "Security Guard", etc. (2026-09-23: only
+// Guards may be scheduled to a site, per explicit instruction.)
+const GUARD_POSITION_PATTERN = /guard/i;
+
+function isGuardPosition(position: string | null | undefined): boolean {
+  return !!position && GUARD_POSITION_PATTERN.test(position);
+}
+
+async function ensureEmployeeIsGuard(employeeId: string) {
+  const employee = await prisma.employee.findUnique({
+    where: { id: employeeId },
+    select: { id: true, position: true },
+  });
+  if (!employee) {
     throw ApiError.badRequest(`Employee ${employeeId} does not exist.`);
+  }
+  if (!isGuardPosition(employee.position)) {
+    throw ApiError.badRequest(
+      `Only employees whose position is "Guard" can be scheduled to a site (this employee's position is "${employee.position ?? "not set"}").`
+    );
   }
 }
 

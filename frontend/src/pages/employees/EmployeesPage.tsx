@@ -297,6 +297,12 @@ function EmployeeModal({
   const isNew = editingId === "new";
   const title = isNew ? "Add Employee" : "Edit Employee";
 
+  // Only employees whose Position is "Guard" can be assigned to a site —
+  // backend enforces this too (see employees.service.ts's
+  // ensurePositionIsGuard). Position is free text, so this is a
+  // case-insensitive substring match, same as the backend's check.
+  const isGuardPosition = /guard/i.test(form.position);
+
   return (
     <div
       className="modal-overlay"
@@ -356,7 +362,16 @@ function EmployeeModal({
                 <label className="text-sm font-medium text-gray-700">Position</label>
                 <input
                   value={form.position}
-                  onChange={(e) => setForm((f) => ({ ...f, position: e.target.value }))}
+                  onChange={(e) =>
+                    setForm((f) => {
+                      const position = e.target.value;
+                      // Clear a now-invalid site assignment rather than
+                      // silently submitting it — the backend would reject
+                      // it anyway once Position stops matching "Guard".
+                      const stillGuard = /guard/i.test(position);
+                      return { ...f, position, assignedSiteId: stillGuard ? f.assignedSiteId : "" };
+                    })
+                  }
                   className="input"
                 />
               </div>
@@ -420,12 +435,19 @@ function EmployeeModal({
                   value={form.assignedSiteId}
                   onChange={(e) => setForm((f) => ({ ...f, assignedSiteId: e.target.value }))}
                   className="select"
+                  disabled={!isGuardPosition}
+                  title={isGuardPosition ? undefined : 'Only employees whose Position is "Guard" can be assigned to a site.'}
                 >
                   <option value="">None</option>
                   {sites.map((s) => (
                     <option key={s.id} value={s.id}>{s.siteName}</option>
                   ))}
                 </select>
+                {!isGuardPosition && (
+                  <p className="text-xs text-gray-500">
+                    Only Guards can be assigned to a site — set Position to "Guard" first.
+                  </p>
+                )}
               </div>
             </div>
 
