@@ -1,0 +1,45 @@
+{
+  "name": "magen-cms-desktop",
+  "version": "1.0.0",
+  "description": "Desktop app for the Magen Security Group Company Management System",
+  "main": "main.js",
+  "author": "Magen Security Limited",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.magensecurity.cms",
+    "productName": "Magen CMS",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "config.json",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Magen CMS"
+    }
+  }
+}
