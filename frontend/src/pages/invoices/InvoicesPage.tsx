@@ -21,6 +21,18 @@ import {
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import Modal from "../../components/ui/Modal";
+import magenLogoUrl from "../../assets/magen-logo.svg";
+
+// Magen Security's own registration/contact details for the invoice
+// letterhead — matches the real branded invoice template (address, phone,
+// email, TPIN). Update here if any of these change; there's nowhere else
+// in the app these are stored yet (see the removed NOTE below this file
+// used to carry — no Settings/Client record holds them).
+const COMPANY_TPIN = "2503459511";
+const COMPANY_ADDRESS_LINES = ["13 Kabulonga Road,", "100/608, Ibex Hill Lusaka."];
+const COMPANY_WEBSITE = "www.magensecurityltd.com";
+const COMPANY_PHONES = ["+260 760-271807", "+260 974-763639"];
+const COMPANY_EMAILS = ["info@magensecurityltd.com", "sales@magensecurityltd.com", "admin@magensecurityltd.com"];
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -130,17 +142,16 @@ function paidPercent(inv: Invoice): number {
 }
 
 // ─── PDF export ───────────────────────────────────────────────────────────────
-// Styled to match the existing print templates (printPayrollRun / printPayslip
-// in PayrollPage.tsx, printDeploymentReport in DeploymentPage.tsx) — same
-// navy/green header, same "open a blank tab, write HTML, trigger print"
-// approach, no extra dependency.
-//
-// NOTE: the header currently only carries the company name — there's no
-// stored company address/TPIN/bank-details record anywhere in this app yet
-// (checked: no such fields in Settings or any Client/Company model). Add
-// those lines into the `.company-details` block below once you decide what
-// exact text should appear on an invoice sent to a client.
-function printInvoice(inv: Invoice, payments: Payment[]) {
+// Rebuilt (2026-09-24) to match Magen Security's actual branded invoice
+// letterhead (logo, address block, numbered item table, signature lines,
+// footer with contact icons) instead of the earlier generic layout — see
+// the real invoice sample this was matched against. The underlying data
+// model still only carries ONE lump `amount` per invoice (no itemized line
+// items like the paper invoice's separate Day/Night Guarding rows) — this
+// prints that single amount as row "1" with the description built from
+// billingPeriod/site, same as before. Ask before adding real multi-line-item
+// support; that's a bigger, separate schema change, not bundled into this.
+function printInvoice(inv: Invoice, payments: Payment[], preparedByName?: string | null) {
   const generatedDate = new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" });
   const cfg = statusConfigPlain(inv.status);
 
@@ -164,85 +175,117 @@ function printInvoice(inv: Invoice, payments: Payment[]) {
 <meta charset="UTF-8"/>
 <title>Invoice ${inv.invoiceNumber}</title>
 <style>
-  @page { size: A4 portrait; margin: 18mm; }
+  @page { size: A4 portrait; margin: 16mm 18mm 14mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: Arial, sans-serif; font-size: 12px; color: #1a1a1a; }
-  .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 18px; border-bottom: 2px solid #003770; padding-bottom: 12px; }
-  .logo { font-size: 26px; font-weight: 900; color: #003770; letter-spacing: -0.5px; }
-  .logo span { color: #09aa4c; }
-  .company-details { font-size: 10.5px; color: #555; margin-top: 4px; }
-  .doc-title { text-align: right; }
-  .doc-title h1 { font-size: 20px; font-weight: 800; color: #003770; letter-spacing: 1px; }
-  .doc-title .num { font-size: 12px; color: #555; margin-top: 2px; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 10px; border-bottom: 3px solid #09aa4c; }
+  .header img.logo { height: 56px; }
+  .company-address { text-align: right; font-size: 10px; color: #444; line-height: 1.5; }
+  .company-address .website { color: #003770; font-weight: 600; }
+  .company-address .tpin { margin-top: 3px; color: #666; }
+  .doc-title { margin: 20px 0 16px; }
+  .doc-title h1 { font-size: 30px; font-weight: 800; color: #111; letter-spacing: 1px; }
   .status-pill { display: inline-block; margin-top: 6px; padding: 3px 10px; border-radius: 999px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; background: ${cfg.bg}; color: ${cfg.fg}; }
-  .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
-  .meta-box h3 { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #999; margin-bottom: 4px; }
-  .meta-box p { font-size: 12px; color: #1a1a1a; line-height: 1.5; }
-  .meta-box p.muted { color: #666; font-size: 11px; }
-  table { width: 100%; border-collapse: collapse; margin-top: 4px; }
-  thead { background: #003770; color: #fff; }
-  thead th { padding: 8px 10px; text-align: left; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; }
-  thead th.num { text-align: right; }
-  tbody tr { border-bottom: 1px solid #e5e7eb; }
-  tbody td { padding: 8px 10px; font-size: 11.5px; }
-  td.num { text-align: right; font-variant-numeric: tabular-nums; }
-  .totals { width: 260px; margin-left: auto; margin-top: 14px; }
-  .totals-row { display: flex; justify-content: space-between; padding: 5px 10px; font-size: 11.5px; }
-  .totals-row.due { background: #003770; color: #fff; font-weight: 700; border-radius: 4px; font-size: 12.5px; margin-top: 4px; }
-  .notes { margin-top: 24px; font-size: 11px; color: #555; }
+  .meta-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 18px; }
+  .customer-box { flex: 1; border: 1px solid #d8dee6; border-radius: 3px; overflow: hidden; }
+  .customer-box .bar { background: #003770; color: #fff; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; padding: 5px 10px; }
+  .customer-box .body { padding: 8px 10px; font-size: 12px; line-height: 1.5; }
+  .info-table { border-collapse: collapse; }
+  .info-table td { border: 1px solid #d8dee6; padding: 5px 10px; font-size: 11px; }
+  .info-table td.label { background: #003770; color: #fff; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; font-size: 9.5px; }
+  .info-table td.invoice-no { color: #c0392b; font-weight: 700; }
+  table.items { width: 100%; border-collapse: collapse; margin-top: 4px; }
+  table.items thead { background: #003770; color: #fff; }
+  table.items thead th { padding: 8px 10px; text-align: left; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; }
+  table.items thead th.num { text-align: right; }
+  table.items tbody td { padding: 9px 10px; font-size: 11.5px; border-bottom: 1px solid #eef1f4; vertical-align: top; }
+  table.items td.rownum { width: 24px; color: #888; }
+  table.items td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .totals { width: 260px; margin-left: auto; margin-top: 4px; }
+  .totals table { width: 100%; border-collapse: collapse; }
+  .totals td { padding: 6px 10px; font-size: 11.5px; border: 1px solid #d8dee6; }
+  .totals td.label { background: #003770; color: #fff; font-weight: 700; text-transform: uppercase; font-size: 9.5px; letter-spacing: 0.3px; }
+  .totals td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .totals tr.due td { font-weight: 800; }
+  .totals tr.balance td { background: #fff7e6; }
+  .notes { margin-top: 22px; font-size: 11px; color: #555; }
   .notes h3 { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #999; margin-bottom: 4px; }
-  .payments-section { margin-top: 24px; }
+  .payments-section { margin-top: 22px; }
   .payments-section h3 { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #999; margin-bottom: 6px; }
-  .footer { margin-top: 30px; font-size: 9.5px; color: #999; text-align: center; border-top: 1px solid #e5e7eb; padding-top: 8px; }
+  .payments-section table { width: 100%; border-collapse: collapse; }
+  .payments-section thead { background: #f3f4f6; color: #555; }
+  .payments-section thead th { padding: 6px 10px; text-align: left; font-size: 9.5px; font-weight: 600; text-transform: uppercase; }
+  .payments-section thead th.num { text-align: right; }
+  .payments-section tbody tr { border-bottom: 1px solid #eef1f4; }
+  .payments-section tbody td { padding: 6px 10px; font-size: 11px; }
+  .payments-section td.num { text-align: right; }
+  .signatures { margin-top: 46px; display: flex; flex-direction: column; gap: 22px; width: 300px; }
+  .sig-row { display: flex; align-items: baseline; gap: 8px; font-size: 12px; }
+  .sig-row .sig-label { color: #333; white-space: nowrap; }
+  .sig-row .sig-line { flex: 1; border-bottom: 1px solid #999; min-width: 120px; padding-bottom: 2px; font-weight: 700; }
+  .footer { margin-top: 36px; border-top: 1px solid #e5e7eb; padding-top: 10px; display: flex; justify-content: space-between; font-size: 9.5px; color: #555; flex-wrap: wrap; gap: 8px; }
+  .footer .tagline { text-align: right; color: #09aa4c; font-weight: 700; }
+  .footer .tagline span { display: block; color: #444; font-weight: 400; }
   @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
 </style>
 </head>
 <body>
   <div class="header">
-    <div>
-      <div class="logo">MAGEN<span>.</span></div>
-      <div class="company-details">Magen Security Limited &middot; Lusaka, Zambia</div>
-    </div>
-    <div class="doc-title">
-      <h1>INVOICE</h1>
-      <div class="num">${inv.invoiceNumber}</div>
-      <div class="status-pill">${cfg.label}</div>
+    <img class="logo" src="${magenLogoUrl}" alt="Magen Security" />
+    <div class="company-address">
+      ${COMPANY_ADDRESS_LINES.map((l) => `<div>${l}</div>`).join("")}
+      <div class="website">${COMPANY_WEBSITE}</div>
+      <div class="tpin">TPIN: ${COMPANY_TPIN}</div>
     </div>
   </div>
 
-  <div class="meta-grid">
-    <div class="meta-box">
-      <h3>Billed To</h3>
-      <p><strong>${inv.client?.name ?? "—"}</strong></p>
-      ${inv.site ? `<p class="muted">${inv.site.siteName}</p>` : ""}
-    </div>
-    <div class="meta-box">
-      <h3>Invoice Details</h3>
-      <p class="muted">Invoice Date: <strong style="color:#1a1a1a">${formatDate(inv.invoiceDate)}</strong></p>
-      <p class="muted">Due Date: <strong style="color:#1a1a1a">${formatDate(inv.dueDate)}</strong></p>
-      ${inv.billingPeriod ? `<p class="muted">Billing Period: <strong style="color:#1a1a1a">${inv.billingPeriod}</strong></p>` : ""}
-    </div>
+  <div class="doc-title">
+    <h1>INVOICE</h1>
+    <div class="status-pill">${cfg.label}</div>
   </div>
 
-  <table>
+  <div class="meta-row">
+    <div class="customer-box">
+      <div class="bar">Customer Details</div>
+      <div class="body">
+        <strong>${inv.client?.name ?? "—"}</strong>
+        ${inv.site ? `<div style="color:#666;font-size:11px;margin-top:2px;">${inv.site.siteName}</div>` : ""}
+      </div>
+    </div>
+    <table class="info-table">
+      <tr><td class="label">Invoice no#</td><td class="invoice-no">${inv.invoiceNumber}</td></tr>
+      <tr><td class="label">Date</td><td>${formatDate(inv.invoiceDate)}</td></tr>
+      <tr><td class="label">Due Date</td><td>${formatDate(inv.dueDate)}</td></tr>
+    </table>
+  </div>
+
+  <table class="items">
     <thead>
       <tr>
+        <th class="rownum"></th>
         <th>Description</th>
-        <th class="num">Amount</th>
+        <th class="num">Price (K)</th>
+        <th class="num">Amount (K)</th>
       </tr>
     </thead>
     <tbody>
       <tr>
+        <td class="rownum">1</td>
         <td>Security services${inv.billingPeriod ? ` — ${inv.billingPeriod}` : ""}${inv.site ? ` (${inv.site.siteName})` : ""}</td>
+        <td class="num"></td>
         <td class="num">${formatCurrency(inv.amount)}</td>
       </tr>
     </tbody>
   </table>
 
   <div class="totals">
-    <div class="totals-row"><span>Invoice Total</span><span>${formatCurrency(inv.amount)}</span></div>
-    <div class="totals-row"><span>Amount Paid</span><span>${formatCurrency(inv.amountPaid)}</span></div>
-    <div class="totals-row due"><span>Balance Due</span><span>${formatCurrency(inv.outstandingBalance)}</span></div>
+    <table>
+      <tr><td class="label">Sub Total</td><td class="num">${formatCurrency(inv.amount)}</td></tr>
+      <tr><td class="label">Discount</td><td class="num"></td></tr>
+      <tr class="due"><td class="label">Total</td><td class="num">${formatCurrency(inv.amount)}</td></tr>
+      <tr class="balance"><td class="label">Amount Paid</td><td class="num">${formatCurrency(inv.amountPaid)}</td></tr>
+      <tr class="balance"><td class="label">Balance Due</td><td class="num">${formatCurrency(inv.outstandingBalance)}</td></tr>
+    </table>
   </div>
 
   ${inv.notes ? `<div class="notes"><h3>Notes</h3><p>${inv.notes}</p></div>` : ""}
@@ -263,7 +306,21 @@ function printInvoice(inv: Invoice, payments: Payment[]) {
     </table>
   </div>` : ""}
 
-  <div class="footer">Generated ${generatedDate} &middot; Magen Security Limited</div>
+  <div class="signatures">
+    <div class="sig-row"><span class="sig-label">Prepared by:</span><span class="sig-line">${preparedByName ?? "&nbsp;"}</span></div>
+    <div class="sig-row"><span class="sig-label">Signature:</span><span class="sig-line">&nbsp;</span></div>
+    <div class="sig-row"><span class="sig-label">Received by:</span><span class="sig-line">&nbsp;</span></div>
+    <div class="sig-row"><span class="sig-label">Signature:</span><span class="sig-line">&nbsp;</span></div>
+  </div>
+
+  <div class="footer">
+    <div>
+      <div>Cell: ${COMPANY_PHONES.join(" &middot; ")}</div>
+      <div>${COMPANY_EMAILS.join(" &middot; ")}</div>
+      <div style="margin-top:4px;color:#999;">Generated ${generatedDate}</div>
+    </div>
+    <div class="tagline">Visible &middot; Vigilant &middot; Always Ready<span>Magen Security Limited</span></div>
+  </div>
 </body>
 </html>`;
 
@@ -977,7 +1034,7 @@ export default function InvoicesPage() {
                     <div className="flex gap-2 mb-3 flex-wrap">
                       <button
                         className="btn-secondary text-xs flex items-center gap-1"
-                        onClick={() => printInvoice(selectedInvoice, payments)}
+                        onClick={() => printInvoice(selectedInvoice, payments, user?.fullName)}
                       >
                         <Printer size={12} /> Print / Export PDF
                       </button>
