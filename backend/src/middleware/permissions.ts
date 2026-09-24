@@ -65,7 +65,7 @@ const ALL_ROLES: Role[] = ["ADMIN", "MANAGER", "PAYROLL", "OPERATIONS", "STAFF",
 // so — write access to Clients itself is still ADMIN/MANAGER only.
 const GET_CLIENTS: Role[] = ["ADMIN", "MANAGER", "OPERATIONS", "MARKETING", "PAYROLL"];
 const GET_CLIENT_CONTRACTS: Role[] = ["ADMIN", "MANAGER", "OPERATIONS", "MARKETING"];
-const GET_EMPLOYEES: Role[] = ["ADMIN", "MANAGER", "PAYROLL", "HR"];
+const GET_EMPLOYEES: Role[] = ["ADMIN", "MANAGER", "PAYROLL", "HR", "OPERATIONS"];
 const GET_EMPLOYEE_CONTRACTS: Role[] = ["ADMIN", "MANAGER", "PAYROLL", "HR"];
 const GET_PAYROLL: Role[] = ["ADMIN", "MANAGER", "PAYROLL", "HR"];
 const GET_OPERATIONS: Role[] = ["ADMIN", "MANAGER", "OPERATIONS", "HR"];
@@ -111,10 +111,17 @@ const REGISTRY: RouteRule[] = [
   // existed; user's actual wording was "see", so write access removed).
   { prefix: "/api/employee-contracts", methods: { GET: GET_EMPLOYEE_CONTRACTS, POST: ADMIN_MANAGER, PUT: ADMIN_MANAGER, PATCH: ADMIN_MANAGER, DELETE: ADMIN } },
 
-  // Employees — deliberately NO Operations access to the general
-  // employee database, per the spec's explicit instruction. Operations
-  // gets employee info through Roster/Operations' own nested responses,
-  // not this endpoint.
+  // Employees — was deliberately NO Operations GET access to the general
+  // employee database, per the spec's explicit instruction (Operations
+  // was meant to get employee info only through Roster/Operations' own
+  // nested responses, not this endpoint).
+  // UPDATED (2026-09-24, explicit instruction): that turned out to break
+  // Roster in practice — the "Schedule Shift" form's Employee dropdown
+  // calls this endpoint directly, so Operations had no way to see any
+  // employees to schedule. OPERATIONS added to GET_EMPLOYEES above (basic
+  // fields only — name/position/status, not salary or contract data,
+  // which stays behind /api/employee-contracts and /api/payroll, both
+  // still closed to Operations).
   // UPDATED (2026-09-24, explicit instruction): write access (create/edit)
   // is ADMIN + HR only — MANAGER no longer has write access here, only
   // GET (via GET_EMPLOYEES below). This supersedes the 2026-09-16 "HR is
