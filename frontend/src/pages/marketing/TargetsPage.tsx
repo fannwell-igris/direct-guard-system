@@ -110,7 +110,7 @@ export default function TargetsPage() {
   }, [year, month]);
 
   useEffect(() => {
-    api.get("/prospects/assignable-users").then((r) => setMarketers(r.data)).catch(() => {});
+    api.get("/prospects/assignable-users").then((r) => setMarketers(r.data.data)).catch(() => {});
   }, []);
 
   function openCreate() {

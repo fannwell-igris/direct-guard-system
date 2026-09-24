@@ -63,7 +63,7 @@ export default function ReportsPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    api.get("/prospects/assignable-users").then((r) => setMarketers(r.data)).catch(() => {});
+    api.get("/prospects/assignable-users").then((r) => setMarketers(r.data.data)).catch(() => {});
   }, []);
 
   async function load() {
