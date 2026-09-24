@@ -227,6 +227,15 @@ function buildWhere(query: InvoiceListQuery): Prisma.InvoiceWhereInput {
   return where;
 }
 
+// One-time starting offsets so the system's numbering continues from an
+// existing manual/paper invoice sequence instead of restarting at 1 for a
+// year that already has real-world invoices issued under lower numbers.
+// Only years listed here get an offset; every other year (including future
+// ones) starts fresh at 0001 as normal.
+const INVOICE_NUMBER_START_OFFSET: Record<number, number> = {
+  2026: 398, // first system invoice this year should read INV-2026-0399
+};
+
 async function generateInvoiceNumber(invoiceDate: Date): Promise<string> {
   const year = invoiceDate.getUTCFullYear();
   const yearStart = new Date(Date.UTC(year, 0, 1));
@@ -234,7 +243,8 @@ async function generateInvoiceNumber(invoiceDate: Date): Promise<string> {
   const countThisYear = await prisma.invoice.count({
     where: { invoiceDate: { gte: yearStart, lt: yearEnd } },
   });
-  const sequence = String(countThisYear + 1).padStart(4, "0");
+  const offset = INVOICE_NUMBER_START_OFFSET[year] ?? 0;
+  const sequence = String(countThisYear + 1 + offset).padStart(4, "0");
   return `INV-${year}-${sequence}`;
 }
 
