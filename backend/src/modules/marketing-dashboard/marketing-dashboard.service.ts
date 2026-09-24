@@ -65,6 +65,13 @@ function resolvePeriodRange(query: DashboardQuery): { from: Date; to: Date } {
 export async function getDashboard(query: DashboardQuery) {
   const { from, to } = resolvePeriodRange(query);
   const periodFilter = { gte: from, lte: to };
+  const marketerId = query.marketerId;
+  // Scopes every count below to one marketer's own prospects/activities
+  // when set; omitted (undefined) leaves the whole team's data, same as
+  // before this filter existed.
+  const assigneeFilter = marketerId ? { assignedToId: marketerId } : {};
+  const performerFilter = marketerId ? { performedById: marketerId } : {};
+  const stageHistoryAssigneeFilter = marketerId ? { prospect: { assignedToId: marketerId } } : {};
 
   const endOfToday = new Date();
   endOfToday.setHours(23, 59, 59, 999);
@@ -79,24 +86,24 @@ export async function getDashboard(query: DashboardQuery) {
     stageHistoryRows,
     activityGroups,
   ] = await Promise.all([
-    prisma.prospect.count({ where: { dateAdded: periodFilter } }),
+    prisma.prospect.count({ where: { dateAdded: periodFilter, ...assigneeFilter } }),
     prisma.prospect.count({
-      where: { nextFollowUpDate: { lte: endOfToday }, stage: { notIn: TERMINAL_STAGES } },
+      where: { nextFollowUpDate: { lte: endOfToday }, stage: { notIn: TERMINAL_STAGES }, ...assigneeFilter },
     }),
-    prisma.prospect.count({ where: { stage: { notIn: TERMINAL_STAGES } } }),
+    prisma.prospect.count({ where: { stage: { notIn: TERMINAL_STAGES }, ...assigneeFilter } }),
     prisma.prospect.aggregate({
-      where: { stage: { notIn: TERMINAL_STAGES } },
+      where: { stage: { notIn: TERMINAL_STAGES }, ...assigneeFilter },
       _sum: { opportunityValue: true },
     }),
-    prisma.prospect.count({ where: { stage: "WON" } }),
-    prisma.prospect.count({ where: { stage: { in: TERMINAL_LOST } } }),
+    prisma.prospect.count({ where: { stage: "WON", ...assigneeFilter } }),
+    prisma.prospect.count({ where: { stage: { in: TERMINAL_LOST }, ...assigneeFilter } }),
     prisma.prospectStageHistory.findMany({
-      where: { changedAt: periodFilter },
+      where: { changedAt: periodFilter, ...stageHistoryAssigneeFilter },
       select: { prospectId: true, toStage: true },
     }),
     prisma.marketingActivity.groupBy({
       by: ["type"],
-      where: { activityDate: periodFilter },
+      where: { activityDate: periodFilter, ...performerFilter },
       _count: { _all: true },
     }),
   ]);
@@ -144,4 +151,30 @@ export async function getDashboard(query: DashboardQuery) {
     activityByType,
     funnel,
   };
+}
+
+/**
+ * Marketing module Phase 8 (Management drill-down: Marketing -> Team ->
+ * Individual). One row per active MARKETING-role user, each computed with
+ * the same getDashboard() logic above scoped to that person — so "Team"
+ * and "Individual" always agree with each other and with the team-wide
+ * dashboard, nothing is aggregated differently in two places.
+ */
+export async function getTeamBreakdown(query: Omit<DashboardQuery, "marketerId">) {
+  const marketers = await prisma.user.findMany({
+    where: { role: "MARKETING", isActive: true },
+    select: { id: true, fullName: true },
+    orderBy: { fullName: "asc" },
+  });
+
+  const { from, to } = resolvePeriodRange(query);
+
+  const rows = await Promise.all(
+    marketers.map(async (marketer) => ({
+      marketer,
+      ...(await getDashboard({ ...query, marketerId: marketer.id })),
+    }))
+  );
+
+  return { period: { type: query.period, from, to }, marketers: rows };
 }

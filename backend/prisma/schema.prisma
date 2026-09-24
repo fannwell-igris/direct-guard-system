@@ -1108,6 +1108,7 @@ model User {
   prospectStageChanges ProspectStageHistory[] @relation("ProspectStageChanger")
   marketingActivities  MarketingActivity[]    @relation("MarketingActivityPerformer")
   fieldVisits          FieldVisit[]           @relation("FieldVisitMarketer")
+  marketingTargets     MarketingTarget[]      @relation("MarketingTargetMarketer")
 
   @@map("users")
 }
@@ -1499,4 +1500,35 @@ model FieldVisit {
   @@index([marketerId])
   @@index([visitDate])
   @@map("field_visits")
+}
+
+// Marketing: Tasks & Targets — Phase 5 of the Marketing module. Tasks
+// themselves reuse the existing generic Task model (departmentId lets a
+// marketing task be filed under a "Marketing" department once one exists,
+// per the brief's "reuse, don't rebuild" instruction). Targets are new:
+// a lightweight monthly goal per marketer (or team-wide when marketerId
+// is null), compared against actuals computed at read time from
+// Prospect/MarketingActivity/FieldVisit/ProspectStageHistory — nothing
+// duplicated or cached here, just the goal numbers themselves.
+model MarketingTarget {
+  id String @id @default(uuid())
+
+  marketerId String?
+  marketer   User?   @relation("MarketingTargetMarketer", fields: [marketerId], references: [id], onDelete: SetNull)
+
+  periodYear  Int
+  periodMonth Int // 1-12
+
+  targetNewProspects Int?
+  targetActivities   Int?
+  targetVisits       Int?
+  targetConversions  Int?
+  notes              String?
+
+  dateCreated DateTime @default(now())
+  lastUpdated DateTime @updatedAt
+
+  @@index([marketerId])
+  @@index([periodYear, periodMonth])
+  @@map("marketing_targets")
 }

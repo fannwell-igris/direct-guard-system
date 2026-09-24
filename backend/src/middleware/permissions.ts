@@ -164,7 +164,12 @@ const REGISTRY: RouteRule[] = [
   { prefix: "/api/invoices", methods: { GET: ADMIN_MANAGER_PAYROLL, POST: ADMIN_PAYROLL, PUT: ADMIN_PAYROLL, PATCH: ADMIN_PAYROLL, DELETE: ADMIN } },
   { prefix: "/api/payments", methods: { GET: ADMIN_MANAGER_PAYROLL, POST: ADMIN_PAYROLL, PUT: ADMIN_PAYROLL, PATCH: ADMIN_PAYROLL, DELETE: ADMIN } },
   { prefix: "/api/operational-costs", methods: { GET: ADMIN_MANAGER_PAYROLL, POST: ADMIN_PAYROLL, PUT: ADMIN_PAYROLL, PATCH: ADMIN_PAYROLL, DELETE: ADMIN } },
-  { prefix: "/api/general-expenses", methods: { GET: ADMIN_MANAGER_PAYROLL, POST: ADMIN_PAYROLL, PUT: ADMIN_PAYROLL, PATCH: ADMIN_PAYROLL, DELETE: ADMIN } },
+  // MARKETING added to GET only (2026-09-24, Marketing module Phase 6
+  // "Marketing Expenses") — per the brief this reuses General Expenses
+  // rather than a separate system, and per the Finance-cluster rule above
+  // ("Only Admin and Finance can edit Finance") marketers can see what's
+  // been logged for their department, not create/edit expenses directly.
+  { prefix: "/api/general-expenses", methods: { GET: ["ADMIN", "MANAGER", "PAYROLL", "MARKETING"], POST: ADMIN_PAYROLL, PUT: ADMIN_PAYROLL, PATCH: ADMIN_PAYROLL, DELETE: ADMIN } },
 
   // Inventory — no broad STAFF access. A future "My Assigned Assets"
   // endpoint with row-level filtering is explicitly out of scope here.
@@ -172,13 +177,18 @@ const REGISTRY: RouteRule[] = [
 
   // Tasks — STAFF gets nothing at this layer until "my tasks" row-level
   // endpoints exist, per the spec's explicit instruction not to expose
-  // all tasks "temporarily".
-  { prefix: "/api/tasks", methods: { GET: ["ADMIN", "MANAGER", "OPERATIONS", "PAYROLL", "HR"], POST: ["ADMIN", "MANAGER", "OPERATIONS", "PAYROLL", "HR"], PUT: ["ADMIN", "MANAGER", "OPERATIONS", "PAYROLL", "HR"], PATCH: ["ADMIN", "MANAGER", "OPERATIONS", "PAYROLL", "HR"], DELETE: ADMIN_MANAGER } },
+  // all tasks "temporarily". MARKETING added (2026-09-24, Marketing
+  // module Phase 5 "Tasks and Targets") — reuses this existing module
+  // rather than a separate marketing-only tasks system, per the brief.
+  { prefix: "/api/tasks", methods: { GET: ["ADMIN", "MANAGER", "OPERATIONS", "PAYROLL", "HR", "MARKETING"], POST: ["ADMIN", "MANAGER", "OPERATIONS", "PAYROLL", "HR", "MARKETING"], PUT: ["ADMIN", "MANAGER", "OPERATIONS", "PAYROLL", "HR", "MARKETING"], PATCH: ["ADMIN", "MANAGER", "OPERATIONS", "PAYROLL", "HR", "MARKETING"], DELETE: ADMIN_MANAGER } },
 
   // Department Requests — Operations can create/view; Payroll/Finance
   // reviews (GET + status transitions, not create); Staff gets nothing
-  // until "my requests" exists.
-  { prefix: "/api/department-requests", methods: { GET: ["ADMIN", "MANAGER", "OPERATIONS", "PAYROLL", "HR"], POST: ["ADMIN", "MANAGER", "OPERATIONS", "HR"], PUT: ["ADMIN", "MANAGER", "PAYROLL"], PATCH: ["ADMIN", "MANAGER", "PAYROLL"], DELETE: ADMIN } },
+  // until "my requests" exists. MARKETING added to GET/POST (2026-09-24,
+  // Marketing module Phase 7) — the brief explicitly says Marketing
+  // Requests should reuse this module rather than a separate system, but
+  // MARKETING was never actually granted access to it until now.
+  { prefix: "/api/department-requests", methods: { GET: ["ADMIN", "MANAGER", "OPERATIONS", "PAYROLL", "HR", "MARKETING"], POST: ["ADMIN", "MANAGER", "OPERATIONS", "HR", "MARKETING"], PUT: ["ADMIN", "MANAGER", "PAYROLL"], PATCH: ["ADMIN", "MANAGER", "PAYROLL"], DELETE: ADMIN } },
 
   // Departments — structural, ADMIN-only to modify. HR keeps read
   // access (needs to know the department structure), not write —
@@ -186,8 +196,10 @@ const REGISTRY: RouteRule[] = [
   // OPERATIONS added for GET: Operations submits Department Requests
   // (see below) and that form needs the department list to pick from —
   // same silent-empty-dropdown bug as Clients/Sites above, not a change
-  // in write access.
-  { prefix: "/api/departments", methods: { GET: ["ADMIN", "MANAGER", "HR", "OPERATIONS"], POST: ADMIN, PUT: ADMIN, PATCH: ADMIN, DELETE: ADMIN } },
+  // in write access. MARKETING added the same way (2026-09-24) — the
+  // Department Requests form MARKETING now also has access to needs this
+  // same dropdown.
+  { prefix: "/api/departments", methods: { GET: ["ADMIN", "MANAGER", "HR", "OPERATIONS", "MARKETING"], POST: ADMIN, PUT: ADMIN, PATCH: ADMIN, DELETE: ADMIN } },
 
   // Dashboard & Alerts — every authenticated role may hit the endpoint;
   // the DATA returned must be role-aware server-side (NOT enforced by
@@ -217,6 +229,10 @@ const REGISTRY: RouteRule[] = [
   // Marketing: Field Visits — same access shape as Prospects/Activities.
   // Covers the nested attachment endpoints too (segment-prefix match).
   { prefix: "/api/field-visits", methods: { GET: ["ADMIN", "MANAGER", "MARKETING"], POST: ["ADMIN", "MARKETING"], PUT: ["ADMIN", "MARKETING"], DELETE: ["ADMIN", "MARKETING"] } },
+
+  // Marketing: Targets — Phase 5 of the Marketing module, alongside Tasks
+  // above. Same access shape as the rest of the Marketing cluster.
+  { prefix: "/api/marketing-targets", methods: { GET: ["ADMIN", "MANAGER", "MARKETING"], POST: ["ADMIN", "MARKETING"], PUT: ["ADMIN", "MARKETING"], DELETE: ["ADMIN", "MARKETING"] } },
 
   // Settings — ADMIN only. Spec allows MANAGER access to "specifically
   // approved" config endpoints, but names none — not granted here.

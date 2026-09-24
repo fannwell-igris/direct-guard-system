@@ -28,6 +28,11 @@ import ProspectsPage from "./pages/marketing/ProspectsPage";
 import ActivitiesPage from "./pages/marketing/ActivitiesPage";
 import MarketingDashboardPage from "./pages/marketing/MarketingDashboardPage";
 import FieldVisitsPage from "./pages/marketing/FieldVisitsPage";
+import DepartmentsPage from "./pages/departments/DepartmentsPage";
+import TargetsPage from "./pages/marketing/TargetsPage";
+import MarketingExpensesPage from "./pages/marketing/MarketingExpensesPage";
+import ReportsPage from "./pages/marketing/ReportsPage";
+import ManagementPage from "./pages/marketing/ManagementPage";
 
 // NOTE (2026-09-13, MB.2): this file previously still had the default
 // Vite starter template in it -- AuthProvider/router/AppLayout/LoginPage/
@@ -64,6 +69,7 @@ function App() {
             <Route path="/department-requests" element={<DepartmentRequestsPage />} />
             <Route path="/expenses" element={<ExpensesPage />} />
             <Route path="/users" element={<UsersPage />} />
+            <Route path="/departments" element={<DepartmentsPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/alerts" element={<AlertsPage />} />
             <Route path="/site-coverage" element={<SiteCoveragePage />} />
@@ -74,6 +80,10 @@ function App() {
             <Route path="/marketing/activities" element={<ActivitiesPage />} />
             <Route path="/marketing/dashboard" element={<MarketingDashboardPage />} />
             <Route path="/marketing/field-visits" element={<FieldVisitsPage />} />
+            <Route path="/marketing/targets" element={<TargetsPage />} />
+            <Route path="/marketing/expenses" element={<MarketingExpensesPage />} />
+            <Route path="/marketing/reports" element={<ReportsPage />} />
+            <Route path="/marketing/management" element={<ManagementPage />} />
           </Route>
 
           {/* Anything unmatched falls back to the dashboard (or login, via AppLayout's own redirect if not authenticated) */}

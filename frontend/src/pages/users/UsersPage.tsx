@@ -111,6 +111,15 @@ function UserAvatar({ user }: { user: User }) {
 
 const ROLE_OPTIONS = ["ADMIN", "MANAGER", "HR", "PAYROLL", "OPERATIONS", "MARKETING", "STAFF"];
 
+// PAYROLL is this system's Finance role internally (see permissions.ts) —
+// displayed as "Finance" everywhere in the UI since that's what the role
+// actually covers (invoices, payments, expenses, payroll), but the stored
+// value stays PAYROLL to avoid a disruptive rename across the database,
+// permissions registry, and every existing user account.
+const ROLE_LABELS: Record<string, string> = {
+  PAYROLL: "Finance",
+};
+
 const ROLE_BADGE: Record<string, string> = {
   ADMIN:      "bg-red-100 text-red-700",
   MANAGER:    "bg-purple-100 text-purple-700",
@@ -282,7 +291,7 @@ export default function UsersPage() {
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Role</label>
               <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} className="select">
-                {ROLE_OPTIONS.map((r) => <option key={r} value={r}>{r}</option>)}
+                {ROLE_OPTIONS.map((r) => <option key={r} value={r}>{ROLE_LABELS[r] ?? r}</option>)}
               </select>
             </div>
             <div>
@@ -369,7 +378,7 @@ export default function UsersPage() {
                   <td className="px-4 py-3 text-gray-500">{u.email}</td>
                   <td className="px-4 py-3">
                     <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${ROLE_BADGE[u.role] ?? "bg-gray-100 text-gray-600"}`}>
-                      {u.role}
+                      {ROLE_LABELS[u.role] ?? u.role}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-gray-500">{u.department?.name ?? "—"}</td>

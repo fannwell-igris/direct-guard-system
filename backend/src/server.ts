@@ -8,6 +8,7 @@ import prospectsRoutes from "./modules/prospects/prospects.routes";
 import marketingActivitiesRoutes from "./modules/marketing-activities/marketing-activities.routes";
 import marketingDashboardRoutes from "./modules/marketing-dashboard/marketing-dashboard.routes";
 import fieldVisitsRoutes from "./modules/field-visits/field-visits.routes";
+import marketingTargetsRoutes from "./modules/marketing-targets/marketing-targets.routes";
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
@@ -192,6 +193,13 @@ app.use("/api/marketing-dashboard", marketingDashboardRoutes);
 // module. Includes attachment upload/serve/delete for a supporting photo
 // or document (see uploadMiddleware.ts's visit-attachments storage).
 app.use("/api/field-visits", fieldVisitsRoutes);
+
+// Marketing: Tasks & Targets — Phase 5 of the Marketing module. Tasks
+// themselves reuse the existing /api/tasks module above (see
+// permissions.ts for the added MARKETING access there); this is just the
+// new Targets piece — monthly goals per marketer, compared against live
+// actuals computed at read time.
+app.use("/api/marketing-targets", marketingTargetsRoutes);
 
 // Must be the LAST app.use() — Express only routes errors here if it's
 // registered after every other route/middleware.
