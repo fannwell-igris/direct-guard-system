@@ -207,6 +207,13 @@ const REGISTRY: RouteRule[] = [
   // prospects.routes.ts), so this falls through to default-deny either way.
   { prefix: "/api/prospects", methods: { GET: ["ADMIN", "MANAGER", "MARKETING"], POST: ["ADMIN", "MARKETING"], PUT: ["ADMIN", "MARKETING"], PATCH: ["ADMIN", "MARKETING"] } },
 
+  // Marketing: Activity tracking — same access shape as Prospects above:
+  // MARKETING owns the data, MANAGER can view for oversight/reporting.
+  { prefix: "/api/marketing-activities", methods: { GET: ["ADMIN", "MANAGER", "MARKETING"], POST: ["ADMIN", "MARKETING"], PUT: ["ADMIN", "MARKETING"], DELETE: ["ADMIN", "MARKETING"] } },
+
+  // Marketing: Dashboard — read-only, same viewers as the rest of Marketing.
+  { prefix: "/api/marketing-dashboard", methods: { GET: ["ADMIN", "MANAGER", "MARKETING"] } },
+
   // Settings — ADMIN only. Spec allows MANAGER access to "specifically
   // approved" config endpoints, but names none — not granted here.
   { prefix: "/api/settings", methods: { GET: ADMIN, POST: ADMIN, PUT: ADMIN, PATCH: ADMIN, DELETE: ADMIN } },

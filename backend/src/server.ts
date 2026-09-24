@@ -5,6 +5,8 @@ import alertsRouter from "./modules/alerts/alerts.routes";
 import { checkAndPushAlerts } from "./modules/alerts/push-notifier";
 import pushTokensRoutes from "./modules/push-tokens/push-tokens.routes";
 import prospectsRoutes from "./modules/prospects/prospects.routes";
+import marketingActivitiesRoutes from "./modules/marketing-activities/marketing-activities.routes";
+import marketingDashboardRoutes from "./modules/marketing-dashboard/marketing-dashboard.routes";
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
@@ -173,6 +175,17 @@ app.use("/api/push-tokens", pushTokensRoutes);
 // module. stage is only changed via PATCH /:id/stage, which appends a
 // ProspectStageHistory row rather than overwriting — see prospects.service.ts.
 app.use("/api/prospects", prospectsRoutes);
+
+// Marketing: Activity tracking — Phase 2 of the Marketing Department
+// module. Generic log covering calls/emails/WhatsApp/meetings/proposals/
+// quotations/social media/campaigns/networking/visits, optionally linked
+// to a Prospect and/or an existing Client.
+app.use("/api/marketing-activities", marketingActivitiesRoutes);
+
+// Marketing: Dashboard/funnel — Phase 3 of the Marketing Department
+// module. Read-only aggregate over Prospects/ProspectStageHistory/
+// MarketingActivity, nothing new stored here.
+app.use("/api/marketing-dashboard", marketingDashboardRoutes);
 
 // Must be the LAST app.use() — Express only routes errors here if it's
 // registered after every other route/middleware.

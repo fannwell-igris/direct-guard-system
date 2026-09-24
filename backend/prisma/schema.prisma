@@ -166,6 +166,7 @@ model Client {
   payrollRuns       PayrollRun[]
   rosterEntries     RosterEntry[]
   operationsRecords OperationsRecord[]
+  marketingActivities MarketingActivity[]
 
   @@map("clients")
 }
@@ -1104,6 +1105,7 @@ model User {
   // and the stage-change history entries this user made on any prospect.
   assignedProspects    Prospect[]             @relation("ProspectAssignee")
   prospectStageChanges ProspectStageHistory[] @relation("ProspectStageChanger")
+  marketingActivities  MarketingActivity[]    @relation("MarketingActivityPerformer")
 
   @@map("users")
 }
@@ -1385,4 +1387,63 @@ model ProspectStageHistory {
 
   @@index([prospectId])
   @@map("prospect_stage_history")
+}
+
+// ---------- MARKETING: ACTIVITY TRACKING ----------
+// Phase 2 of the Marketing Department module. Deliberately generic enough
+// to cover every activity type the brief lists (calls, emails, WhatsApp,
+// meetings, proposals/quotations sent, social media, campaigns,
+// networking) plus a lightweight VISIT entry — a fuller Field Visit
+// Management module (location, photo, person visited) is a later,
+// separate phase; this is not that, just the basic activity log an
+// eventual Visit record can also show up in.
+//
+// An activity may reference a Prospect, an existing Client, or neither
+// (e.g. general market research) — never required to have both, since a
+// call to an existing client isn't a "prospect" activity.
+
+enum MarketingActivityType {
+  EMAIL
+  CALL
+  WHATSAPP
+  VISIT
+  MEETING
+  FOLLOW_UP
+  PROPOSAL_SENT
+  QUOTATION_SENT
+  NEW_PROSPECT_IDENTIFIED
+  SOCIAL_MEDIA
+  CAMPAIGN
+  NETWORKING_EVENT
+  OTHER
+}
+
+model MarketingActivity {
+  id   String                @id @default(uuid())
+  type MarketingActivityType
+
+  prospectId String?
+  prospect   Prospect? @relation(fields: [prospectId], references: [id], onDelete: SetNull)
+
+  clientId String?
+  client   Client? @relation(fields: [clientId], references: [id], onDelete: SetNull)
+
+  purpose      String?
+  outcome      String?
+  nextAction   String?
+  followUpDate DateTime?
+  notes        String?
+
+  activityDate DateTime @default(now())
+
+  performedById String?
+  performedBy   User?   @relation("MarketingActivityPerformer", fields: [performedById], references: [id])
+
+  dateCreated DateTime @default(now())
+
+  @@index([prospectId])
+  @@index([clientId])
+  @@index([performedById])
+  @@index([activityDate])
+  @@map("marketing_activities")
 }
