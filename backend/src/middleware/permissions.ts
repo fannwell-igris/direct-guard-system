@@ -60,12 +60,19 @@ const ALL_ROLES: Role[] = ["ADMIN", "MANAGER", "PAYROLL", "OPERATIONS", "STAFF",
 // GET-only additions for HR/MARKETING, kept separate from the
 // write-capable consts above so neither role ever accidentally picks up
 // POST/PUT/PATCH/DELETE access through a shared array.
-const GET_CLIENTS: Role[] = ["ADMIN", "MANAGER", "OPERATIONS", "MARKETING"];
+// PAYROLL included: Payroll/Finance can create invoices (see the Finance
+// cluster below) and needs to see the client list to pick one when doing
+// so — write access to Clients itself is still ADMIN/MANAGER only.
+const GET_CLIENTS: Role[] = ["ADMIN", "MANAGER", "OPERATIONS", "MARKETING", "PAYROLL"];
 const GET_CLIENT_CONTRACTS: Role[] = ["ADMIN", "MANAGER", "OPERATIONS", "MARKETING"];
 const GET_EMPLOYEES: Role[] = ["ADMIN", "MANAGER", "PAYROLL", "HR"];
 const GET_EMPLOYEE_CONTRACTS: Role[] = ["ADMIN", "MANAGER", "PAYROLL", "HR"];
 const GET_PAYROLL: Role[] = ["ADMIN", "MANAGER", "PAYROLL", "HR"];
 const GET_OPERATIONS: Role[] = ["ADMIN", "MANAGER", "OPERATIONS", "HR"];
+// PAYROLL included: Payroll/Finance creates Operational Costs and General
+// Expenses, both of which require picking a site (validated as a
+// client+site pair) — write access to Sites itself stays ADMIN/MANAGER/OPERATIONS.
+const GET_SITES: Role[] = ["ADMIN", "MANAGER", "OPERATIONS", "PAYROLL"];
 
 /**
  * Routes that bypass this registry entirely. `/api/auth/login` is
@@ -92,7 +99,7 @@ const REGISTRY: RouteRule[] = [
 
   // Sites — Operations needs to both read and act on site info for
   // operational duties, per the spec.
-  { prefix: "/api/sites", methods: { GET: ADMIN_MANAGER_OPS, POST: ADMIN_MANAGER_OPS, PUT: ADMIN_MANAGER_OPS, PATCH: ADMIN_MANAGER_OPS, DELETE: ADMIN_MANAGER } },
+  { prefix: "/api/sites", methods: { GET: GET_SITES, POST: ADMIN_MANAGER_OPS, PUT: ADMIN_MANAGER_OPS, PATCH: ADMIN_MANAGER_OPS, DELETE: ADMIN_MANAGER } },
 
   // Client Contracts — MARKETING added to GET only (2026-09-16): "see
   // ...contracts we have", view-only.
@@ -169,7 +176,11 @@ const REGISTRY: RouteRule[] = [
   // Departments — structural, ADMIN-only to modify. HR keeps read
   // access (needs to know the department structure), not write —
   // unchanged from the prior session, not part of this correction.
-  { prefix: "/api/departments", methods: { GET: ["ADMIN", "MANAGER", "HR"], POST: ADMIN, PUT: ADMIN, PATCH: ADMIN, DELETE: ADMIN } },
+  // OPERATIONS added for GET: Operations submits Department Requests
+  // (see below) and that form needs the department list to pick from —
+  // same silent-empty-dropdown bug as Clients/Sites above, not a change
+  // in write access.
+  { prefix: "/api/departments", methods: { GET: ["ADMIN", "MANAGER", "HR", "OPERATIONS"], POST: ADMIN, PUT: ADMIN, PATCH: ADMIN, DELETE: ADMIN } },
 
   { prefix: "/api/employees", methods: { GET: ["ADMIN", "MANAGER", "HR", "PAYROLL"], POST: ["ADMIN", "HR"], PUT: ["ADMIN", "HR"], PATCH: ["ADMIN", "HR"], DELETE: ["ADMIN"] } },
 
