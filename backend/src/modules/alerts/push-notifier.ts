@@ -1,3 +1,4 @@
+import { UserRole } from "@prisma/client";
 import { prisma } from "../../lib/prisma";
 import { sendPushToTokens, isPushConfigured } from "../../lib/push";
 import { getAlerts, Alert, AlertCategory, FINANCE_CATEGORIES, FINANCE_ROLES } from "./alerts.service";
@@ -12,7 +13,7 @@ const SEVERITY_RANK: Record<string, number> = { LOW: 0, MEDIUM: 1, HIGH: 2, CRIT
 // has overall oversight — Admin/Manager. Finance-flagged alerts go to
 // FINANCE_ROLES instead (same audience the in-app alerts feed already
 // gates them to).
-const OPS_RECIPIENT_ROLES = ["ADMIN", "MANAGER"];
+const OPS_RECIPIENT_ROLES: UserRole[] = ["ADMIN", "MANAGER"];
 
 const CATEGORY_TITLES: Record<AlertCategory, string> = {
   INVOICE_OVERDUE: "Invoice Overdue",
@@ -60,7 +61,7 @@ export async function checkAndPushAlerts(): Promise<void> {
 
   const [financeUsers, opsUsers] = await Promise.all([
     prisma.user.findMany({
-      where: { role: { in: Array.from(FINANCE_ROLES) }, isActive: true },
+      where: { role: { in: Array.from(FINANCE_ROLES) as UserRole[] }, isActive: true },
       include: { deviceTokens: true },
     }),
     prisma.user.findMany({
