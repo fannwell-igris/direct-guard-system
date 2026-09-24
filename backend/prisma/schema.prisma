@@ -167,6 +167,7 @@ model Client {
   rosterEntries     RosterEntry[]
   operationsRecords OperationsRecord[]
   marketingActivities MarketingActivity[]
+  fieldVisits         FieldVisit[]
 
   @@map("clients")
 }
@@ -1106,6 +1107,7 @@ model User {
   assignedProspects    Prospect[]             @relation("ProspectAssignee")
   prospectStageChanges ProspectStageHistory[] @relation("ProspectStageChanger")
   marketingActivities  MarketingActivity[]    @relation("MarketingActivityPerformer")
+  fieldVisits          FieldVisit[]           @relation("FieldVisitMarketer")
 
   @@map("users")
 }
@@ -1360,7 +1362,9 @@ model Prospect {
 
   lastUpdated DateTime @updatedAt
 
-  stageHistory ProspectStageHistory[]
+  stageHistory        ProspectStageHistory[]
+  marketingActivities MarketingActivity[]
+  fieldVisits         FieldVisit[]
 
   @@index([assignedToId])
   @@index([stage])
@@ -1446,4 +1450,53 @@ model MarketingActivity {
   @@index([performedById])
   @@index([activityDate])
   @@map("marketing_activities")
+}
+
+// ---------- MARKETING: FIELD VISIT MANAGEMENT ----------
+// Phase 4 of the Marketing Department module. A richer, dedicated record
+// for in-person visits (brief section 5) — location, person/company
+// visited, opportunities identified, and an optional supporting photo/
+// document — distinct from the generic MarketingActivity log (a VISIT
+// activity type still exists there for a quick one-line mention; this is
+// for the fuller record a real field visit report needs).
+//
+// attachmentFilename follows the exact same local-disk-upload pattern as
+// Employee.photoFilename (see uploadMiddleware.ts / employees.service.ts)
+// for consistency — including the same known limitation: if the backend's
+// disk isn't backed by a persistent volume on its host (check Railway's
+// volume config), an uploaded file can be lost on redeploy. Not fixed
+// here since it's a pre-existing, shared limitation, not new to this
+// feature — worth checking once file uploads start mattering for real
+// records like this.
+model FieldVisit {
+  id String @id @default(uuid())
+
+  prospectId String?
+  prospect   Prospect? @relation(fields: [prospectId], references: [id], onDelete: SetNull)
+
+  clientId String?
+  client   Client? @relation(fields: [clientId], references: [id], onDelete: SetNull)
+
+  visitDate               DateTime  @default(now())
+  location                String?
+  personVisited           String?
+  purpose                 String?
+  outcome                 String?
+  opportunitiesIdentified String?
+  nextAction              String?
+  followUpDate            DateTime?
+  notes                   String?
+
+  attachmentFilename String?
+
+  marketerId String?
+  marketer   User?   @relation("FieldVisitMarketer", fields: [marketerId], references: [id])
+
+  dateCreated DateTime @default(now())
+
+  @@index([prospectId])
+  @@index([clientId])
+  @@index([marketerId])
+  @@index([visitDate])
+  @@map("field_visits")
 }

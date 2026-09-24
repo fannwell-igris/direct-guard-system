@@ -7,6 +7,7 @@ import pushTokensRoutes from "./modules/push-tokens/push-tokens.routes";
 import prospectsRoutes from "./modules/prospects/prospects.routes";
 import marketingActivitiesRoutes from "./modules/marketing-activities/marketing-activities.routes";
 import marketingDashboardRoutes from "./modules/marketing-dashboard/marketing-dashboard.routes";
+import fieldVisitsRoutes from "./modules/field-visits/field-visits.routes";
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
@@ -186,6 +187,11 @@ app.use("/api/marketing-activities", marketingActivitiesRoutes);
 // module. Read-only aggregate over Prospects/ProspectStageHistory/
 // MarketingActivity, nothing new stored here.
 app.use("/api/marketing-dashboard", marketingDashboardRoutes);
+
+// Marketing: Field Visit Management — Phase 4 of the Marketing Department
+// module. Includes attachment upload/serve/delete for a supporting photo
+// or document (see uploadMiddleware.ts's visit-attachments storage).
+app.use("/api/field-visits", fieldVisitsRoutes);
 
 // Must be the LAST app.use() — Express only routes errors here if it's
 // registered after every other route/middleware.

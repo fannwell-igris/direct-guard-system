@@ -5,7 +5,7 @@ import {
   Bell, Activity, Building2, MapPin, Users, FileText, CalendarDays,
   ClipboardList, CheckSquare, Inbox, Wallet, Receipt, DollarSign,
   Package, UserCog, Settings as SettingsIcon, TrendingUp, MessageSquare,
-  UserCheck, Target, ClipboardCheck, LayoutGrid,
+  UserCheck, Target, ClipboardCheck, LayoutGrid, Navigation,
 } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { useAuth } from "../../contexts/AuthContext";
@@ -60,6 +60,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: "Dashboard", to: "/marketing/dashboard", icon: LayoutGrid },
       { label: "Prospects", to: "/marketing/prospects", icon: Target },
       { label: "Activities", to: "/marketing/activities", icon: ClipboardCheck },
+      { label: "Field Visits", to: "/marketing/field-visits", icon: Navigation },
     ],
   },
   {

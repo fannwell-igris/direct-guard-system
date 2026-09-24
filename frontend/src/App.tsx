@@ -27,6 +27,7 @@ import DeploymentPage from "./pages/deployment/DeploymentPage";
 import ProspectsPage from "./pages/marketing/ProspectsPage";
 import ActivitiesPage from "./pages/marketing/ActivitiesPage";
 import MarketingDashboardPage from "./pages/marketing/MarketingDashboardPage";
+import FieldVisitsPage from "./pages/marketing/FieldVisitsPage";
 
 // NOTE (2026-09-13, MB.2): this file previously still had the default
 // Vite starter template in it -- AuthProvider/router/AppLayout/LoginPage/
@@ -72,6 +73,7 @@ function App() {
             <Route path="/marketing/prospects" element={<ProspectsPage />} />
             <Route path="/marketing/activities" element={<ActivitiesPage />} />
             <Route path="/marketing/dashboard" element={<MarketingDashboardPage />} />
+            <Route path="/marketing/field-visits" element={<FieldVisitsPage />} />
           </Route>
 
           {/* Anything unmatched falls back to the dashboard (or login, via AppLayout's own redirect if not authenticated) */}

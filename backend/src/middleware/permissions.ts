@@ -214,6 +214,10 @@ const REGISTRY: RouteRule[] = [
   // Marketing: Dashboard — read-only, same viewers as the rest of Marketing.
   { prefix: "/api/marketing-dashboard", methods: { GET: ["ADMIN", "MANAGER", "MARKETING"] } },
 
+  // Marketing: Field Visits — same access shape as Prospects/Activities.
+  // Covers the nested attachment endpoints too (segment-prefix match).
+  { prefix: "/api/field-visits", methods: { GET: ["ADMIN", "MANAGER", "MARKETING"], POST: ["ADMIN", "MARKETING"], PUT: ["ADMIN", "MARKETING"], DELETE: ["ADMIN", "MARKETING"] } },
+
   // Settings — ADMIN only. Spec allows MANAGER access to "specifically
   // approved" config endpoints, but names none — not granted here.
   { prefix: "/api/settings", methods: { GET: ADMIN, POST: ADMIN, PUT: ADMIN, PATCH: ADMIN, DELETE: ADMIN } },
