@@ -25,11 +25,11 @@
     gap: 18px;
   }
 
-  /* The logo SVG has solid white shapes in the shield, drawn to sit on a
-     dark background -- on a plain white page those shapes would vanish
-     and the shield would look broken. This navy card is sized just to
-     the logo so the rest of the splash can be plain white as requested,
-     while the logo itself still renders correctly. */
+  /* The logo has solid white shapes (shield highlights + the "SECURITY"
+     subtitle under the wordmark) drawn to sit on a dark background -- on
+     a plain white page those would vanish. This navy card is sized just
+     to the logo so the rest of the splash can be plain white as
+     requested, while the logo itself still renders correctly. */
   .logo-card {
     padding: 26px 34px;
     border-radius: 18px;
@@ -44,8 +44,7 @@
 
   .logo {
     display: block;
-    width: 190px;
-    border-radius: 10px;
+    width: 250px;
   }
 
   @keyframes logo-in {
@@ -58,17 +57,6 @@
   @keyframes logo-glow {
     0%, 100% { box-shadow: 0 8px 28px rgba(0, 55, 112, 0.18), 0 0 0 rgba(9, 170, 76, 0); }
     50%      { box-shadow: 0 8px 28px rgba(0, 55, 112, 0.18), 0 0 22px rgba(9, 170, 76, 0.55); }
-  }
-
-  .subtitle {
-    color: #003770;
-    font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
-    font-weight: 700;
-    font-size: 13px;
-    letter-spacing: 0.28em;
-    text-transform: uppercase;
-    opacity: 0;
-    animation: text-fade-in 400ms ease-out 550ms forwards;
   }
 
   /* Indeterminate loading bar -- fades in after the logo has landed. */
@@ -103,9 +91,8 @@
 <body>
   <div class="wrap">
     <div class="logo-card">
-      <img class="logo" src="./assets/magen-hiring-software.svg" alt="Magen Security" />
+      <img class="logo" src="./assets/magen-security-logo.svg" alt="Magen Security" />
     </div>
-    <div class="subtitle">Security</div>
     <div class="bar-track"><div class="bar-fill"></div></div>
   </div>
 </body>
