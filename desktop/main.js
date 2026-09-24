@@ -92,6 +92,10 @@ function createWindow() {
     backgroundColor: "#ffffff",
     autoHideMenuBar: true,
     show: false,
+    // Sets the window/taskbar icon even in an unpackaged `npm start` run,
+    // where Windows would otherwise show the plain Electron icon -- the
+    // packaged installer also gets this via build.win.icon in package.json.
+    icon: path.join(__dirname, "assets", "icon.ico"),
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,

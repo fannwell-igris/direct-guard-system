@@ -20,6 +20,18 @@ interface AuthContextType {
   isLoading: boolean;
 }
 
+// Present only inside the Android app's WebView (see mobile/android's
+// MainActivity.kt) — undefined on the plain website and in the desktop
+// app, so every call below is guarded and a complete no-op there.
+declare global {
+  interface Window {
+    AndroidNative?: {
+      onLoggedIn?: (token: string) => void;
+      onLoggedOut?: () => void;
+    };
+  }
+}
+
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -44,6 +56,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem("cms_user", JSON.stringify(newUser));
     setToken(newToken);
     setUser(newUser);
+    // Lets the Android app register this device for push notifications
+    // right at login, since its WebView doesn't reload the page here to
+    // notice the new token any other way. No-op on web/desktop.
+    window.AndroidNative?.onLoggedIn?.(newToken);
   };
 
   const logout = () => {
@@ -51,6 +67,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem("cms_user");
     setToken(null);
     setUser(null);
+    // Stops push notifications to this device before the user (and
+    // possibly a different one next) navigates to /login. No-op on
+    // web/desktop.
+    window.AndroidNative?.onLoggedOut?.();
     window.location.href = "/login";
   };
 

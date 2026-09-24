@@ -30,4 +30,48 @@
             android:layout_marginTop="28dp"
             android:indeterminateTint="@color/magen_green" />
     </LinearLayout>
+
+    <!-- No-connection screen: shown when the CMS can't be reached, hidden otherwise. -->
+    <LinearLayout
+        android:id="@+id/errorOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:padding="32dp"
+        android:background="@color/white"
+        android:visibility="gone">
+
+        <ImageView
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:src="@android:drawable/ic_dialog_alert"
+            android:contentDescription="@string/no_connection_title" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="@string/no_connection_title"
+            android:textColor="@color/magen_navy"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:gravity="center"
+            android:text="@string/no_connection_message"
+            android:textColor="@color/muted_text" />
+
+        <Button
+            android:id="@+id/retryButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:backgroundTint="@color/magen_green"
+            android:text="@string/retry"
+            android:textColor="@color/white" />
+    </LinearLayout>
 </FrameLayout>

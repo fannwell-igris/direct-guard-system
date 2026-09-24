@@ -195,6 +195,18 @@ const REGISTRY: RouteRule[] = [
   { prefix: "/api/dashboard", methods: { GET: ALL_ROLES } },
   { prefix: "/api/alerts", methods: { GET: ALL_ROLES } },
 
+  // Push token registration — every authenticated role may register or
+  // unregister their OWN device's token (self-service, not a data-access
+  // endpoint, so no role gating beyond "logged in" makes sense here).
+  { prefix: "/api/push-tokens", methods: { POST: ALL_ROLES, DELETE: ALL_ROLES } },
+
+  // Marketing: Prospect/Lead CRM — per the Marketing module brief, MARKETING
+  // owns this data (create/edit/stage changes); MANAGER gets view access
+  // ("management should be able to view marketing performance"), not write.
+  // No DELETE rule: the route itself doesn't implement one (see
+  // prospects.routes.ts), so this falls through to default-deny either way.
+  { prefix: "/api/prospects", methods: { GET: ["ADMIN", "MANAGER", "MARKETING"], POST: ["ADMIN", "MARKETING"], PUT: ["ADMIN", "MARKETING"], PATCH: ["ADMIN", "MARKETING"] } },
+
   // Settings — ADMIN only. Spec allows MANAGER access to "specifically
   // approved" config endpoints, but names none — not granted here.
   { prefix: "/api/settings", methods: { GET: ADMIN, POST: ADMIN, PUT: ADMIN, PATCH: ADMIN, DELETE: ADMIN } },

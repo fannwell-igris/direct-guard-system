@@ -5,7 +5,7 @@ import {
   Bell, Activity, Building2, MapPin, Users, FileText, CalendarDays,
   ClipboardList, CheckSquare, Inbox, Wallet, Receipt, DollarSign,
   Package, UserCog, Settings as SettingsIcon, TrendingUp, MessageSquare,
-  UserCheck,
+  UserCheck, Target,
 } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { useAuth } from "../../contexts/AuthContext";
@@ -51,6 +51,13 @@ const NAV_GROUPS: NavGroup[] = [
       { label: "Deployment", to: "/deployment", icon: UserCheck },
       { label: "Tasks", to: "/tasks", icon: CheckSquare },
       { label: "Department Requests", to: "/department-requests", icon: Inbox },
+    ],
+  },
+  {
+    label: "Marketing",
+    roles: ["ADMIN", "MANAGER", "MARKETING"],
+    items: [
+      { label: "Prospects", to: "/marketing/prospects", icon: Target },
     ],
   },
   {

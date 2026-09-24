@@ -1095,7 +1095,51 @@ model User {
   employeeId    String?   @unique
   employee      Employee? @relation(fields: [employeeId], references: [id])
 
+  // Mobile push notifications — a user may have more than one device
+  // (phone + tablet, or a reinstall that got a fresh token before the
+  // old one expired).
+  deviceTokens  DeviceToken[]
+
+  // Marketing prospect/lead CRM — prospects this user is assigned to work,
+  // and the stage-change history entries this user made on any prospect.
+  assignedProspects    Prospect[]             @relation("ProspectAssignee")
+  prospectStageChanges ProspectStageHistory[] @relation("ProspectStageChanger")
+
   @@map("users")
+}
+
+// One row per mobile device registered for push notifications. A token
+// always belongs to whichever user most recently registered it (see
+// push-tokens.service.ts) rather than being permanently tied to one
+// account, since the same phone can be used by different logged-in users
+// over time.
+model DeviceToken {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  token      String   @unique
+  platform   String   @default("android")
+  createdAt  DateTime @default(now())
+  lastUsedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@map("device_tokens")
+}
+
+// Tracks which alerts (from alerts.service.ts's live-calculated feed)
+// have already triggered a push notification, keyed by the same
+// (category, referenceId) pair alerts already use. A row is deleted once
+// its alert's underlying issue is resolved, so a future recurrence
+// notifies again instead of staying silent forever.
+model SentAlertNotification {
+  id          String   @id @default(uuid())
+  category    String
+  referenceId String
+  severity    String
+  sentAt      DateTime @default(now())
+
+  @@unique([category, referenceId])
+  @@map("sent_alert_notifications")
 }
 // ---------- SYSTEM SETTINGS ----------
 
@@ -1268,4 +1312,77 @@ model PayslipRecord {
   generatedAt   DateTime @default(now())
 
   @@map("payslip_records")
+}
+
+// ---------- MARKETING: PROSPECT / LEAD CRM ----------
+// Phase 1 of the Marketing Department module (see the marketing brief) —
+// a lightweight CRM so marketing staff can track prospects through a
+// funnel from first contact to won/lost, independent of the Client model
+// (a prospect only becomes a Client once actually won and set up as one —
+// no automatic link is created here, that's a manual follow-on step for
+// whoever converts them).
+
+enum ProspectStage {
+  NEW
+  CONTACTED
+  QUALIFIED
+  MEETING
+  PROPOSAL_SENT
+  NEGOTIATION
+  WON
+  LOST
+  NOT_INTERESTED
+}
+
+model Prospect {
+  id               String   @id @default(uuid())
+  companyName      String
+  contactName      String?
+  contactPhone     String?
+  contactEmail     String?
+  location         String?
+  potentialService String?
+  source           String?
+
+  assignedToId String?
+  assignedTo   User?   @relation("ProspectAssignee", fields: [assignedToId], references: [id])
+
+  dateAdded        DateTime  @default(now())
+  lastContactDate  DateTime?
+  nextFollowUpDate DateTime?
+
+  stage            ProspectStage @default(NEW)
+  opportunityValue Decimal?      @db.Decimal(12, 2)
+  outcome          String?
+  notes            String?
+
+  lastUpdated DateTime @updatedAt
+
+  stageHistory ProspectStageHistory[]
+
+  @@index([assignedToId])
+  @@index([stage])
+  @@index([nextFollowUpDate])
+  @@map("prospects")
+}
+
+// Append-only log of every stage change — this is what the funnel/
+// conversion-rate reporting (Phase 3 of the Marketing module) will read
+// from, not just the prospect's current `stage` field, so history is
+// never overwritten.
+model ProspectStageHistory {
+  id         String   @id @default(uuid())
+  prospectId String
+  prospect   Prospect @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+
+  fromStage ProspectStage?
+  toStage   ProspectStage
+  notes     String?
+  changedAt DateTime @default(now())
+
+  changedById String?
+  changedBy   User?   @relation("ProspectStageChanger", fields: [changedById], references: [id])
+
+  @@index([prospectId])
+  @@map("prospect_stage_history")
 }

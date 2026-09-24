@@ -2,4 +2,5 @@
     <color name="magen_navy">#003770</color>
     <color name="magen_green">#09AA4C</color>
     <color name="white">#FFFFFF</color>
+    <color name="muted_text">#666666</color>
 </resources>

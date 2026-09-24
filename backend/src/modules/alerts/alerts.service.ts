@@ -325,13 +325,15 @@ const SEVERITY_ORDER: Record<AlertSeverity, number> = {
  * Categories that contain financial data — only ADMIN, MANAGER, PAYROLL
  * should receive these. All other roles get operational/HR alerts only.
  */
-const FINANCE_CATEGORIES = new Set<AlertCategory>([
+// Exported so push-notifier.ts can reuse the exact same finance gating
+// when deciding who gets a push notification for a given alert.
+export const FINANCE_CATEGORIES = new Set<AlertCategory>([
   "INVOICE_OVERDUE",
   "PAYROLL_DUE",
   "LOW_STOCK",
 ]);
 
-const FINANCE_ROLES = new Set(["ADMIN", "MANAGER", "PAYROLL"]);
+export const FINANCE_ROLES = new Set(["ADMIN", "MANAGER", "PAYROLL"]);
 
 export async function getAlerts(category?: AlertCategory, role = "STAFF"): Promise<Alert[]> {
   const canSeeFinance = FINANCE_ROLES.has(role);

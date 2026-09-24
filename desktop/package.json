@@ -29,6 +29,7 @@
       "assets/**/*"
     ],
     "win": {
+      "icon": "assets/icon.ico",
       "target": [
         {
           "target": "nsis",

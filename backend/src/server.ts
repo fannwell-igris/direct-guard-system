@@ -2,6 +2,9 @@ import employeeLoansRouter from "./modules/employee-loans/employee-loans.routes"
 import settingsRouter from "./modules/settings/settings.routes";
 import dashboardRouter from "./modules/dashboard/dashboard.routes";
 import alertsRouter from "./modules/alerts/alerts.routes";
+import { checkAndPushAlerts } from "./modules/alerts/push-notifier";
+import pushTokensRoutes from "./modules/push-tokens/push-tokens.routes";
+import prospectsRoutes from "./modules/prospects/prospects.routes";
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
@@ -163,6 +166,14 @@ app.use("/api/invoices", invoicesRoutes);
 app.use("/api/payments", paymentsRoutes);
 app.use("/api/salary-advances", salaryAdvancesRoutes);
 
+// Push notification device-token registration — see push-tokens.routes.ts.
+app.use("/api/push-tokens", pushTokensRoutes);
+
+// Marketing: Prospect/Lead CRM — Phase 1 of the Marketing Department
+// module. stage is only changed via PATCH /:id/stage, which appends a
+// ProspectStageHistory row rather than overwriting — see prospects.service.ts.
+app.use("/api/prospects", prospectsRoutes);
+
 // Must be the LAST app.use() — Express only routes errors here if it's
 // registered after every other route/middleware.
 app.use(errorHandler);
@@ -170,4 +181,17 @@ app.use(errorHandler);
 app.listen(PORT, () => {
   console.log(`CMS backend listening on http://localhost:${PORT}`);
 });
+
+// Push notifications: periodically re-check the live alerts feed and
+// notify registered devices about anything new/escalated. A total no-op
+// if Firebase env vars aren't set (see lib/push.ts) — safe to leave
+// running in every environment, including local dev.
+const PUSH_CHECK_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
+setInterval(() => {
+  checkAndPushAlerts().catch((err) => console.error("Push notification check failed:", err));
+}, PUSH_CHECK_INTERVAL_MS);
+// Also run once shortly after startup rather than waiting the full interval.
+setTimeout(() => {
+  checkAndPushAlerts().catch((err) => console.error("Push notification check failed:", err));
+}, 15_000);
 
