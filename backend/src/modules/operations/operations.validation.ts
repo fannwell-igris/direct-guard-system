@@ -261,8 +261,8 @@ export function parseListQuery(query: Record<string, unknown>): OperationsListQu
 
   if (query.pageSize !== undefined) {
     const pageSize = Number(query.pageSize);
-    if (!Number.isInteger(pageSize) || pageSize < 1 || pageSize > 100) {
-      throw ApiError.badRequest("`pageSize` must be an integer between 1 and 100.");
+    if (!Number.isInteger(pageSize) || pageSize < 1 || pageSize > 500) {
+      throw ApiError.badRequest("`pageSize` must be an integer between 1 and 500.");
     }
     result.pageSize = pageSize;
   }
