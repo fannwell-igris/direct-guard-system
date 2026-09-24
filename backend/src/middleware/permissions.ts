@@ -114,9 +114,16 @@ const REGISTRY: RouteRule[] = [
   // Employees — deliberately NO Operations access to the general
   // employee database, per the spec's explicit instruction. Operations
   // gets employee info through Roster/Operations' own nested responses,
-  // not this endpoint. HR is VIEW-ONLY (2026-09-16 correction, same
-  // reasoning as Employee Contracts above).
-  { prefix: "/api/employees", methods: { GET: GET_EMPLOYEES, POST: ADMIN_MANAGER, PUT: ADMIN_MANAGER, PATCH: ADMIN_MANAGER, DELETE: ADMIN } },
+  // not this endpoint.
+  // UPDATED (2026-09-24, explicit instruction): write access (create/edit)
+  // is ADMIN + HR only — MANAGER no longer has write access here, only
+  // GET (via GET_EMPLOYEES below). This supersedes the 2026-09-16 "HR is
+  // VIEW-ONLY" correction above the Employee Contracts rule, which still
+  // applies to /api/employee-contracts, just not to /api/employees.
+  // (A second, conflicting rule for this same prefix existed further down
+  // this file and was silently dead code, since only the first matching
+  // rule ever applies — removed rather than left as a trap.)
+  { prefix: "/api/employees", methods: { GET: GET_EMPLOYEES, POST: ["ADMIN", "HR"], PUT: ["ADMIN", "HR"], PATCH: ["ADMIN", "HR"], DELETE: ADMIN } },
 
   // Operations cluster — Roster, Operations records, Site Requirements,
   // Shift Types. STAFF gets no broad access; "my roster" style
@@ -181,8 +188,6 @@ const REGISTRY: RouteRule[] = [
   // same silent-empty-dropdown bug as Clients/Sites above, not a change
   // in write access.
   { prefix: "/api/departments", methods: { GET: ["ADMIN", "MANAGER", "HR", "OPERATIONS"], POST: ADMIN, PUT: ADMIN, PATCH: ADMIN, DELETE: ADMIN } },
-
-  { prefix: "/api/employees", methods: { GET: ["ADMIN", "MANAGER", "HR", "PAYROLL"], POST: ["ADMIN", "HR"], PUT: ["ADMIN", "HR"], PATCH: ["ADMIN", "HR"], DELETE: ["ADMIN"] } },
 
   // Dashboard & Alerts — every authenticated role may hit the endpoint;
   // the DATA returned must be role-aware server-side (NOT enforced by
