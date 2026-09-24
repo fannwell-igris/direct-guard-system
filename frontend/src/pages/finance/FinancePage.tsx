@@ -147,21 +147,21 @@ function printFinanceSummary(data: {
   accounts: AccountEntry[];
 }) {
   const { invoices, payrollRuns, opCosts, genExpenses, accounts } = data;
-  const totalInvoiced = invoices.reduce((s, i) => s + i.amount, 0);
-  const totalReceived = invoices.reduce((s, i) => s + i.amountPaid, 0);
-  const totalOutstanding = invoices.reduce((s, i) => s + i.outstandingBalance, 0);
+  const totalInvoiced = invoices.reduce((s, i) => s + Number(i.amount), 0);
+  const totalReceived = invoices.reduce((s, i) => s + Number(i.amountPaid), 0);
+  const totalOutstanding = invoices.reduce((s, i) => s + Number(i.outstandingBalance), 0);
   const overdueCount = invoices.filter((i) => i.status === "OVERDUE").length;
-  const totalOpCosts = opCosts.reduce((s, c) => s + c.amount, 0);
-  const totalGenExp = genExpenses.reduce((s, e) => s + e.amount, 0);
-  const totalPayroll = payrollRuns.reduce((s, r) => s + (r.totalNet ?? 0), 0);
+  const totalOpCosts = opCosts.reduce((s, c) => s + Number(c.amount), 0);
+  const totalGenExp = genExpenses.reduce((s, e) => s + Number(e.amount), 0);
+  const totalPayroll = payrollRuns.reduce((s, r) => s + Number(r.totalNet ?? 0), 0);
   const totalExpenses = totalOpCosts + totalGenExp + totalPayroll;
   const netPosition = totalReceived - totalExpenses;
   const cashOnHand = accounts.filter((a) => a.type === "cash").reduce((s, a) => s + a.balance, 0);
   const bankTotal = accounts.filter((a) => a.type === "bank").reduce((s, a) => s + a.balance, 0);
   const currentMonth = new Date().toISOString().slice(0, 7);
   const monthInvoices = invoices.filter((i) => i.invoiceDate?.slice(0, 7) === currentMonth);
-  const monthIncome = monthInvoices.reduce((s, i) => s + i.amountPaid, 0);
-  const monthOpCosts = opCosts.filter((c) => c.month?.slice(0, 7) === currentMonth).reduce((s, c) => s + c.amount, 0);
+  const monthIncome = monthInvoices.reduce((s, i) => s + Number(i.amountPaid), 0);
+  const monthOpCosts = opCosts.filter((c) => c.month?.slice(0, 7) === currentMonth).reduce((s, c) => s + Number(c.amount), 0);
   const printDate = new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" });
 
   const accountRows = accounts.map((a) =>
@@ -281,14 +281,14 @@ function OverviewTab({ invoices, payrollRuns, opCosts, genExpenses, accounts }: 
   genExpenses: GeneralExpense[];
   accounts: AccountEntry[];
 }) {
-  const totalInvoiced = invoices.reduce((s, i) => s + i.amount, 0);
-  const totalReceived = invoices.reduce((s, i) => s + i.amountPaid, 0);
-  const totalOutstanding = invoices.reduce((s, i) => s + i.outstandingBalance, 0);
+  const totalInvoiced = invoices.reduce((s, i) => s + Number(i.amount), 0);
+  const totalReceived = invoices.reduce((s, i) => s + Number(i.amountPaid), 0);
+  const totalOutstanding = invoices.reduce((s, i) => s + Number(i.outstandingBalance), 0);
   const overdueCount = invoices.filter((i) => i.status === "OVERDUE").length;
 
-  const totalOpCosts = opCosts.reduce((s, c) => s + c.amount, 0);
-  const totalGenExp = genExpenses.reduce((s, e) => s + e.amount, 0);
-  const totalPayroll = payrollRuns.reduce((s, r) => s + (r.totalNet ?? 0), 0);
+  const totalOpCosts = opCosts.reduce((s, c) => s + Number(c.amount), 0);
+  const totalGenExp = genExpenses.reduce((s, e) => s + Number(e.amount), 0);
+  const totalPayroll = payrollRuns.reduce((s, r) => s + Number(r.totalNet ?? 0), 0);
   const totalExpenses = totalOpCosts + totalGenExp + totalPayroll;
 
   const netPosition = totalReceived - totalExpenses;
@@ -297,8 +297,8 @@ function OverviewTab({ invoices, payrollRuns, opCosts, genExpenses, accounts }: 
 
   const currentMonth = new Date().toISOString().slice(0, 7);
   const monthInvoices = invoices.filter((i) => i.invoiceDate?.slice(0, 7) === currentMonth);
-  const monthIncome = monthInvoices.reduce((s, i) => s + i.amountPaid, 0);
-  const monthOpCosts = opCosts.filter((c) => c.month?.slice(0, 7) === currentMonth).reduce((s, c) => s + c.amount, 0);
+  const monthIncome = monthInvoices.reduce((s, i) => s + Number(i.amountPaid), 0);
+  const monthOpCosts = opCosts.filter((c) => c.month?.slice(0, 7) === currentMonth).reduce((s, c) => s + Number(c.amount), 0);
 
   return (
     <div className="space-y-6">
@@ -581,9 +581,9 @@ function IncomeTab() {
   useEffect(() => { load(1); setPage(1); }, [load]);
 
   const pages = Math.max(1, Math.ceil(total / INV_PAGE));
-  const totalAmount = invoices.reduce((s, i) => s + i.amount, 0);
-  const totalPaid = invoices.reduce((s, i) => s + i.amountPaid, 0);
-  const totalOut = invoices.reduce((s, i) => s + i.outstandingBalance, 0);
+  const totalAmount = invoices.reduce((s, i) => s + Number(i.amount), 0);
+  const totalPaid = invoices.reduce((s, i) => s + Number(i.amountPaid), 0);
+  const totalOut = invoices.reduce((s, i) => s + Number(i.outstandingBalance), 0);
 
   return (
     <div className="space-y-4">
@@ -640,9 +640,9 @@ function IncomeTab() {
                   <td className="px-4 py-2.5 text-gray-700 whitespace-nowrap">{fmtDate(inv.dueDate)}</td>
                   <td className="px-4 py-2.5 text-gray-700">{inv.client?.name ?? "—"}</td>
                   <td className="px-4 py-2.5 text-gray-500">{inv.site?.siteName ?? "—"}</td>
-                  <td className="px-4 py-2.5 font-medium text-gray-900 whitespace-nowrap">{fmt(inv.amount)}</td>
-                  <td className="px-4 py-2.5 text-emerald-600 whitespace-nowrap">{fmt(inv.amountPaid)}</td>
-                  <td className="px-4 py-2.5 text-amber-600 whitespace-nowrap">{fmt(inv.outstandingBalance)}</td>
+                  <td className="px-4 py-2.5 font-medium text-gray-900 whitespace-nowrap">{fmt(Number(inv.amount))}</td>
+                  <td className="px-4 py-2.5 text-emerald-600 whitespace-nowrap">{fmt(Number(inv.amountPaid))}</td>
+                  <td className="px-4 py-2.5 text-amber-600 whitespace-nowrap">{fmt(Number(inv.outstandingBalance))}</td>
                   <td className="px-4 py-2.5">
                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[inv.status] ?? ""}`}>
                       {inv.status.replace("_", " ")}
@@ -716,8 +716,8 @@ function ExpensesTab() {
 
   const opPages = Math.max(1, Math.ceil(opTotal / EXP_PAGE));
   const genPages = Math.max(1, Math.ceil(genTotal / EXP_PAGE));
-  const opSum = opCosts.reduce((s, c) => s + c.amount, 0);
-  const genSum = genExp.reduce((s, e) => s + e.amount, 0);
+  const opSum = opCosts.reduce((s, c) => s + Number(c.amount), 0);
+  const genSum = genExp.reduce((s, e) => s + Number(e.amount), 0);
 
   return (
     <div className="space-y-4">
@@ -780,7 +780,7 @@ function ExpensesTab() {
                       <td className="px-4 py-2.5">{c.client?.name ?? "—"}</td>
                       <td className="px-4 py-2.5 text-gray-500">{c.site?.siteName ?? "—"}</td>
                       <td className="px-4 py-2.5"><span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-xs">{c.costCategory}</span></td>
-                      <td className="px-4 py-2.5 font-medium text-gray-900 whitespace-nowrap">{fmt(c.amount)}</td>
+                      <td className="px-4 py-2.5 font-medium text-gray-900 whitespace-nowrap">{fmt(Number(c.amount))}</td>
                       <td className="px-4 py-2.5 text-gray-500 text-xs">{c.notes ?? "—"}</td>
                     </tr>
                   ))}
@@ -825,7 +825,7 @@ function ExpensesTab() {
                       <td className="px-4 py-2.5">{e.department?.name ?? "—"}</td>
                       <td className="px-4 py-2.5"><span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-xs">{e.category}</span></td>
                       <td className="px-4 py-2.5 text-gray-700">{e.description}</td>
-                      <td className="px-4 py-2.5 font-medium text-gray-900 whitespace-nowrap">{fmt(e.amount)}</td>
+                      <td className="px-4 py-2.5 font-medium text-gray-900 whitespace-nowrap">{fmt(Number(e.amount))}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -878,9 +878,9 @@ function PayrollCostsTab() {
   useEffect(() => { load(1); }, [load]);
 
   const pages = Math.max(1, Math.ceil(total / PR_PAGE));
-  const totalNet = runs.reduce((s, r) => s + (r.totalNet ?? 0), 0);
-  const totalGross = runs.reduce((s, r) => s + (r.totalGross ?? 0), 0);
-  const totalDeductions = runs.reduce((s, r) => s + (r.totalDeductions ?? 0), 0);
+  const totalNet = runs.reduce((s, r) => s + Number(r.totalNet ?? 0), 0);
+  const totalGross = runs.reduce((s, r) => s + Number(r.totalGross ?? 0), 0);
+  const totalDeductions = runs.reduce((s, r) => s + Number(r.totalDeductions ?? 0), 0);
 
   return (
     <div className="space-y-4">
@@ -920,9 +920,9 @@ function PayrollCostsTab() {
                   </td>
                   <td className="px-4 py-2.5 whitespace-nowrap text-gray-500">{fmtDate(r.createdAt)}</td>
                   <td className="px-4 py-2.5 text-gray-700">{r.employeeCount ?? "—"}</td>
-                  <td className="px-4 py-2.5 font-medium text-gray-900 whitespace-nowrap">{fmt(r.totalGross ?? 0)}</td>
-                  <td className="px-4 py-2.5 text-red-600 whitespace-nowrap">{fmt(r.totalDeductions ?? 0)}</td>
-                  <td className="px-4 py-2.5 font-bold text-gray-900 whitespace-nowrap">{fmt(r.totalNet ?? 0)}</td>
+                  <td className="px-4 py-2.5 font-medium text-gray-900 whitespace-nowrap">{fmt(Number(r.totalGross ?? 0))}</td>
+                  <td className="px-4 py-2.5 text-red-600 whitespace-nowrap">{fmt(Number(r.totalDeductions ?? 0))}</td>
+                  <td className="px-4 py-2.5 font-bold text-gray-900 whitespace-nowrap">{fmt(Number(r.totalNet ?? 0))}</td>
                   <td className="px-4 py-2.5">
                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${PR_STATUS_COLORS[r.status] ?? ""}`}>
                       {r.status.replace("_", " ")}
