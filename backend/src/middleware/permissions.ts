@@ -150,7 +150,16 @@ const REGISTRY: RouteRule[] = [
   { prefix: "/api/payroll", methods: { GET: GET_PAYROLL, POST: ADMIN_PAYROLL, PUT: ADMIN_PAYROLL, PATCH: ADMIN_PAYROLL, DELETE: ADMIN } },
 
   // Salary Advances -- same sensitivity/access shape as Payroll (2026-09-17): HR can view ("see...salaries" covers this), only Admin/Payroll can create/edit/cancel/record repayments.
-  { prefix: "/api/salary-advances", methods: { GET: GET_PAYROLL, POST: ADMIN_PAYROLL, PUT: ADMIN_PAYROLL, PATCH: ADMIN_PAYROLL, DELETE: ADMIN } },
+  // UPDATED (2026-09-24, explicit instruction): MANAGER added to POST/PUT
+  // here specifically — the boss pays employees directly and outside the
+  // formal payroll run, without going through Admin/Finance first, and
+  // wants those payments recorded in the system himself rather than after
+  // the fact through someone else. This is a deliberate, narrow exception
+  // to the "Only Admin and Finance can edit Finance" rule (2026-09-23) —
+  // scoped to this one module only, not the rest of the Finance cluster
+  // below (Invoices/Payments/Operational Costs/General Expenses stay
+  // Admin+Finance only).
+  { prefix: "/api/salary-advances", methods: { GET: GET_PAYROLL, POST: ["ADMIN", "MANAGER", "PAYROLL"], PUT: ["ADMIN", "MANAGER", "PAYROLL"], PATCH: ["ADMIN", "MANAGER", "PAYROLL"], DELETE: ADMIN } },
   { prefix: "/api/allowance-types", methods: { GET: ADMIN_MANAGER_PAYROLL, POST: ADMIN_PAYROLL, PUT: ADMIN_PAYROLL, PATCH: ADMIN_PAYROLL, DELETE: ADMIN } },
   { prefix: "/api/deduction-types", methods: { GET: ADMIN_MANAGER_PAYROLL, POST: ADMIN_PAYROLL, PUT: ADMIN_PAYROLL, PATCH: ADMIN_PAYROLL, DELETE: ADMIN } },
   { prefix: "/api/statutory-rules", methods: { GET: ADMIN_MANAGER_PAYROLL, POST: ADMIN_PAYROLL, PUT: ADMIN_PAYROLL, PATCH: ADMIN_PAYROLL, DELETE: ADMIN } },

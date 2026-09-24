@@ -75,6 +75,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: "Finance Overview", to: "/finance", icon: TrendingUp },
       { label: "Payroll", to: "/payroll", icon: Wallet },
+      { label: "Salary Advances", to: "/finance/salary-advances", icon: ClipboardList },
       { label: "Invoices & Payments", to: "/invoices", icon: Receipt },
       { label: "Expenses & Costs", to: "/expenses", icon: DollarSign },
       { label: "Inventory & Assets", to: "/inventory", icon: Package },

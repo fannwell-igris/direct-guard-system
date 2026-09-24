@@ -22,6 +22,7 @@ import SettingsPage from "./pages/settings/SettingsPage";
 import AlertsPage from "./pages/alerts/AlertsPage";
 import SiteCoveragePage from "./pages/site-coverage/SiteCoveragePage";
 import FinancePage from "./pages/finance/FinancePage";
+import SalaryAdvancesPage from "./pages/finance/SalaryAdvancesPage";
 import MessagesPage from "./pages/messages/MessagesPage";
 import DeploymentPage from "./pages/deployment/DeploymentPage";
 import ProspectsPage from "./pages/marketing/ProspectsPage";
@@ -74,6 +75,7 @@ function App() {
             <Route path="/alerts" element={<AlertsPage />} />
             <Route path="/site-coverage" element={<SiteCoveragePage />} />
             <Route path="/finance" element={<FinancePage />} />
+            <Route path="/finance/salary-advances" element={<SalaryAdvancesPage />} />
             <Route path="/messages" element={<MessagesPage />} />
             <Route path="/deployment" element={<DeploymentPage />} />
             <Route path="/marketing/prospects" element={<ProspectsPage />} />
