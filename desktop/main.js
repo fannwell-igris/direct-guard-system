@@ -32,13 +32,20 @@ function loadAppUrl() {
 
 let mainWindow;
 let splashWindow;
+let splashShownAt = 0;
+
+// Baseline splash display time: long enough for the logo's entrance
+// animation (splash.html's `logo-in`) to actually finish playing instead
+// of getting cut off when the CMS loads fast, bumped 15% per request.
+const BASE_SPLASH_DISPLAY_MS = 1500;
+const MIN_SPLASH_DISPLAY_MS = Math.round(BASE_SPLASH_DISPLAY_MS * 1.15); // 1725ms
 
 // Small branded splash shown the instant the app launches, while the main
 // window loads the live CMS URL over the network (which can take a couple
 // seconds). Frameless/undecorated so it reads as a loading screen, not a
-// second app window. Closed as soon as the main window is ready to show
-// (success) or fails to load (so a network hiccup never leaves the user
-// staring at the splash forever).
+// second app window. Stays up for at least MIN_SPLASH_DISPLAY_MS, then
+// closes once the main window is ready to show (success) or fails to load
+// (so a network hiccup never leaves the user staring at the splash forever).
 function createSplashWindow() {
   splashWindow = new BrowserWindow({
     width: 460,
@@ -47,10 +54,11 @@ function createSplashWindow() {
     resizable: false,
     movable: false,
     show: true,
-    backgroundColor: "#003770",
+    backgroundColor: "#ffffff",
     alwaysOnTop: true,
     skipTaskbar: true,
   });
+  splashShownAt = Date.now();
   splashWindow.loadFile(path.join(__dirname, "splash.html"));
 }
 
@@ -61,6 +69,19 @@ function closeSplashWindow() {
   splashWindow = null;
 }
 
+// Closes the splash and shows the main window, but never before
+// MIN_SPLASH_DISPLAY_MS has elapsed since the splash first appeared.
+function finishSplash() {
+  const elapsed = Date.now() - splashShownAt;
+  const remaining = Math.max(0, MIN_SPLASH_DISPLAY_MS - elapsed);
+  setTimeout(() => {
+    closeSplashWindow();
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.show();
+    }
+  }, remaining);
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1400,
@@ -68,7 +89,7 @@ function createWindow() {
     minWidth: 1024,
     minHeight: 640,
     title: "Magen CMS",
-    backgroundColor: "#003770",
+    backgroundColor: "#ffffff",
     autoHideMenuBar: true,
     show: false,
     webPreferences: {
@@ -78,18 +99,12 @@ function createWindow() {
     },
   });
 
-  mainWindow.once("ready-to-show", () => {
-    closeSplashWindow();
-    mainWindow.show();
-  });
+  mainWindow.once("ready-to-show", finishSplash);
 
   // If the CMS URL fails to load (e.g. no internet on launch), don't leave
   // the user stuck on the splash screen forever -- show the window anyway
   // so Electron's own "can't reach this page" error is visible.
-  mainWindow.webContents.on("did-fail-load", () => {
-    closeSplashWindow();
-    mainWindow.show();
-  });
+  mainWindow.webContents.on("did-fail-load", finishSplash);
 
   const appUrl = loadAppUrl();
   mainWindow.loadURL(appUrl);
