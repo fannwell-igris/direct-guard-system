@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <WebView
+        android:id="@+id/webView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <!-- Splash overlay: shown until the CMS finishes its first page load,
+         then faded out, mirroring the desktop app's splash screen. -->
+    <LinearLayout
+        android:id="@+id/splashOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:background="@color/magen_navy">
+
+        <ImageView
+            android:layout_width="180dp"
+            android:layout_height="wrap_content"
+            android:src="@drawable/magen_security_logo"
+            android:contentDescription="@string/app_name" />
+
+        <ProgressBar
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="28dp"
+            android:indeterminateTint="@color/magen_green" />
+    </LinearLayout>
+</FrameLayout>
