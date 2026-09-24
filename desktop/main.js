@@ -48,13 +48,13 @@ const MIN_SPLASH_DISPLAY_MS = Math.round(BASE_SPLASH_DISPLAY_MS * 1.15); // 1725
 // (so a network hiccup never leaves the user staring at the splash forever).
 function createSplashWindow() {
   splashWindow = new BrowserWindow({
-    width: 460,
-    height: 300,
+    width: 560,
+    height: 360,
     frame: false,
     resizable: false,
     movable: false,
     show: true,
-    backgroundColor: "#ffffff",
+    backgroundColor: "#003770",
     alwaysOnTop: true,
     skipTaskbar: true,
   });
