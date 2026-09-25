@@ -36,7 +36,7 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
-        <!-- Receives push notifications -- see MagenFcmService.kt. -->
+        <!-- Receives push notifications — see MagenFcmService.kt. -->
         <service
             android:name=".MagenFcmService"
             android:exported="false">
