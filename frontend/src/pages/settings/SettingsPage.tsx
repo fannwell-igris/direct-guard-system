@@ -42,6 +42,13 @@ const TAB_CONFIG: Record<
   shiftTypes:     { label: "Shift Types",      endpoint: "/shift-types",     hasDescription: false, icon: Clock },
   allowanceTypes: { label: "Allowance Types",  endpoint: "/allowance-types", hasDescription: true,  icon: Gift },
   deductionTypes: { label: "Deduction Types",  endpoint: "/deduction-types", hasDescription: true,  icon: Minus },
+  // Never actually read — the Invoicing tab has its own dedicated render
+  // path (see `tab === "invoicing"` below) and never goes through the
+  // generic TAB_CONFIG[tab] lookup that shiftTypes/allowanceTypes/
+  // deductionTypes/statutoryRules use. This entry exists only so
+  // TAB_CONFIG's type (which requires every non-statutoryRules Tab) is
+  // satisfied — omitting it is what broke every deploy since 2026-09-25.
+  invoicing:      { label: "Invoicing", endpoint: "", hasDescription: false, icon: Receipt },
 };
 
 const BASE_TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
