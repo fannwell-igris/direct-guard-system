@@ -1,7 +1,26 @@
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("com.google.gms.google-services")
+}
+
+// Release signing config, added 2026-09-25 for the first in-house release
+// build (previously only debug builds existed). Reads
+// android/keystore.properties (git-ignored, see mobile/.gitignore) rather
+// than hardcoding the keystore path/passwords here, since this file IS
+// committed to git. If keystore.properties is missing (e.g. a fresh
+// checkout that hasn't been given the keystore), releaseSigning stays
+// null and the release build type simply falls back to no explicit
+// signing config rather than failing the whole Gradle sync.
+val keystorePropertiesFile = rootProject.file("keystore.properties")
+val keystoreProperties = Properties()
+var releaseSigningAvailable = false
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+    releaseSigningAvailable = true
 }
 
 android {
@@ -12,14 +31,28 @@ android {
         applicationId = "com.magensecurity.cms"
         minSdk = 24
         targetSdk = 34
-        versionCode = 2
-        versionName = "1.0.1"
+        versionCode = 3
+        versionName = "1.1.0"
+    }
+
+    signingConfigs {
+        if (releaseSigningAvailable) {
+            create("release") {
+                storeFile = rootProject.file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            }
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            if (releaseSigningAvailable) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 

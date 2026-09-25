@@ -6,3 +6,11 @@ android/build/
 android/*.iml
 android/app/*.iml
 android/captures/
+
+# Release signing key + its passwords — NEVER commit these (added
+# 2026-09-25). Keep a backup of both somewhere safe outside the repo:
+# losing them means future updates can never be signed the same way
+# again, and every installed phone would need a fresh uninstall/reinstall.
+android/keystore.properties
+android/*.jks
+android/*.keystore
