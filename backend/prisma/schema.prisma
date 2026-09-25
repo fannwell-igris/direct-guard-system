@@ -37,6 +37,13 @@ enum EmploymentStatus {
   ACTIVE
   INACTIVE
   TERMINATED
+  // Added 2026-09-25, per explicit instruction: an employee who deserted
+  // a site and stopped showing up, typically along with company property
+  // (uniforms, equipment) that was never returned. Distinct from
+  // TERMINATED (a normal, managed exit) so alerts.service.ts can flag
+  // their still-assigned InventoryItems immediately rather than waiting
+  // on the normal 7-day "taken home" overdue threshold.
+  ABSCONDED
 }
 
 enum InvoiceStatus {
@@ -207,6 +214,7 @@ model Site {
   siteRequirements  SiteRequirement[]
   rosterEntries     RosterEntry[]
   operationsRecords OperationsRecord[]
+  fieldReceiptEntries FieldReceiptEntry[]
 
   @@map("sites")
 }
@@ -794,6 +802,13 @@ model OperationsRecord {
 
   siteIssues        String?
   incidents         String?
+  // Added 2026-09-25, per explicit instruction: a plain "HH:MM" time
+  // string for when the incident/issue described above actually
+  // happened — `date` alone (the day) wasn't enough to say when during
+  // the shift something occurred. Free text, not a DateTime, since it's
+  // just a time-of-day label attached to the incidents/siteIssues text,
+  // not a separate timestamped event log.
+  incidentTime      String?
   operationalReport String?
   notes             String?
 
@@ -872,6 +887,7 @@ model Department {
   generalExpenses     GeneralExpense[]
     inventoryItems       InventoryItem[]
   stockMovementsIssued StockMovement[]
+  departmentBudgets    DepartmentBudget[]
 
   @@map("departments")
 }
@@ -970,7 +986,120 @@ model GeneralExpense {
   lastUpdated      DateTime @updatedAt
 
   @@map("general_expenses")
-}// ---------- INVENTORY & ASSETS ----------
+}
+
+// Added 2026-09-25, per explicit instruction: Operations, out in the
+// field, often collects cash or has a receipt in hand before the actual
+// paperwork reaches Finance. This lets them log the receipt's reference
+// number and amount on the spot, so that when the physical receipt is
+// later handed in, Finance or Admin can reconcile it against what was
+// already entered — catching a missing or altered receipt quickly,
+// rather than trusting the paper trail alone.
+enum FieldReceiptStatus {
+  PENDING
+  RECONCILED
+  DISCREPANCY
+}
+
+model FieldReceiptEntry {
+  id              String   @id @default(uuid())
+  referenceNumber String
+  amount          Decimal  @db.Decimal(12, 2)
+  date            DateTime
+  purpose         String?
+
+  siteId String?
+  site   Site?   @relation(fields: [siteId], references: [id], onDelete: SetNull)
+
+  recordedBy String? // free text, same pattern as OperationsRecord.submittedBy
+
+  status               FieldReceiptStatus @default(PENDING)
+  reconciledBy         String?
+  reconciledAt         DateTime?
+  reconciliationNotes  String?
+
+  notes       String?
+  dateCreated DateTime @default(now())
+  lastUpdated DateTime @updatedAt
+
+  @@map("field_receipt_entries")
+}
+
+// Added 2026-09-25, per the "Departmental Monthly Budgets" brief: lets a
+// department prepare a planned monthly budget, submit it to Finance for
+// review, and afterwards compare it against real spending. Deliberately
+// modeled as its own module rather than folded into GeneralExpense/
+// DepartmentRequest — a budget is a PLAN made before the fact, those two
+// are records of what actually happened, and this module reads both of
+// them at request-time (not stored, always live) to show budget vs actual.
+enum BudgetStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  RETURNED
+  REJECTED
+}
+
+model DepartmentBudget {
+  id           String   @id @default(uuid())
+
+  departmentId String
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+
+  // 1-12. Paired with year rather than a single DateTime — a budget covers
+  // a whole calendar month, not a point in time, same reasoning as
+  // PayrollRun.period elsewhere in this schema.
+  month Int
+  year  Int
+
+  status BudgetStatus @default(DRAFT)
+
+  preparedBy   String?
+  submittedAt  DateTime?
+
+  // Set by Finance/Management on any review action (UNDER_REVIEW, APPROVED,
+  // RETURNED, REJECTED) — reused for all four rather than one field per
+  // outcome, since only the latest review action ever matters.
+  reviewedBy    String?
+  reviewedAt    DateTime?
+  reviewComment String?
+
+  notes       String?
+  dateCreated DateTime @default(now())
+  lastUpdated DateTime @updatedAt
+
+  lines DepartmentBudgetLine[]
+
+  // One budget per department per calendar month — "create October
+  // Marketing budget" is meaningless twice over; copy-forward and manual
+  // creation both go through the same uniqueness check.
+  @@unique([departmentId, month, year])
+  @@map("department_budgets")
+}
+
+model DepartmentBudgetLine {
+  id       String @id @default(uuid())
+
+  budgetId String
+  budget   DepartmentBudget @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+
+  // Free text, matching GeneralExpense.category — actual-vs-budget for
+  // this line is computed by matching this same text against
+  // GeneralExpense.category for the same department or in the same month,
+  // not a hard foreign key (both sides already use free-text categories
+  // elsewhere in this schema, e.g. GeneralExpense/InventoryItem).
+  category      String
+  plannedAmount Decimal @db.Decimal(12, 2)
+  description   String?
+
+  dateCreated DateTime @default(now())
+  lastUpdated DateTime @updatedAt
+
+  @@map("department_budget_lines")
+}
+
+// ---------- INVENTORY & ASSETS ----------
 
 enum ItemType {
   ASSET
