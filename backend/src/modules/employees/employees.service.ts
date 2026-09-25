@@ -158,6 +158,81 @@ export async function setEmploymentStatus(id: string, employmentStatus: Employme
   });
 }
 
+/**
+ * Hard-deletes an employee record. Employees are otherwise never
+ * hard-deleted (see setEmploymentStatus above, and Section 19's data
+ * integrity rule) — this exists only for genuine duplicate/mistaken
+ * records that never accumulated any real history, e.g. the same person
+ * added twice by accident. Added 2026-09-25 per explicit request.
+ *
+ * Refuses to delete (400, not 404/500) if the employee has ANY of:
+ * contracts, payroll line items, roster entries, attendance records,
+ * salary advances, employee loans, payslip records, or a linked login
+ * account — any one of those means this is a real employee with real
+ * history, and the existing "set status to Terminated/Absconded" path is
+ * the correct way to remove them from active use without losing that
+ * history. An empty/never-touched payroll profile (created automatically
+ * the first time anyone opened the employee's Payroll Profile section) is
+ * deleted along with the employee, but only if it has no salary history.
+ */
+export async function deleteEmployee(id: string) {
+  const employee = await prisma.employee.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      fullName: true,
+      photoFilename: true,
+      user: { select: { id: true } },
+      payrollProfile: { select: { id: true, salaryHistory: { select: { id: true }, take: 1 } } },
+      _count: {
+        select: {
+          employeeContracts: true,
+          payrollLineItems: true,
+          rosterEntries: true,
+          attendanceRecords: true,
+          salaryAdvances: true,
+          employeeLoans: true,
+          payslipRecords: true,
+        },
+      },
+    },
+  });
+  if (!employee) {
+    throw ApiError.notFound(`Employee ${id} not found.`);
+  }
+
+  const blockers: string[] = [];
+  if (employee._count.employeeContracts > 0) blockers.push("employment contracts");
+  if (employee._count.payrollLineItems > 0) blockers.push("payroll history");
+  if (employee._count.rosterEntries > 0) blockers.push("roster entries");
+  if (employee._count.attendanceRecords > 0) blockers.push("attendance records");
+  if (employee._count.salaryAdvances > 0) blockers.push("salary advances");
+  if (employee._count.employeeLoans > 0) blockers.push("loans");
+  if (employee._count.payslipRecords > 0) blockers.push("payslips");
+  if (employee.payrollProfile && employee.payrollProfile.salaryHistory.length > 0) blockers.push("salary history");
+  if (employee.user) blockers.push("a linked login account");
+
+  if (blockers.length > 0) {
+    throw ApiError.badRequest(
+      `"${employee.fullName}" has real history (${blockers.join(", ")}) and can't be deleted. ` +
+        `Set their status to Terminated or Absconded instead.`
+    );
+  }
+
+  await prisma.$transaction(async (tx) => {
+    if (employee.payrollProfile) {
+      await tx.employeePayrollProfile.delete({ where: { id: employee.payrollProfile.id } });
+    }
+    await tx.employee.delete({ where: { id } });
+  });
+
+  if (employee.photoFilename) {
+    deletePhotoFile(employee.photoFilename);
+  }
+
+  return { id, fullName: employee.fullName };
+}
+
 // ---- Photo functions ----
 
 /**

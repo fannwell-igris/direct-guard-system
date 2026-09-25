@@ -13,6 +13,7 @@ import {
   ClipboardList,
   CheckCircle2,
   XCircle,
+  Trash2,
 } from "lucide-react";
 import api from "../../api/client";
 import { useToast } from "../../contexts/ToastContext";
@@ -167,6 +168,17 @@ const EMPTY_FORM: EmployeeFormState = {
 const PAGE_SIZE = 15;
 
 type StatusFilter = "ALL" | "ACTIVE" | "INACTIVE" | "TERMINATED" | "ABSCONDED";
+
+type EmployeeSortField = "fullName" | "employeeNumber" | "position" | "salary" | "contractStartDate" | "dateAdded";
+
+const SORT_OPTIONS: { value: EmployeeSortField; label: string }[] = [
+  { value: "fullName", label: "Name" },
+  { value: "employeeNumber", label: "Employee No." },
+  { value: "position", label: "Position" },
+  { value: "salary", label: "Salary" },
+  { value: "contractStartDate", label: "Contract start" },
+  { value: "dateAdded", label: "Date added" },
+];
 
 const STATUS_TABS: { value: StatusFilter; label: string }[] = [
   { value: "ALL", label: "All" },
@@ -572,6 +584,7 @@ export default function EmployeesPage() {
   const { toast } = useToast();
   const { user } = useAuth();
   const canSeePayrollProfile = user?.role === "ADMIN" || user?.role === "HR" || user?.role === "PAYROLL";
+  const isAdmin = user?.role === "ADMIN";
 
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
@@ -589,6 +602,8 @@ export default function EmployeesPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ACTIVE");
   const [clientFilter, setClientFilter] = useState("");
   const [siteFilter, setSiteFilter] = useState("");
+  const [sortBy, setSortBy] = useState<EmployeeSortField>("fullName");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [page, setPage] = useState(1);
 
   // Form state
@@ -609,6 +624,10 @@ export default function EmployeesPage() {
   const [payrollProfileForm, setPayrollProfileForm] = useState<PayrollProfileFormState>(EMPTY_PAYROLL_PROFILE_FORM);
   const [isSavingPayrollProfile, setIsSavingPayrollProfile] = useState(false);
   const [payrollProfileError, setPayrollProfileError] = useState<string | null>(null);
+
+  // Employee delete (ADMIN only — genuine duplicates/mistakes with no history)
+  const [isDeletingEmployee, setIsDeletingEmployee] = useState(false);
+  const [deleteEmployeeError, setDeleteEmployeeError] = useState<string | null>(null);
 
   // ── Data loading ───────────────────────────────────────────────────────────
 
@@ -639,6 +658,8 @@ export default function EmployeesPage() {
       if (statusFilter !== "ALL") params.employmentStatus = statusFilter;
       if (clientFilter) params.assignedClientId = clientFilter;
       if (siteFilter) params.assignedSiteId = siteFilter;
+      params.sortBy = sortBy;
+      params.sortOrder = sortOrder;
 
       const res = await api.get("/employees", { params });
       setEmployees(res.data.data);
@@ -679,7 +700,7 @@ export default function EmployeesPage() {
     setPage(1);
     loadEmployees(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statusFilter, clientFilter, siteFilter]);
+  }, [statusFilter, clientFilter, siteFilter, sortBy, sortOrder]);
 
   async function handleSearch() {
     setPage(1);
@@ -697,6 +718,7 @@ export default function EmployeesPage() {
     setPayrollProfile(null);
     setIsEditingPayrollProfile(false);
     setPayrollProfileError(null);
+    setDeleteEmployeeError(null);
     try {
       const res = await api.get(`/employees/${id}`);
       setDetailEmployee(res.data.data);
@@ -756,6 +778,30 @@ export default function EmployeesPage() {
       setPayrollProfileError(err.response?.data?.message ?? "Failed to save payroll profile.");
     } finally {
       setIsSavingPayrollProfile(false);
+    }
+  }
+
+  async function handleDeleteEmployee(emp: EmployeeDetail) {
+    if (
+      !window.confirm(
+        `Permanently delete ${emp.fullName}? This can't be undone, and only works if they have no contracts, payroll, or attendance history.`
+      )
+    ) {
+      return;
+    }
+    setIsDeletingEmployee(true);
+    setDeleteEmployeeError(null);
+    try {
+      await api.delete(`/employees/${emp.id}`);
+      toast("success", `${emp.fullName} deleted`);
+      setDetailEmployee(null);
+      await loadEmployees();
+    } catch (err: any) {
+      const message = err.response?.data?.message ?? "Failed to delete employee.";
+      setDeleteEmployeeError(message);
+      toast("error", "Delete failed", message);
+    } finally {
+      setIsDeletingEmployee(false);
     }
   }
 
@@ -928,6 +974,23 @@ export default function EmployeesPage() {
                 <option key={s.id} value={s.id}>{s.siteName}</option>
               ))}
             </select>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as EmployeeSortField)}
+              className="select w-40"
+              title="Sort by"
+            >
+              {SORT_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>Sort: {opt.label}</option>
+              ))}
+            </select>
+            <button
+              onClick={() => setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"))}
+              className="btn-secondary px-2.5"
+              title={sortOrder === "asc" ? "Ascending — click for descending" : "Descending — click for ascending"}
+            >
+              {sortOrder === "asc" ? "A→Z" : "Z→A"}
+            </button>
             <button onClick={handleSearch} className="btn-secondary">
               Search
             </button>
@@ -1086,13 +1149,30 @@ export default function EmployeesPage() {
                         </span>
                       </div>
                     </div>
-                    <button
-                      onClick={() => setDetailEmployee(null)}
-                      className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 flex-shrink-0"
-                    >
-                      <X size={15} />
-                    </button>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      {isAdmin && (
+                        <button
+                          onClick={() => handleDeleteEmployee(detailEmployee)}
+                          disabled={isDeletingEmployee}
+                          title="Delete employee (only if no history — for duplicates/mistakes)"
+                          className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:bg-red-50 hover:text-red-600"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setDetailEmployee(null)}
+                        className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100"
+                      >
+                        <X size={15} />
+                      </button>
+                    </div>
                   </div>
+                  {deleteEmployeeError && (
+                    <p className="text-xs text-red-600 bg-red-50 rounded-lg px-2 py-1.5 border border-red-100">
+                      {deleteEmployeeError}
+                    </p>
+                  )}
 
                   {/* Contact + assignment */}
                   <div className="space-y-1.5 text-sm text-gray-600 border-t border-gray-100 pt-3">

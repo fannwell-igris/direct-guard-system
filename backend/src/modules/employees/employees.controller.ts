@@ -37,6 +37,11 @@ export const updateEmploymentStatus = asyncHandler(async (req: Request, res: Res
   res.status(200).json({ status: "ok", data: employee });
 });
 
+export const deleteEmployee = asyncHandler(async (req: Request, res: Response) => {
+  const result = await employeesService.deleteEmployee(req.params.id);
+  res.status(200).json({ status: "ok", data: result });
+});
+
 // ---- Photo endpoints ----
 
 export const uploadEmployeePhoto = asyncHandler(async (req: Request, res: Response) => {

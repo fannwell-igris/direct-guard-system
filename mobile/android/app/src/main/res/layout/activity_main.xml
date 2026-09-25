@@ -31,7 +31,11 @@
             android:indeterminateTint="@color/magen_green" />
     </LinearLayout>
 
-    <!-- No-connection screen: shown when the CMS can't be reached, hidden otherwise. -->
+    <!-- No-connection screen: shown when the CMS can't be reached, hidden
+         otherwise. A stalled car (rocking side to side, with a warning
+         badge and a puff of smoke drifting up) replaces the old plain
+         alert icon, so a lost connection reads as "vehicle broken down"
+         rather than a bare error message. -->
     <LinearLayout
         android:id="@+id/errorOverlay"
         android:layout_width="match_parent"
@@ -42,16 +46,40 @@
         android:background="@color/white"
         android:visibility="gone">
 
-        <ImageView
-            android:layout_width="56dp"
-            android:layout_height="56dp"
-            android:src="@android:drawable/ic_dialog_alert"
-            android:contentDescription="@string/no_connection_title" />
+        <FrameLayout
+            android:layout_width="140dp"
+            android:layout_height="140dp">
+
+            <ImageView
+                android:id="@+id/smokePuff"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_gravity="top|center_horizontal"
+                android:src="@drawable/ic_smoke_puff"
+                android:alpha="0"
+                android:contentDescription="@null" />
+
+            <ImageView
+                android:id="@+id/vehicleImage"
+                android:layout_width="96dp"
+                android:layout_height="96dp"
+                android:layout_gravity="bottom|center_horizontal"
+                android:src="@drawable/ic_vehicle_breakdown"
+                android:contentDescription="@string/no_connection_title" />
+
+            <ImageView
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:layout_gravity="top|end"
+                android:layout_marginEnd="4dp"
+                android:src="@drawable/ic_warning_badge"
+                android:contentDescription="@null" />
+        </FrameLayout>
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
+            android:layout_marginTop="12dp"
             android:text="@string/no_connection_title"
             android:textColor="@color/magen_navy"
             android:textSize="18sp"

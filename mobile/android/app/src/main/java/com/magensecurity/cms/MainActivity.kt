@@ -1,41 +1,29 @@
 package com.magensecurity.cms
 
-import android.Manifest
+import android.animation.AnimatorSet
+import android.animation.ObjectAnimator
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
-import android.provider.MediaStore
 import android.view.View
-import android.webkit.JavascriptInterface
-import android.webkit.ValueCallback
-import android.webkit.WebChromeClient
+import android.view.animation.LinearInterpolator
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Button
+import android.widget.ImageView
 import androidx.activity.OnBackPressedCallback
-import androidx.activity.result.ActivityResultLauncher
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.ContextCompat
-import androidx.core.content.FileProvider
-import java.io.File
 
 /**
  * Loads the live CMS website in a native WebView, mirroring the desktop
  * Electron wrapper: same live app, external links open in the system
- * browser instead of inside the app.
- *
- * On top of the plain wrapper this adds:
- *  - a native "no connection" screen with a retry button, shown when the
- *    main page fails to load, instead of the browser's default error page;
- *  - support for file inputs in the CMS (e.g. uploading a document or an
- *    ID photo), including taking a new photo directly from the camera --
- *    neither works in a bare WebView without this wiring.
+ * browser instead of inside the app. Unlike desktop, this WebView had no
+ * offline page of its own, so a lost connection used to just show a blank
+ * white screen -- errorOverlay below replaces that with a stalled-car
+ * animation plus a retry button.
  */
 class MainActivity : AppCompatActivity() {
 
@@ -49,78 +37,27 @@ class MainActivity : AppCompatActivity() {
     private lateinit var splashOverlay: View
     private lateinit var errorOverlay: View
     private lateinit var retryButton: Button
+    private lateinit var vehicleImage: ImageView
+    private lateinit var smokePuff: ImageView
 
-    // Pending callback the WebView is waiting on for a file-input result,
-    // and the Uri we told the camera app to save its photo to.
-    private var filePathCallback: ValueCallback<Array<Uri>>? = null
-    private var cameraPhotoUri: Uri? = null
+    private var breakdownAnimator: AnimatorSet? = null
 
-    private lateinit var fileChooserLauncher: ActivityResultLauncher<Intent>
-    private lateinit var notificationPermissionLauncher: ActivityResultLauncher<String>
-
-    /**
-     * Bridge exposed to the CMS web app as `window.AndroidNative`. The web
-     * app calls onLoggedIn/onLoggedOut from AuthContext.tsx right at login
-     * and logout — a WebView SPA doesn't reload the page on either, so
-     * there's no other reliable moment to notice a session starting or
-     * ending. Guarded on the JS side with `typeof window.AndroidNative
-     * !== "undefined"`, so it's a no-op on the plain website/desktop app.
-     */
-    private inner class NativeBridge {
-        @JavascriptInterface
-        fun onLoggedIn(authToken: String) {
-            runOnUiThread { registerPushToken(applicationContext, authToken) }
-        }
-
-        @JavascriptInterface
-        fun onLoggedOut() {
-            runOnUiThread { unregisterStoredPushToken(applicationContext) }
-        }
-    }
+    // Set when the current main-frame load has failed (e.g. no internet);
+    // cleared at the start of every new load. onPageFinished checks this to
+    // decide whether the load actually succeeded, since WebView still calls
+    // onPageFinished after a failed load.
+    private var currentLoadFailed = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        createNotificationChannel(applicationContext)
-
         webView = findViewById(R.id.webView)
         splashOverlay = findViewById(R.id.splashOverlay)
         errorOverlay = findViewById(R.id.errorOverlay)
         retryButton = findViewById(R.id.retryButton)
-
-        webView.addJavascriptInterface(NativeBridge(), "AndroidNative")
-
-        notificationPermissionLauncher =
-            registerForActivityResult(ActivityResultContracts.RequestPermission()) { /* no-op either way */ }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) !=
-            PackageManager.PERMISSION_GRANTED
-        ) {
-            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-        }
-
-        fileChooserLauncher = registerForActivityResult(
-            ActivityResultContracts.StartActivityForResult()
-        ) { result ->
-            var results: Array<Uri>? = null
-            if (result.resultCode == RESULT_OK) {
-                val data = result.data
-                val pickedUri = data?.data
-                results = if (pickedUri != null) {
-                    // Picked from gallery/files.
-                    arrayOf(pickedUri)
-                } else {
-                    // No data means it came back from the camera -- use the
-                    // Uri we handed it to save the photo to.
-                    cameraPhotoUri?.let { arrayOf(it) }
-                }
-            }
-            filePathCallback?.onReceiveValue(results)
-            filePathCallback = null
-        }
-
-        retryButton.setOnClickListener { retryLoad() }
+        vehicleImage = findViewById(R.id.vehicleImage)
+        smokePuff = findViewById(R.id.smokePuff)
 
         webView.settings.javaScriptEnabled = true
         webView.settings.domStorageEnabled = true
@@ -145,30 +82,7 @@ class MainActivity : AppCompatActivity() {
 
             override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {
                 super.onPageStarted(view, url, favicon)
-            }
-
-            override fun onPageFinished(view: WebView, url: String) {
-                super.onPageFinished(view, url)
-                // Hide the splash/error screens once the page has actually
-                // loaded -- same "don't dismiss until ready" idea as the
-                // desktop app's ready-to-show handling.
-                splashOverlay.visibility = View.GONE
-                errorOverlay.visibility = View.GONE
-                webView.visibility = View.VISIBLE
-
-                // Cold-start fallback: if the app opens straight into an
-                // already-logged-in session (JWT still valid from
-                // yesterday), NativeBridge.onLoggedIn never fires because
-                // no fresh login happened this run. Check localStorage
-                // directly so push registration still happens.
-                view.evaluateJavascript(
-                    "(function(){return window.localStorage.getItem('cms_token');})();"
-                ) { value ->
-                    val token = value?.trim('"')
-                    if (!token.isNullOrEmpty() && token != "null") {
-                        registerPushToken(applicationContext, token)
-                    }
-                }
+                currentLoadFailed = false
             }
 
             override fun onReceivedError(
@@ -177,55 +91,31 @@ class MainActivity : AppCompatActivity() {
                 error: WebResourceError
             ) {
                 super.onReceivedError(view, request, error)
-                // Only treat a failure to load the CMS page itself as fatal;
-                // a failed sub-resource (an image, a font, an ad blocker
-                // hiccup) shouldn't take over the whole screen.
+                // Only react to the main page failing to load -- a failed
+                // sub-resource (an image, a tracking script, etc.) shouldn't
+                // blank out an otherwise-working page.
                 if (request.isForMainFrame) {
-                    showError()
+                    currentLoadFailed = true
+                    showOfflineState()
+                }
+            }
+
+            override fun onPageFinished(view: WebView, url: String) {
+                super.onPageFinished(view, url)
+                if (!currentLoadFailed) {
+                    // A real page loaded successfully -- make sure both
+                    // overlays are out of the way, whichever was showing.
+                    hideOfflineState()
+                    splashOverlay.visibility = View.GONE
+                    webView.visibility = View.VISIBLE
                 }
             }
         }
 
-        webView.webChromeClient = object : WebChromeClient() {
-            override fun onShowFileChooser(
-                webView: WebView,
-                filePathCallback: ValueCallback<Array<Uri>>,
-                fileChooserParams: FileChooserParams
-            ): Boolean {
-                // Cancel any previous pending chooser before starting a new one.
-                this@MainActivity.filePathCallback?.onReceiveValue(null)
-                this@MainActivity.filePathCallback = filePathCallback
-
-                val photoFile = createImageFile()
-                cameraPhotoUri = if (photoFile != null) {
-                    FileProvider.getUriForFile(
-                        this@MainActivity,
-                        "$packageName.fileprovider",
-                        photoFile
-                    )
-                } else {
-                    null
-                }
-
-                val cameraIntent = Intent(MediaStore.ACTION_IMAGE_CAPTURE).apply {
-                    putExtra(MediaStore.EXTRA_OUTPUT, cameraPhotoUri)
-                    addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
-                }
-
-                val contentIntent = Intent(Intent.ACTION_GET_CONTENT).apply {
-                    addCategory(Intent.CATEGORY_OPENABLE)
-                    type = "*/*"
-                }
-
-                val chooserIntent = Intent.createChooser(contentIntent, "Choose file").apply {
-                    if (cameraPhotoUri != null) {
-                        putExtra(Intent.EXTRA_INITIAL_INTENTS, arrayOf(cameraIntent))
-                    }
-                }
-
-                fileChooserLauncher.launch(chooserIntent)
-                return true
-            }
+        retryButton.setOnClickListener {
+            hideOfflineState()
+            splashOverlay.visibility = View.VISIBLE
+            webView.loadUrl(appUrl)
         }
 
         webView.loadUrl(appUrl)
@@ -244,26 +134,58 @@ class MainActivity : AppCompatActivity() {
         })
     }
 
-    private fun showError() {
+    private fun showOfflineState() {
         splashOverlay.visibility = View.GONE
         webView.visibility = View.GONE
         errorOverlay.visibility = View.VISIBLE
+        startBreakdownAnimation()
     }
 
-    private fun retryLoad() {
+    private fun hideOfflineState() {
         errorOverlay.visibility = View.GONE
-        splashOverlay.visibility = View.VISIBLE
-        webView.loadUrl(appUrl)
+        stopBreakdownAnimation()
     }
 
-    /** A fresh temp jpg under cacheDir/camera/, matching file_paths.xml's cache-path. */
-    private fun createImageFile(): File? {
-        return try {
-            val dir = File(cacheDir, "camera")
-            if (!dir.exists()) dir.mkdirs()
-            File.createTempFile("IMG_", ".jpg", dir)
-        } catch (e: Exception) {
-            null
+    /** Rocks the car side to side and puffs a smoke ring above it, on loop. */
+    private fun startBreakdownAnimation() {
+        if (breakdownAnimator?.isRunning == true) return
+
+        val rock = ObjectAnimator.ofFloat(vehicleImage, View.ROTATION, -4f, 4f).apply {
+            duration = 260
+            repeatCount = ObjectAnimator.INFINITE
+            repeatMode = ObjectAnimator.REVERSE
+            interpolator = LinearInterpolator()
         }
+        val puffAlpha = ObjectAnimator.ofFloat(smokePuff, View.ALPHA, 0f, 0.85f, 0f).apply {
+            duration = 1400
+            repeatCount = ObjectAnimator.INFINITE
+        }
+        val puffRise = ObjectAnimator.ofFloat(smokePuff, View.TRANSLATION_Y, 12f, -34f).apply {
+            duration = 1400
+            repeatCount = ObjectAnimator.INFINITE
+        }
+        val puffScaleX = ObjectAnimator.ofFloat(smokePuff, View.SCALE_X, 0.5f, 1.3f).apply {
+            duration = 1400
+            repeatCount = ObjectAnimator.INFINITE
+        }
+        val puffScaleY = ObjectAnimator.ofFloat(smokePuff, View.SCALE_Y, 0.5f, 1.3f).apply {
+            duration = 1400
+            repeatCount = ObjectAnimator.INFINITE
+        }
+
+        breakdownAnimator = AnimatorSet().apply {
+            playTogether(rock, puffAlpha, puffRise, puffScaleX, puffScaleY)
+            start()
+        }
+    }
+
+    private fun stopBreakdownAnimation() {
+        breakdownAnimator?.cancel()
+        breakdownAnimator = null
+        vehicleImage.rotation = 0f
+        smokePuff.alpha = 0f
+        smokePuff.translationY = 0f
+        smokePuff.scaleX = 1f
+        smokePuff.scaleY = 1f
     }
 }
