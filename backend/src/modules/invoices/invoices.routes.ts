@@ -13,6 +13,18 @@ const router = Router();
 //                                         auto-generated, status starts
 //                                         DRAFT, amountPaid/
 //                                         outstandingBalance derived)
+// GET   /api/invoices/next-number      - peek (doesn't reserve) the number
+//                                         the next invoice would get, e.g.
+//                                         for a live preview on the New
+//                                         Invoice form; ?date= optional
+// DELETE /api/invoices                 - wipes EVERY invoice + payment
+//                                         (added 2026-09-25, for clearing
+//                                         trial/test data). ADMIN only,
+//                                         body must be
+//                                         { "confirm": "WIPE_ALL_INVOICES",
+//                                           "resetNumberingTo"?: number }
+//                                         plus the usual password
+//                                         re-confirmation.
 // GET   /api/invoices/:id              - view one, includes payments
 // PUT   /api/invoices/:id              - edit; locked once CANCELLED;
 //                                         amount can't drop below what's
@@ -39,6 +51,8 @@ const router = Router();
 
 router.get("/", controller.listInvoices);
 router.post("/", controller.createInvoice);
+router.delete("/", controller.wipeAllInvoices);
+router.get("/next-number", controller.peekNextInvoiceNumber);
 router.get("/:id", controller.getInvoice);
 router.put("/:id", controller.updateInvoice);
 router.post("/:id/issue", controller.issueInvoice);

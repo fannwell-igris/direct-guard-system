@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import {
   Settings, Clock, Gift, Minus, ShieldCheck, Plus, ToggleLeft, ToggleRight,
+  Receipt, AlertTriangle,
 } from "lucide-react";
 import api from "../../api/client";
 import Modal from "../../components/ui/Modal";
+import { useAuth } from "../../contexts/AuthContext";
 
 interface LookupRow {
   id: string;
@@ -31,7 +33,7 @@ interface StatutoryRule {
   deductionType?: { id: string; name: string };
 }
 
-type Tab = "shiftTypes" | "allowanceTypes" | "deductionTypes" | "statutoryRules";
+type Tab = "shiftTypes" | "allowanceTypes" | "deductionTypes" | "statutoryRules" | "invoicing";
 
 const TAB_CONFIG: Record<
   Exclude<Tab, "statutoryRules">,
@@ -42,15 +44,90 @@ const TAB_CONFIG: Record<
   deductionTypes: { label: "Deduction Types",  endpoint: "/deduction-types", hasDescription: true,  icon: Minus },
 };
 
-const ALL_TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
+const BASE_TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
   { key: "shiftTypes",     label: "Shift Types",      icon: Clock },
   { key: "allowanceTypes", label: "Allowance Types",  icon: Gift },
   { key: "deductionTypes", label: "Deduction Types",  icon: Minus },
   { key: "statutoryRules", label: "Statutory Rules",  icon: ShieldCheck },
 ];
 
+const ADMIN_ONLY_TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
+  { key: "invoicing", label: "Invoicing", icon: Receipt },
+];
+
 export default function SettingsPage() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === "ADMIN";
+  const ALL_TABS = isAdmin ? [...BASE_TABS, ...ADMIN_ONLY_TABS] : BASE_TABS;
   const [tab, setTab] = useState<Tab>("shiftTypes");
+
+  // ── Invoicing tab state (Admin only) ──────────────────────────────────────
+  const [nextInvoiceSeq, setNextInvoiceSeq] = useState("");
+  const [invoicingLoading, setInvoicingLoading] = useState(false);
+  const [invoicingError, setInvoicingError] = useState<string | null>(null);
+  const [invoicingSaving, setInvoicingSaving] = useState(false);
+  const [invoicingSaved, setInvoicingSaved] = useState(false);
+  const [wipeConfirmText, setWipeConfirmText] = useState("");
+  const [wipeResetTo, setWipeResetTo] = useState("399");
+  const [wiping, setWiping] = useState(false);
+  const [wipeError, setWipeError] = useState<string | null>(null);
+  const [wipeResult, setWipeResult] = useState<{ deletedInvoices: number; deletedPayments: number } | null>(null);
+
+  const currentYear = new Date().getFullYear();
+
+  async function loadInvoicing() {
+    setInvoicingLoading(true);
+    setInvoicingError(null);
+    try {
+      const res = await api.get("/settings/finance");
+      const sequences = res.data.data?.invoiceNumberSequences ?? {};
+      setNextInvoiceSeq(String(sequences[String(currentYear)] ?? 1));
+    } catch (err: any) {
+      setInvoicingError(err.response?.data?.message ?? "Failed to load invoicing settings.");
+    } finally {
+      setInvoicingLoading(false);
+    }
+  }
+
+  async function saveInvoicing(e: FormEvent) {
+    e.preventDefault();
+    setInvoicingSaving(true);
+    setInvoicingError(null);
+    setInvoicingSaved(false);
+    try {
+      const res = await api.get("/settings/finance");
+      const sequences = { ...(res.data.data?.invoiceNumberSequences ?? {}) };
+      sequences[String(currentYear)] = Number(nextInvoiceSeq);
+      await api.put("/settings/finance", { invoiceNumberSequences: sequences });
+      setInvoicingSaved(true);
+    } catch (err: any) {
+      setInvoicingError(err.response?.data?.message ?? "Failed to save.");
+    } finally {
+      setInvoicingSaving(false);
+    }
+  }
+
+  const WIPE_PHRASE = "DELETE ALL INVOICES";
+
+  async function handleWipeAll() {
+    if (wipeConfirmText !== WIPE_PHRASE) return;
+    setWiping(true);
+    setWipeError(null);
+    setWipeResult(null);
+    try {
+      const resetNumberingTo = wipeResetTo.trim() ? Number(wipeResetTo) : undefined;
+      const res = await api.delete("/invoices", {
+        data: { confirm: "WIPE_ALL_INVOICES", resetNumberingTo },
+      });
+      setWipeResult(res.data.data);
+      setWipeConfirmText("");
+      if (resetNumberingTo) setNextInvoiceSeq(String(resetNumberingTo));
+    } catch (err: any) {
+      setWipeError(err.response?.data?.message ?? "Failed to wipe invoices.");
+    } finally {
+      setWiping(false);
+    }
+  }
 
   // Lookup tabs state
   const [rows, setRows]               = useState<LookupRow[]>([]);
@@ -72,6 +149,10 @@ export default function SettingsPage() {
   });
 
   async function loadTab(t: Tab) {
+    if (t === "invoicing") {
+      await loadInvoicing();
+      return;
+    }
     setIsLoading(true);
     setError(null);
     try {
@@ -154,7 +235,7 @@ export default function SettingsPage() {
     }
   }
 
-  const isLookupTab = tab !== "statutoryRules";
+  const isLookupTab = tab !== "statutoryRules" && tab !== "invoicing";
 
   return (
     <div className="space-y-6">
@@ -167,13 +248,15 @@ export default function SettingsPage() {
           </h1>
           <p className="page-subtitle">Manage shift types, allowances, deductions, and statutory rules</p>
         </div>
-        <button
-          onClick={() => isLookupTab ? setShowForm(true) : setShowRuleForm(true)}
-          className="btn-primary"
-        >
-          <Plus size={15} />
-          Add {isLookupTab ? TAB_CONFIG[tab].label.replace(/s$/, "") : "Rule"}
-        </button>
+        {tab !== "invoicing" && (
+          <button
+            onClick={() => isLookupTab ? setShowForm(true) : setShowRuleForm(true)}
+            className="btn-primary"
+          >
+            <Plus size={15} />
+            Add {isLookupTab ? TAB_CONFIG[tab].label.replace(/s$/, "") : "Rule"}
+          </button>
+        )}
       </div>
 
       {/* Tab nav */}
@@ -400,6 +483,96 @@ export default function SettingsPage() {
               </tbody>
             </table>
           )}
+        </div>
+      )}
+
+      {/* ── Invoicing tab (Admin only) ─────────────────────────────────────── */}
+      {tab === "invoicing" && isAdmin && (
+        <div className="space-y-6 max-w-xl">
+          {invoicingError && (
+            <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-4 py-3">{invoicingError}</div>
+          )}
+
+          {/* Numbering */}
+          <div className="card space-y-3">
+            <h2 className="font-semibold text-gray-900 flex items-center gap-2">
+              <Receipt size={16} className="text-magen-green" /> Invoice Numbering
+            </h2>
+            <p className="text-sm text-gray-500">
+              The next invoice created in {currentYear} will be numbered <span className="font-mono">INV-{currentYear}-{String(nextInvoiceSeq || 1).padStart(4, "0")}</span>.
+              Change the number below to continue a different sequence.
+            </p>
+            {invoicingLoading ? (
+              <div className="text-sm text-gray-500">Loading…</div>
+            ) : (
+              <form onSubmit={saveInvoicing} className="flex items-end gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Next invoice number ({currentYear})</label>
+                  <input
+                    type="number"
+                    min={1}
+                    className="input w-40"
+                    value={nextInvoiceSeq}
+                    onChange={(e) => { setNextInvoiceSeq(e.target.value); setInvoicingSaved(false); }}
+                  />
+                </div>
+                <button type="submit" disabled={invoicingSaving} className="btn-primary">
+                  {invoicingSaving ? "Saving…" : "Save"}
+                </button>
+                {invoicingSaved && <span className="text-xs text-magen-green">Saved.</span>}
+              </form>
+            )}
+          </div>
+
+          {/* Danger zone */}
+          <div className="card space-y-3 border-red-200">
+            <h2 className="font-semibold text-red-700 flex items-center gap-2">
+              <AlertTriangle size={16} /> Danger Zone
+            </h2>
+            <p className="text-sm text-gray-600">
+              Permanently deletes <strong>every invoice and payment record</strong> in the system — including
+              issued and paid ones. Use this only to clear out trial/test data before going live. This cannot be undone.
+            </p>
+            {wipeError && (
+              <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{wipeError}</div>
+            )}
+            {wipeResult && (
+              <div className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                Deleted {wipeResult.deletedInvoices} invoice(s) and {wipeResult.deletedPayments} payment(s).
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Restart numbering at ({currentYear})</label>
+                <input
+                  type="number"
+                  min={1}
+                  className="input"
+                  value={wipeResetTo}
+                  onChange={(e) => setWipeResetTo(e.target.value)}
+                  placeholder="e.g. 399"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Type <span className="font-mono">{WIPE_PHRASE}</span> to confirm
+                </label>
+                <input
+                  className="input"
+                  value={wipeConfirmText}
+                  onChange={(e) => setWipeConfirmText(e.target.value)}
+                  placeholder={WIPE_PHRASE}
+                />
+              </div>
+            </div>
+            <button
+              onClick={handleWipeAll}
+              disabled={wiping || wipeConfirmText !== WIPE_PHRASE}
+              className="btn-danger disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {wiping ? "Deleting…" : "Delete ALL invoices and payments"}
+            </button>
+          </div>
         </div>
       )}
     </div>

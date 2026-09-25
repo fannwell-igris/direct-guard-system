@@ -2,6 +2,7 @@ import { Prisma, InvoiceStatus } from "@prisma/client";
 import { prisma } from "../../lib/prisma";
 import { ApiError } from "../../middleware/errorHandler";
 import { InvoiceCreateInput, InvoiceUpdateInput, InvoiceListQuery } from "./invoices.validation";
+import * as settingsService from "../settings/settings.service";
 
 /**
  * Creates a new invoice. Validates clientId exists, and — if siteId is
@@ -214,6 +215,39 @@ export async function deleteInvoice(id: string) {
 }
 
 /**
+ * Wipes EVERY invoice and payment record in the system. Added 2026-09-25,
+ * per explicit instruction, to clear out trial/test invoices created
+ * before go-live so real invoicing can start clean. Payments are deleted
+ * first (Payment.invoice is onDelete: Restrict, so an invoice with
+ * payments can't be removed until they're gone). Optionally also resets
+ * the current year's invoice-number sequence (see peekNextInvoiceNumber /
+ * generateInvoiceNumber below) so the very next invoice created picks up
+ * at a chosen number instead of continuing wherever it left off.
+ *
+ * Gated in the controller to ADMIN + an exact confirmation phrase, and
+ * sits behind the app-wide requireDeleteConfirmation password re-check
+ * like every other delete (this is a DELETE request).
+ */
+export async function wipeAllInvoices(resetNumberingTo?: number) {
+  const [deletedPayments, deletedInvoices] = await prisma.$transaction([
+    prisma.payment.deleteMany({}),
+    prisma.invoice.deleteMany({}),
+  ]);
+
+  let numberingReset: string | undefined;
+  if (typeof resetNumberingTo === "number" && resetNumberingTo > 0) {
+    const year = new Date().getUTCFullYear();
+    numberingReset = await setInvoiceNumberSequence(year, resetNumberingTo);
+  }
+
+  return {
+    deletedPayments: deletedPayments.count,
+    deletedInvoices: deletedInvoices.count,
+    numberingReset,
+  };
+}
+
+/**
  * Recalculates amountPaid/outstandingBalance/status from the invoice's
  * actual Payments — called after every payment create/edit/delete, per
  * the schema's own comment on Invoice.amountPaid. `amountOverride` lets
@@ -273,25 +307,53 @@ function buildWhere(query: InvoiceListQuery): Prisma.InvoiceWhereInput {
   return where;
 }
 
-// One-time starting offsets so the system's numbering continues from an
-// existing manual/paper invoice sequence instead of restarting at 1 for a
-// year that already has real-world invoices issued under lower numbers.
-// Only years listed here get an offset; every other year (including future
-// ones) starts fresh at 0001 as normal.
-const INVOICE_NUMBER_START_OFFSET: Record<number, number> = {
-  2026: 398, // first system invoice this year should read INV-2026-0399
-};
-
+// Invoice numbering (format INV-<year>-<0000>) is now a persisted,
+// admin-editable counter kept in the "finance" settings section
+// (finance.invoiceNumberSequences, e.g. { "2026": 399 }) rather than
+// derived from how many invoices happen to exist for the year — that
+// count-based approach broke the moment invoices could be deleted (see
+// wipeAllInvoices/deleteInvoice above), since removing invoices would
+// silently shift every number that came after them. Changed 2026-09-25.
+//
+// Each key is the year (as a string, since JSON object keys are always
+// strings) mapped to the NEXT sequence number to hand out for that year.
+// A year with no entry yet starts at 1. Settings > Invoicing lets an
+// Admin view/override this directly (e.g. to continue an existing
+// paper/manual numbering sequence, or to restart after a bulk wipe).
 async function generateInvoiceNumber(invoiceDate: Date): Promise<string> {
   const year = invoiceDate.getUTCFullYear();
-  const yearStart = new Date(Date.UTC(year, 0, 1));
-  const yearEnd = new Date(Date.UTC(year + 1, 0, 1));
-  const countThisYear = await prisma.invoice.count({
-    where: { invoiceDate: { gte: yearStart, lt: yearEnd } },
-  });
-  const offset = INVOICE_NUMBER_START_OFFSET[year] ?? 0;
-  const sequence = String(countThisYear + 1 + offset).padStart(4, "0");
-  return `INV-${year}-${sequence}`;
+  const finance = (await settingsService.getSection("finance")) as {
+    invoiceNumberSequences?: Record<string, number>;
+  };
+  const sequences = { ...(finance.invoiceNumberSequences ?? {}) };
+  const next = sequences[String(year)] ?? 1;
+  sequences[String(year)] = next + 1;
+  await settingsService.updateSection("finance", { invoiceNumberSequences: sequences });
+  return `INV-${year}-${String(next).padStart(4, "0")}`;
+}
+
+/**
+ * Read-only peek at the number the NEXT invoice for this year would get,
+ * without reserving/incrementing it — used by the New Invoice form to
+ * show the number live before the invoice is actually created.
+ */
+export async function peekNextInvoiceNumber(invoiceDate: Date): Promise<string> {
+  const year = invoiceDate.getUTCFullYear();
+  const finance = (await settingsService.getSection("finance")) as {
+    invoiceNumberSequences?: Record<string, number>;
+  };
+  const next = finance.invoiceNumberSequences?.[String(year)] ?? 1;
+  return `INV-${year}-${String(next).padStart(4, "0")}`;
+}
+
+/** Directly sets the next sequence number to hand out for a given year. */
+async function setInvoiceNumberSequence(year: number, nextNumber: number): Promise<string> {
+  const finance = (await settingsService.getSection("finance")) as {
+    invoiceNumberSequences?: Record<string, number>;
+  };
+  const sequences = { ...(finance.invoiceNumberSequences ?? {}), [String(year)]: nextNumber };
+  await settingsService.updateSection("finance", { invoiceNumberSequences: sequences });
+  return `INV-${year}-${String(nextNumber).padStart(4, "0")}`;
 }
 
 async function ensureClientExists(clientId: string) {

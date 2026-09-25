@@ -34,6 +34,9 @@ export const SETTINGS_DEFAULTS: Record<string, unknown> = {
   finance: {
     defaultInvoiceDueDays: 30,      // default payment terms in days
     invoicePrefix: "INV",           // e.g. INV-2026-0001
+    invoiceNumberSequences: {},     // { "2026": 399 } = next invoice number
+                                     // to hand out for that year; see
+                                     // invoices.service.ts generateInvoiceNumber
     invoiceNotes: "",               // default notes on every invoice
     paymentMethods: [
       "Bank Transfer",

@@ -426,6 +426,13 @@ export default function InvoicesPage() {
   // brand new invoice, never on edit.
   const [billingSuggestion, setBillingSuggestion] = useState<{ frequency: string; amount: number } | null>(null);
 
+  // Live preview of the invoice number a brand-new invoice will get,
+  // added 2026-09-25 per explicit instruction ("let me see the invoice
+  // numbers as they are being made"). Purely a peek — the real number is
+  // still assigned by the backend on save, so this is re-fetched whenever
+  // the invoice date changes (numbering is per calendar year).
+  const [nextInvoiceNumber, setNextInvoiceNumber] = useState<string | null>(null);
+
   // ── payment form
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [paymentForm, setPaymentForm] = useState<PaymentForm>(blankPaymentForm());
@@ -482,6 +489,17 @@ export default function InvoicesPage() {
       .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [invoiceForm.clientId, invoiceForm.siteId, invoicePanel]);
+
+  // ─── Live "next invoice number" preview (new invoices only) ──────────────
+  useEffect(() => {
+    setNextInvoiceNumber(null);
+    if (invoicePanel !== "add") return;
+    const params = invoiceForm.invoiceDate ? `?date=${invoiceForm.invoiceDate}` : "";
+    fetch(`${API}/invoices/next-number${params}`, { headers: authHeader })
+      .then((r) => r.json())
+      .then((j) => setNextInvoiceNumber(j.data?.invoiceNumber ?? null))
+      .catch(() => {});
+  }, [invoicePanel, invoiceForm.invoiceDate]);
 
   function applyBillingSuggestion() {
     if (!billingSuggestion) return;
@@ -943,6 +961,16 @@ export default function InvoicesPage() {
                 )}
 
                 <form onSubmit={handleInvoiceSubmit} className="space-y-3">
+                  {/* Live preview of the number this invoice will be assigned */}
+                  {invoicePanel === "add" && (
+                    <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs">
+                      <span className="text-gray-500">Invoice number</span>
+                      <span className="font-mono font-semibold text-gray-700">
+                        {nextInvoiceNumber ?? "…"}
+                      </span>
+                    </div>
+                  )}
+
                   {/* Client — only editable on create */}
                   {invoicePanel === "add" && (
                     <div>
