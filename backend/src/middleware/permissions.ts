@@ -209,6 +209,15 @@ const REGISTRY: RouteRule[] = [
   // a new month's copy-forward, not removed.
   { prefix: "/api/department-budgets", methods: { GET: ["ADMIN", "MANAGER", "PAYROLL", "OPERATIONS", "HR", "MARKETING"], POST: ["ADMIN", "MANAGER", "PAYROLL", "OPERATIONS", "HR", "MARKETING"], PUT: ["ADMIN", "MANAGER", "PAYROLL", "OPERATIONS", "HR", "MARKETING"], PATCH: ["ADMIN", "MANAGER", "PAYROLL", "OPERATIONS", "HR", "MARKETING"] } },
 
+  // Weekly operational plans (2026-09-25) — the week-level companion to the
+  // monthly budgets above, and deliberately given the same audience: any
+  // department plans its own week, and the plan shows its intended spend
+  // against that department's monthly budget. Nothing here is enforced
+  // against the budget, so PAYROLL needs no special standing. DELETE is
+  // ADMIN-only: unlike a budget (superseded by the next month), a plan has
+  // no natural successor, so removing one is a genuine deletion.
+  { prefix: "/api/weekly-plans", methods: { GET: ["ADMIN", "MANAGER", "PAYROLL", "OPERATIONS", "HR", "MARKETING"], POST: ["ADMIN", "MANAGER", "PAYROLL", "OPERATIONS", "HR", "MARKETING"], PUT: ["ADMIN", "MANAGER", "PAYROLL", "OPERATIONS", "HR", "MARKETING"], PATCH: ["ADMIN", "MANAGER", "PAYROLL", "OPERATIONS", "HR", "MARKETING"], DELETE: ADMIN } },
+
   // Inventory — no broad STAFF access. A future "My Assigned Assets"
   // endpoint with row-level filtering is explicitly out of scope here.
   { prefix: "/api/inventory", methods: { GET: ADMIN_MANAGER_OPS, POST: ADMIN_MANAGER_OPS, PUT: ADMIN_MANAGER_OPS, PATCH: ADMIN_MANAGER_OPS, DELETE: ADMIN_MANAGER } },

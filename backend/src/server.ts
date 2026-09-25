@@ -29,6 +29,7 @@ import departmentRequestsRouter from "./modules/department-requests/department-r
 import generalExpensesRouter from "./modules/general-expenses/general-expenses.routes";
 import fieldReceiptsRouter from "./modules/field-receipts/field-receipts.routes";
 import departmentBudgetsRouter from "./modules/department-budgets/department-budgets.routes";
+import weeklyPlansRouter from "./modules/weekly-plans/weekly-plans.routes";
 import payrollRoutes from "./modules/payroll/payroll.routes";
 import allowanceTypesRoutes from "./modules/allowance-types/allowance-types.routes";
 import deductionTypesRoutes from "./modules/deduction-types/deduction-types.routes";
@@ -165,6 +166,9 @@ app.use("/api/department-requests", departmentRequestsRouter);
 app.use("/api/general-expenses", generalExpensesRouter);
 app.use("/api/field-receipts", fieldReceiptsRouter);
 app.use("/api/department-budgets", departmentBudgetsRouter);
+// Weekly operational plans — what a department intends to DO in one week,
+// read against the monthly budget above for visibility only (never enforced).
+app.use("/api/weekly-plans", weeklyPlansRouter);
 app.use("/api/inventory", inventoryRouter);
 
 // Invoices — invoiceNumber auto-generated (INV-<year>-<0000>), status

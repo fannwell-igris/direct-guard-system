@@ -6,7 +6,7 @@ import {
   ClipboardList, CheckSquare, Inbox, Wallet, Receipt, DollarSign,
   Package, UserCog, Settings as SettingsIcon, TrendingUp, MessageSquare,
   UserCheck, Target, ClipboardCheck, LayoutGrid, Navigation, Flag, BarChart3,
-  PiggyBank,
+  PiggyBank, CalendarRange,
 } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { useAuth } from "../../contexts/AuthContext";
@@ -48,6 +48,7 @@ const NAV_GROUPS: NavGroup[] = [
     roles: ["ADMIN", "MANAGER", "OPERATIONS", "HR", "PAYROLL"],
     items: [
       { label: "Operations Records", to: "/operations", icon: ClipboardList },
+      { label: "Weekly Plans", to: "/operations/weekly-plans", icon: CalendarRange },
       { label: "Attendance Calendar", to: "/operations/calendar", icon: CalendarDays },
       { label: "Field Receipts", to: "/operations/field-receipts", icon: Receipt },
       { label: "Deployment", to: "/deployment", icon: UserCheck },

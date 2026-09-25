@@ -11,6 +11,7 @@ import ContractsPage from "./pages/contracts/ContractsPage";
 import OperationsPage from "./pages/operations/OperationsPage";
 import AttendanceCalendarPage from "./pages/operations/AttendanceCalendarPage";
 import FieldReceiptsPage from "./pages/operations/FieldReceiptsPage";
+import WeeklyPlansPage from "./pages/operations/WeeklyPlansPage";
 import "./App.css";
 import InventoryPage from "./pages/inventory/InventoryPage";
 import InvoicesPage from "./pages/invoices/InvoicesPage";
@@ -70,6 +71,7 @@ function App() {
             <Route path="/operations" element={<OperationsPage />} />
             <Route path="/operations/calendar" element={<AttendanceCalendarPage />} />
             <Route path="/operations/field-receipts" element={<FieldReceiptsPage />} />
+            <Route path="/operations/weekly-plans" element={<WeeklyPlansPage />} />
             <Route path="/inventory" element={<InventoryPage />} />
             <Route path="/tasks" element={<TasksPage />} />
             <Route path="/department-requests" element={<DepartmentRequestsPage />} />

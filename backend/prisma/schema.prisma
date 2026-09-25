@@ -888,6 +888,7 @@ model Department {
     inventoryItems       InventoryItem[]
   stockMovementsIssued StockMovement[]
   departmentBudgets    DepartmentBudget[]
+  weeklyPlans          WeeklyPlan[]
 
   @@map("departments")
 }
@@ -1097,6 +1098,67 @@ model DepartmentBudgetLine {
   lastUpdated DateTime @updatedAt
 
   @@map("department_budget_lines")
+}
+
+// Added 2026-09-25: a department's plan for ONE week — what it intends to
+// do, not what it spent. Deliberately separate from DepartmentBudget (a
+// month-level money plan) and from Task (an open-ended to-do with no week
+// boundary): this is the weekly operational rhythm sitting between them.
+// Each item carries an optional estimated cost so the week's intended
+// spend can be read against the department's monthly budget, but nothing
+// here is ever enforced against that budget — the comparison is shown for
+// judgement, not used to block a plan (see weekly-plans.service.ts).
+enum WeeklyPlanItemStatus {
+  PLANNED
+  DONE
+  CANCELLED
+}
+
+model WeeklyPlan {
+  id           String     @id @default(uuid())
+
+  departmentId String
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+
+  // Always normalised to the Monday of the week (see startOfWeek() in
+  // weekly-plans.validation.ts) so "the week of the 13th" is the same row
+  // no matter which day inside it the user happened to pick.
+  weekStartDate DateTime
+
+  preparedBy   String?
+  notes        String?
+  dateCreated  DateTime   @default(now())
+  lastUpdated  DateTime   @updatedAt
+
+  items WeeklyPlanItem[]
+
+  // One plan per department per week — same reasoning as
+  // DepartmentBudget's per-month uniqueness.
+  @@unique([departmentId, weekStartDate])
+  @@map("weekly_plans")
+}
+
+model WeeklyPlanItem {
+  id       String     @id @default(uuid())
+
+  planId   String
+  plan     WeeklyPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  activity    String
+  plannedDate DateTime
+  responsible String?
+
+  // Optional — plenty of planned activities cost nothing. Defaults to 0 so
+  // the week's total is always summable without null handling.
+  estimatedCost Decimal @default(0) @db.Decimal(12, 2)
+
+  status WeeklyPlanItemStatus @default(PLANNED)
+  notes  String?
+
+  dateCreated DateTime @default(now())
+  lastUpdated DateTime @updatedAt
+
+  @@map("weekly_plan_items")
 }
 
 // ---------- INVENTORY & ASSETS ----------
