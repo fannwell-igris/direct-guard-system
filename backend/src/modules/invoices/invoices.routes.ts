@@ -20,9 +20,9 @@ const router = Router();
 // POST  /api/invoices/:id/issue        - DRAFT -> ISSUED, one-time
 // POST  /api/invoices/:id/cancel       - -> CANCELLED, only while
 //                                         amountPaid is still 0; terminal
-// DELETE /api/invoices/:id             - hard delete; only DRAFT/CANCELLED
-//                                         invoices with no payments (added
-//                                         2026-09-25, for clearing out
+// DELETE /api/invoices/:id             - hard delete; only DRAFT/CANCELLED/
+//                                         OVERDUE invoices with no payments
+//                                         (added 2026-09-25, for clearing out
 //                                         trial/test invoices). ADMIN only
 //                                         (permissions.ts) + requires the
 //                                         requester's own password

@@ -167,16 +167,19 @@ export async function cancelInvoice(id: string) {
   return prisma.invoice.update({ where: { id }, data: { status: "CANCELLED" } });
 }
 
-// Only a DRAFT or CANCELLED invoice can ever be hard-deleted — anything
-// else (ISSUED, PARTIAL, PAID, OVERDUE) is real financial history and
-// must be cancelled first (see cancelInvoice above), never deleted
-// outright. Added 2026-09-25, per explicit instruction: trial/test
-// invoices created before go-live needed a way to be cleared out, and
-// separately the Admin wanted the ability to delete a cancelled invoice
-// rather than have it linger forever. This sits behind the existing
-// Admin password-confirmation middleware (requireDeleteConfirmation) like
-// every other delete in the system.
-const DELETABLE_STATUSES: InvoiceStatus[] = ["DRAFT", "CANCELLED"];
+// A DRAFT, CANCELLED, or OVERDUE invoice can be hard-deleted — ISSUED and
+// PAID (and PARTIALLY_PAID, which always has payments recorded) are real
+// financial history and must be cancelled first (see cancelInvoice above),
+// never deleted outright. The zero-payments check just below is what
+// actually protects a PARTIALLY_PAID invoice: an OVERDUE invoice with $0
+// paid is allowed through, but the moment any payment exists (whatever the
+// status), deletion is refused. Added 2026-09-25, per explicit instruction:
+// trial/test invoices created before go-live needed a way to be cleared
+// out, and separately the Admin wanted the ability to delete a cancelled
+// or overdue-but-unpaid invoice rather than have it linger forever. This
+// sits behind the existing Admin password-confirmation middleware
+// (requireDeleteConfirmation) like every other delete in the system.
+const DELETABLE_STATUSES: InvoiceStatus[] = ["DRAFT", "CANCELLED", "OVERDUE"];
 
 export async function deleteInvoice(id: string) {
   const existing = await prisma.invoice.findUnique({ where: { id } });

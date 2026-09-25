@@ -1153,7 +1153,7 @@ export default function InvoicesPage() {
                             <CreditCard size={12} /> Record Payment
                           </button>
                         )}
-                        {(selectedInvoice.status === "DRAFT" || selectedInvoice.status === "ISSUED") && Number(selectedInvoice.amountPaid) === 0 && (
+                        {(selectedInvoice.status === "DRAFT" || selectedInvoice.status === "ISSUED" || selectedInvoice.status === "OVERDUE") && Number(selectedInvoice.amountPaid) === 0 && (
                           <button
                             className="btn-danger text-xs flex items-center gap-1"
                             onClick={handleCancel}
@@ -1162,7 +1162,7 @@ export default function InvoicesPage() {
                             <XCircle size={12} /> Cancel
                           </button>
                         )}
-                        {user?.role === "ADMIN" && (selectedInvoice.status === "DRAFT" || selectedInvoice.status === "CANCELLED") && (
+                        {user?.role === "ADMIN" && (selectedInvoice.status === "DRAFT" || selectedInvoice.status === "CANCELLED" || selectedInvoice.status === "OVERDUE") && Number(selectedInvoice.amountPaid) === 0 && (
                           <button
                             className="btn-danger text-xs flex items-center gap-1"
                             onClick={handleDeleteInvoice}
