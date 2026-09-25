@@ -19,6 +19,7 @@ interface SalaryAdvance {
   status: "ACTIVE" | "FULLY_REPAID" | "CANCELLED";
   approvedBy: string | null;
   notes: string | null;
+  advanceType: "CURRENT_PERIOD" | "LOAN";
 }
 
 interface FormState {
@@ -29,14 +30,21 @@ interface FormState {
   repaymentMonths: string;
   approvedBy: string;
   notes: string;
+  advanceType: "CURRENT_PERIOD" | "LOAN";
 }
 
 function emptyForm(): FormState {
   return {
     employeeId: "", advanceDate: new Date().toISOString().slice(0, 10),
     amount: "", reason: "", repaymentMonths: "1", approvedBy: "", notes: "",
+    advanceType: "CURRENT_PERIOD",
   };
 }
+
+const ADVANCE_TYPE_LABEL: Record<string, string> = {
+  CURRENT_PERIOD: "Early payment (this period)",
+  LOAN: "Loan (repaid over months)",
+};
 
 function fmtMoney(n: string | number) {
   return `K ${Number(n).toLocaleString("en-ZM", { minimumFractionDigits: 2 })}`;
@@ -110,6 +118,7 @@ export default function SalaryAdvancesPage() {
         amount: Number(form.amount),
         reason: form.reason.trim() || null,
         repaymentMonths: Number(form.repaymentMonths),
+        advanceType: form.advanceType,
         approvedBy: form.approvedBy.trim() || null,
         notes: form.notes.trim() || null,
       });
@@ -182,6 +191,19 @@ export default function SalaryAdvancesPage() {
                 {employees.map((e) => <option key={e.id} value={e.id}>{e.fullName}</option>)}
               </select>
             </div>
+            <div>
+              <label className="text-xs font-medium text-gray-700 block mb-1">Type *</label>
+              <select value={form.advanceType} onChange={(e) => setForm({ ...form, advanceType: e.target.value as "CURRENT_PERIOD" | "LOAN" })}
+                className="w-full border border-gray-300 rounded px-3 py-2 text-sm">
+                <option value="CURRENT_PERIOD">Early payment of this period's wages</option>
+                <option value="LOAN">Loan — repaid over several months</option>
+              </select>
+              <p className="text-xs text-gray-400 mt-1">
+                {form.advanceType === "CURRENT_PERIOD"
+                  ? "Use this when someone is paid directly before payroll runs — it's automatically netted off that period's payroll so they aren't shown as unpaid."
+                  : "Use this for a genuine loan against future pay, repaid in installments over the months below."}
+              </p>
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <div><label className="text-xs font-medium text-gray-700 block mb-1">Date *</label>
                 <input required type="date" value={form.advanceDate} onChange={(e) => setForm({ ...form, advanceDate: e.target.value })}
@@ -190,11 +212,13 @@ export default function SalaryAdvancesPage() {
                 <input required type="number" min={0.01} step="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })}
                   className="w-full border border-gray-300 rounded px-3 py-2 text-sm" /></div>
             </div>
-            <div>
-              <label className="text-xs font-medium text-gray-700 block mb-1">Repayment Period (months) *</label>
-              <input required type="number" min={1} value={form.repaymentMonths} onChange={(e) => setForm({ ...form, repaymentMonths: e.target.value })}
-                className="w-full border border-gray-300 rounded px-3 py-2 text-sm" />
-            </div>
+            {form.advanceType === "LOAN" && (
+              <div>
+                <label className="text-xs font-medium text-gray-700 block mb-1">Repayment Period (months) *</label>
+                <input required type="number" min={1} value={form.repaymentMonths} onChange={(e) => setForm({ ...form, repaymentMonths: e.target.value })}
+                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm" />
+              </div>
+            )}
             <div>
               <label className="text-xs font-medium text-gray-700 block mb-1">Reason</label>
               <input value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })}
@@ -255,6 +279,7 @@ export default function SalaryAdvancesPage() {
               <tr>
                 <th className="text-left px-4 py-3">Date</th>
                 <th className="text-left px-4 py-3">Employee</th>
+                <th className="text-left px-4 py-3">Type</th>
                 <th className="text-right px-4 py-3">Amount</th>
                 <th className="text-right px-4 py-3">Repaid</th>
                 <th className="text-right px-4 py-3">Outstanding</th>
@@ -267,6 +292,7 @@ export default function SalaryAdvancesPage() {
                 <tr key={a.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 text-xs text-gray-500">{fmtDate(a.advanceDate)}</td>
                   <td className="px-4 py-3 font-medium text-gray-900">{a.employee?.fullName ?? "—"}</td>
+                  <td className="px-4 py-3 text-xs text-gray-500">{ADVANCE_TYPE_LABEL[a.advanceType] ?? a.advanceType}</td>
                   <td className="px-4 py-3 text-right">{fmtMoney(a.amount)}</td>
                   <td className="px-4 py-3 text-right text-gray-500">{fmtMoney(a.amountRepaid)}</td>
                   <td className="px-4 py-3 text-right font-medium">{fmtMoney(a.outstandingBalance)}</td>
@@ -277,8 +303,12 @@ export default function SalaryAdvancesPage() {
                   </td>
                   <td className="px-4 py-3 text-right">
                     {a.status === "ACTIVE" && (
-                      <div className="flex justify-end gap-3">
-                        <button onClick={() => openRepay(a)} className="text-xs text-green-600 hover:underline">Record Repayment</button>
+                      <div className="flex justify-end gap-3 items-center">
+                        {a.advanceType === "LOAN" ? (
+                          <button onClick={() => openRepay(a)} className="text-xs text-green-600 hover:underline">Record Repayment</button>
+                        ) : (
+                          <span className="text-xs text-gray-400 italic">Settles automatically in payroll</span>
+                        )}
                         <button onClick={() => handleCancel(a)} className="text-xs text-red-500 hover:underline">Cancel</button>
                       </div>
                     )}

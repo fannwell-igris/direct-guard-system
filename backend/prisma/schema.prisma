@@ -67,6 +67,19 @@ enum PayrollPaymentStatus {
   PAID
 }
 
+// CURRENT_PERIOD: an early payment of THIS pay period's wages (e.g. the
+// boss hands a guard cash before that month's payroll run) — settled in
+// full, automatically, the moment payroll for that period is generated,
+// so the employee isn't shown as still owing/unpaid. repaymentMonths is
+// forced to 1 for this type; it is never spread across future runs.
+// LOAN: the original behavior — a cash advance repaid over
+// `repaymentMonths` future payroll periods via `monthlyDeduction`. Left
+// exactly as it was; only entered/settled manually via the deductions UI.
+enum SalaryAdvanceType {
+  CURRENT_PERIOD
+  LOAN
+}
+
 // PERCENTAGE: rate is a fraction (e.g. 0.05 = 5%) applied to relevant pay.
 // FIXED: rate is a flat currency amount.
 // BRACKETED: progressive/tiered rule (e.g. PAYE); the `config` JSON field on
@@ -590,6 +603,10 @@ model PayrollLineItem {
 
   allowances       PayrollAllowance[]
   deductions       PayrollDeduction[]
+
+  // CURRENT_PERIOD salary advances auto-settled into this line item's
+  // `advances` amount at generation time -- see SalaryAdvance above.
+  settledSalaryAdvances SalaryAdvance[]
 
   // One line item per employee per run.
   @@unique([payrollRunId, employeeId])
@@ -1226,6 +1243,20 @@ model SalaryAdvance {
   notes            String?
   dateCreated      DateTime @default(now())
   lastUpdated      DateTime @updatedAt
+
+  // Added 2026-09-25 for the "boss pays a guard directly, before payroll
+  // runs" case: CURRENT_PERIOD (default) is auto-settled by
+  // payroll.service.ts the moment a run covering advanceDate's month is
+  // generated -- it adds `amount` into that employee's PayrollLineItem
+  // .advances and immediately marks this row FULLY_REPAID, so the
+  // employee isn't shown owing/unpaid for wages already handed to them.
+  // LOAN keeps the original manual, multi-month repayment behavior.
+  advanceType SalaryAdvanceType @default(CURRENT_PERIOD)
+
+  // Set once a payroll run's generation consumes this advance into a line
+  // item, so re-generating/regenerating payroll never double-counts it.
+  settledInPayrollLineItemId String?
+  settledInPayrollLineItem   PayrollLineItem? @relation(fields: [settledInPayrollLineItemId], references: [id], onDelete: SetNull)
 
   @@map("salary_advances")
 }

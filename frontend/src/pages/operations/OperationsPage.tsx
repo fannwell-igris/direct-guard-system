@@ -23,6 +23,7 @@ interface OperationsRecord {
   shiftType?: { id: string; name: string };
   siteIssues: string | null;
   incidents: string | null;
+  incidentTime: string | null;
   operationalReport: string | null;
   notes: string | null;
   submittedBy: string | null;
@@ -60,6 +61,7 @@ const EMPTY_FORM = {
   date: "",
   siteIssues: "",
   incidents: "",
+  incidentTime: "",
   operationalReport: "",
   notes: "",
   submittedBy: "",
@@ -184,6 +186,17 @@ function OperationModal({
             </div>
 
             <div className="space-y-1">
+              <label className="text-sm font-medium text-gray-700">Time of Incident/Issue</label>
+              <input
+                type="time"
+                value={form.incidentTime}
+                onChange={(e) => setForm({ ...form, incidentTime: e.target.value })}
+                className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+              />
+              <p className="text-xs text-gray-400">Optional — when during the shift this happened.</p>
+            </div>
+
+            <div className="space-y-1">
               <label className="text-sm font-medium text-gray-700">Operational Report</label>
               <textarea
                 value={form.operationalReport}
@@ -226,6 +239,202 @@ function OperationModal({
   );
 }
 
+type AttendanceStatus = "PRESENT" | "ABSENT" | "LEAVE" | "APPROVED_ABSENCE" | "REPLACEMENT" | "EXTRA_SHIFT" | "OTHER";
+
+const ATTENDANCE_STATUS_LABEL: Record<AttendanceStatus, string> = {
+  PRESENT: "Present",
+  ABSENT: "Absent / no-show",
+  LEAVE: "On leave",
+  APPROVED_ABSENCE: "Approved absence",
+  REPLACEMENT: "Replacement (covered for someone)",
+  EXTRA_SHIFT: "Extra shift",
+  OTHER: "Other",
+};
+
+const ATTENDANCE_BADGE: Record<AttendanceStatus, string> = {
+  PRESENT: "bg-green-100 text-green-700",
+  ABSENT: "bg-red-100 text-red-700",
+  LEAVE: "bg-purple-100 text-purple-700",
+  APPROVED_ABSENCE: "bg-amber-100 text-amber-700",
+  REPLACEMENT: "bg-teal-100 text-teal-700",
+  EXTRA_SHIFT: "bg-blue-100 text-blue-700",
+  OTHER: "bg-gray-100 text-gray-600",
+};
+
+interface AttendanceRecordRow {
+  id: string;
+  employee: { id: string; fullName: string };
+  status: AttendanceStatus;
+  replacementForEmployee?: { id: string; fullName: string } | null;
+  notes: string | null;
+}
+
+interface EmployeeLite {
+  id: string;
+  fullName: string;
+}
+
+/**
+ * Records who actually showed up (or didn't) for a specific Operations
+ * Record's site+date+shift — added 2026-09-25, per explicit instruction
+ * to handle "an officer designated for a site is sick or doesn't go."
+ * The backend (POST /operations/:id/attendance) already fully supported
+ * this, including the REPLACEMENT + "who they covered for" link — this
+ * was the missing frontend for it.
+ */
+function AttendanceModal({ record, onClose }: { record: OperationsRecord; onClose: () => void }) {
+  const [rows, setRows] = useState<AttendanceRecordRow[]>([]);
+  const [employees, setEmployees] = useState<EmployeeLite[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [employeeId, setEmployeeId] = useState("");
+  const [status, setStatus] = useState<AttendanceStatus>("PRESENT");
+  const [replacementForEmployeeId, setReplacementForEmployeeId] = useState("");
+  const [notes, setNotes] = useState("");
+  const [formError, setFormError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  async function load() {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const res = await api.get(`/operations/${record.id}`);
+      setRows(res.data.data.attendanceRecords ?? []);
+    } catch (err: any) {
+      setError(err.response?.data?.message ?? "Failed to load attendance.");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    load();
+    api.get("/employees", { params: { pageSize: 200, employmentStatus: "ACTIVE" } })
+      .then((r) => setEmployees(r.data.data)).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [record.id]);
+
+  const absentEmployees = rows.filter((r) => r.status === "ABSENT");
+
+  async function handleAdd(e: FormEvent) {
+    e.preventDefault();
+    setFormError(null);
+    setIsSaving(true);
+    try {
+      await api.post(`/operations/${record.id}/attendance`, {
+        employeeId,
+        status,
+        replacementForEmployeeId: status === "REPLACEMENT" ? replacementForEmployeeId : undefined,
+        notes: notes.trim() || null,
+      });
+      setEmployeeId("");
+      setStatus("PRESENT");
+      setReplacementForEmployeeId("");
+      setNotes("");
+      await load();
+    } catch (err: any) {
+      setFormError(err.response?.data?.message ?? "Failed to record attendance.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ backgroundColor: "rgba(0,0,0,0.45)" }}
+      onClick={onClose}
+    >
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg animate-fade-in" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <div>
+            <h2 className="text-sm font-semibold text-gray-900">Attendance — {record.site?.siteName}</h2>
+            <p className="text-xs text-gray-500">{formatDate(record.date)} · {record.shiftType?.name}</p>
+          </div>
+          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="px-6 py-5 space-y-4 max-h-[80vh] overflow-y-auto">
+          {error && <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded px-3 py-2">{error}</div>}
+
+          {isLoading ? (
+            <p className="text-sm text-gray-400">Loading...</p>
+          ) : rows.length === 0 ? (
+            <p className="text-sm text-gray-400">No attendance recorded yet for this record.</p>
+          ) : (
+            <div className="space-y-2">
+              {rows.map((r) => (
+                <div key={r.id} className="flex items-center justify-between border border-gray-100 rounded px-3 py-2">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">{r.employee.fullName}</p>
+                    {r.replacementForEmployee && (
+                      <p className="text-xs text-gray-500">Covering for {r.replacementForEmployee.fullName}</p>
+                    )}
+                    {r.notes && <p className="text-xs text-gray-400">{r.notes}</p>}
+                  </div>
+                  <span className={`text-xs font-medium px-2 py-1 rounded-full ${ATTENDANCE_BADGE[r.status]}`}>
+                    {ATTENDANCE_STATUS_LABEL[r.status]}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <form onSubmit={handleAdd} className="space-y-3 border-t border-gray-100 pt-4">
+            {formError && <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded px-3 py-2">{formError}</div>}
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-gray-700">Employee *</label>
+              <select required value={employeeId} onChange={(e) => setEmployeeId(e.target.value)}
+                className="w-full border border-gray-300 rounded px-3 py-2 text-sm">
+                <option value="">Select employee...</option>
+                {employees.map((e) => <option key={e.id} value={e.id}>{e.fullName}</option>)}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-gray-700">Status *</label>
+              <select required value={status} onChange={(e) => setStatus(e.target.value as AttendanceStatus)}
+                className="w-full border border-gray-300 rounded px-3 py-2 text-sm">
+                {(Object.keys(ATTENDANCE_STATUS_LABEL) as AttendanceStatus[]).map((s) => (
+                  <option key={s} value={s}>{ATTENDANCE_STATUS_LABEL[s]}</option>
+                ))}
+              </select>
+            </div>
+            {status === "REPLACEMENT" && (
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-gray-700">Covering For *</label>
+                <select required value={replacementForEmployeeId} onChange={(e) => setReplacementForEmployeeId(e.target.value)}
+                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm">
+                  <option value="">Select who they're covering for...</option>
+                  {(absentEmployees.length > 0 ? absentEmployees.map((r) => r.employee) : employees).map((e) => (
+                    <option key={e.id} value={e.id}>{e.fullName}</option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-400">
+                  {absentEmployees.length > 0
+                    ? "Showing employees already marked Absent on this record."
+                    : "No one marked Absent yet on this record — pick who this replacement is for."}
+                </p>
+              </div>
+            )}
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-gray-700">Notes</label>
+              <input value={notes} onChange={(e) => setNotes(e.target.value)}
+                className="w-full border border-gray-300 rounded px-3 py-2 text-sm" placeholder="Optional" />
+            </div>
+            <button type="submit" disabled={isSaving}
+              className="bg-green-600 text-white text-sm font-medium rounded px-4 py-2 hover:bg-green-700 disabled:opacity-60">
+              {isSaving ? "Saving..." : "Add Attendance Record"}
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function OperationsPage() {
   const [records, setRecords] = useState<OperationsRecord[]>([]);
   const [sites, setSites] = useState<SiteLite[]>([]);
@@ -245,6 +454,8 @@ export default function OperationsPage() {
   const [reviewerName, setReviewerName] = useState("");
   const [reviewingId, setReviewingId] = useState<string | null>(null);
   const [reviewError, setReviewError] = useState<string | null>(null);
+
+  const [attendanceRecord, setAttendanceRecord] = useState<OperationsRecord | null>(null);
 
   async function loadRecords() {
     setIsLoading(true);
@@ -302,6 +513,7 @@ export default function OperationsPage() {
       date: form.date,
       siteIssues: form.siteIssues.trim() || null,
       incidents: form.incidents.trim() || null,
+      incidentTime: form.incidentTime.trim() || null,
       operationalReport: form.operationalReport.trim() || null,
       notes: form.notes.trim() || null,
       submittedBy: form.submittedBy.trim() || null,
@@ -351,6 +563,10 @@ export default function OperationsPage() {
           onSubmit={handleCreateSubmit}
           onClose={() => setShowCreateForm(false)}
         />
+      )}
+
+      {attendanceRecord && (
+        <AttendanceModal record={attendanceRecord} onClose={() => setAttendanceRecord(null)} />
       )}
 
       <div className="space-y-6">
@@ -437,6 +653,12 @@ export default function OperationsPage() {
                       <ReviewBadge status={r.reviewStatus} />
                     </td>
                     <td className="px-4 py-3 text-right space-x-2">
+                      <button
+                        onClick={() => setAttendanceRecord(r)}
+                        className="text-teal-600 hover:underline"
+                      >
+                        Attendance
+                      </button>
                       {r.reviewStatus === "PENDING" ? (
                         <>
                           <button

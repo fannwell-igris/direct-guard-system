@@ -191,6 +191,34 @@ export async function createPayrollRun(input: PayrollRunCreateInput) {
   const skipped: { employeeId: string; fullName: string; reason: string }[] = [];
   const lineItemsData: any[] = [];
 
+  // Salary advances flagged CURRENT_PERIOD (an early payment of THIS
+  // period's wages, e.g. the boss handing a guard cash before the run is
+  // generated) are pulled in and netted off automatically here, per
+  // employee, so nobody has to remember to type them into `advances` by
+  // hand and the employee isn't shown owing/unpaid for money already in
+  // their pocket. Keyed by employeeId so we can settle the matching rows
+  // once line items exist below. LOAN-type advances are untouched —
+  // still manual, unchanged, existing behavior.
+  const advancesByEmployee = new Map<string, { ids: string[]; total: number }>();
+  for (const employee of employees) {
+    const pendingAdvances = await prisma.salaryAdvance.findMany({
+      where: {
+        employeeId: employee.id,
+        status: "ACTIVE",
+        advanceType: "CURRENT_PERIOD",
+        settledInPayrollLineItemId: null,
+        advanceDate: { gte: periodStart, lte: periodEnd },
+      },
+      select: { id: true, amount: true },
+    });
+    if (pendingAdvances.length > 0) {
+      advancesByEmployee.set(employee.id, {
+        ids: pendingAdvances.map((a) => a.id),
+        total: pendingAdvances.reduce((sum, a) => sum + Number(a.amount), 0),
+      });
+    }
+  }
+
   for (const employee of employees) {
     const contract = await prisma.employeeContract.findFirst({
       where: {
@@ -227,6 +255,7 @@ export async function createPayrollRun(input: PayrollRunCreateInput) {
         positionSnapshot: employee.position,
         payType: "MONTHLY",
         basicSalary,
+        advances: advancesByEmployee.get(employee.id)?.total ?? 0,
         grossPay: basicSalary, // placeholder — recalculated properly via recalcLineItem below
         netPay: basicSalary,
       });
@@ -255,6 +284,7 @@ export async function createPayrollRun(input: PayrollRunCreateInput) {
         extraShiftRate: calc.contract!.extraShiftRate,
         normalShiftPay: calc.normalShiftPay,
         extraShiftPay: calc.extraShiftPay,
+        advances: advancesByEmployee.get(employee.id)?.total ?? 0,
         grossPay: calc.normalShiftPay + (calc.extraShiftPay ?? 0), // placeholder — recalculated below
         netPay: calc.normalShiftPay + (calc.extraShiftPay ?? 0),
       });
@@ -289,12 +319,42 @@ export async function createPayrollRun(input: PayrollRunCreateInput) {
   }
   await recalcRunTotals(run.id);
 
+  // Now that line items have real ids, mark the CURRENT_PERIOD advances
+  // gathered above as settled against this specific line item — this is
+  // what stops them being pulled into a later run and prevents the
+  // employee showing as unpaid for wages they already received.
+  let settledAdvancesCount = 0;
+  for (const item of createdItems) {
+    const pending = advancesByEmployee.get(item.employeeId);
+    if (!pending) continue;
+    await prisma.salaryAdvance.updateMany({
+      where: { id: { in: pending.ids } },
+      data: {
+        status: "FULLY_REPAID",
+        settledInPayrollLineItemId: item.id,
+      },
+    });
+    // amountRepaid/outstandingBalance need each row's own `amount`, which
+    // updateMany can't reference — set them per row.
+    for (const advanceId of pending.ids) {
+      const advance = await prisma.salaryAdvance.findUnique({ where: { id: advanceId }, select: { amount: true } });
+      if (advance) {
+        await prisma.salaryAdvance.update({
+          where: { id: advanceId },
+          data: { amountRepaid: advance.amount, outstandingBalance: 0 },
+        });
+      }
+    }
+    settledAdvancesCount += pending.ids.length;
+  }
+
   await prisma.payrollAuditLog.create({
     data: {
       payrollRunId: run.id,
       action: "CREATED",
       performedBy: input.createdBy ?? "unknown",
-      details: `Generated ${createdItems.length} line item(s); ${skipped.length} employee(s) skipped.`,
+      details: `Generated ${createdItems.length} line item(s); ${skipped.length} employee(s) skipped.`
+        + (settledAdvancesCount > 0 ? ` ${settledAdvancesCount} salary advance(s) auto-settled against this run.` : ""),
     },
   });
 

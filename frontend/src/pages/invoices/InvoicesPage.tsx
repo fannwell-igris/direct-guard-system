@@ -412,6 +412,13 @@ export default function InvoicesPage() {
   const [formSites, setFormSites] = useState<Site[]>([]);
   const [invoiceFormError, setInvoiceFormError] = useState<string | null>(null);
   const [invoiceSaving, setInvoiceSaving] = useState(false);
+  // Some clients pay several months in advance and are only invoiced once
+  // a quarter or year (their ClientContract.billingFrequency), not every
+  // month — this surfaces that contract's own cycle + amount as a
+  // one-click suggestion instead of leaving Finance to remember it, added
+  // 2026-09-25 per explicit instruction. Only looked up while creating a
+  // brand new invoice, never on edit.
+  const [billingSuggestion, setBillingSuggestion] = useState<{ frequency: string; amount: number } | null>(null);
 
   // ── payment form
   const [showPaymentForm, setShowPaymentForm] = useState(false);
@@ -451,6 +458,34 @@ export default function InvoicesPage() {
     setFormSites(allSites.filter((s) => !invoiceForm.clientId || s.clientId === invoiceForm.clientId));
     setInvoiceForm((f) => ({ ...f, siteId: "" }));
   }, [invoiceForm.clientId, allSites]);
+
+  // ─── Look up the client's own billing cycle (new invoices only) ──────────
+  useEffect(() => {
+    setBillingSuggestion(null);
+    if (invoicePanel !== "add" || !invoiceForm.clientId) return;
+    const params = new URLSearchParams({ clientId: invoiceForm.clientId, status: "ACTIVE", pageSize: "5" });
+    if (invoiceForm.siteId) params.set("siteId", invoiceForm.siteId);
+    fetch(`${API}/client-contracts?${params.toString()}`, { headers: authHeader })
+      .then((r) => r.json())
+      .then((j) => {
+        const contract = (j.data ?? [])[0];
+        if (contract && contract.billingFrequency !== "MONTHLY" && contract.billingFrequency !== "ONE_OFF") {
+          setBillingSuggestion({ frequency: contract.billingFrequency, amount: Number(contract.amount) });
+        }
+      })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [invoiceForm.clientId, invoiceForm.siteId, invoicePanel]);
+
+  function applyBillingSuggestion() {
+    if (!billingSuggestion) return;
+    const label = billingSuggestion.frequency.charAt(0) + billingSuggestion.frequency.slice(1).toLowerCase();
+    setInvoiceForm((f) => ({
+      ...f,
+      amount: String(billingSuggestion.amount),
+      billingPeriod: f.billingPeriod || label,
+    }));
+  }
 
   // ─── Reload on filter / page change ──────────────────────────────────────
   useEffect(() => {
@@ -912,6 +947,17 @@ export default function InvoicesPage() {
                         onChange={(e) => setInvoiceForm((f) => ({ ...f, dueDate: e.target.value }))} required />
                     </div>
                   </div>
+
+                  {billingSuggestion && (
+                    <div className="flex items-center justify-between gap-2 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 text-xs text-blue-700">
+                      <span>
+                        This client is billed <strong>{billingSuggestion.frequency}</strong> — K{billingSuggestion.amount.toLocaleString()} per cycle, not every month.
+                      </span>
+                      <button type="button" onClick={applyBillingSuggestion} className="shrink-0 font-semibold underline">
+                        Use
+                      </button>
+                    </div>
+                  )}
 
                   {/* Billing period */}
                   <div>

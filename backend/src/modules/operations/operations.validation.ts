@@ -7,6 +7,7 @@ export interface OperationsRecordCreateInput {
   date: Date;
   siteIssues?: string | null;
   incidents?: string | null;
+  incidentTime?: string | null;
   operationalReport?: string | null;
   notes?: string | null;
   submittedBy?: string | null;
@@ -15,9 +16,21 @@ export interface OperationsRecordCreateInput {
 export interface OperationsRecordUpdateInput {
   siteIssues?: string | null;
   incidents?: string | null;
+  incidentTime?: string | null;
   operationalReport?: string | null;
   notes?: string | null;
   submittedBy?: string | null;
+}
+
+const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
+
+function parseOptionalTime(v: unknown): string | null | undefined {
+  if (v === undefined) return undefined;
+  if (v === null || v === "") return null;
+  if (typeof v !== "string" || !TIME_PATTERN.test(v)) {
+    throw ApiError.badRequest("`incidentTime` must be in 24-hour HH:MM format (e.g. \"14:30\").");
+  }
+  return v;
 }
 
 export interface OperationsReviewInput {
@@ -88,6 +101,7 @@ export function parseOperationsRecordCreate(body: unknown): OperationsRecordCrea
     date: parseRequiredDate(b.date, "date"),
     siteIssues: trimOrNull(b.siteIssues) ?? null,
     incidents: trimOrNull(b.incidents) ?? null,
+    incidentTime: parseOptionalTime(b.incidentTime) ?? null,
     operationalReport: trimOrNull(b.operationalReport) ?? null,
     notes: trimOrNull(b.notes) ?? null,
     submittedBy: trimOrNull(b.submittedBy) ?? null,
@@ -109,13 +123,14 @@ export function parseOperationsRecordUpdate(body: unknown): OperationsRecordUpda
 
   if (b.siteIssues !== undefined) out.siteIssues = trimOrNull(b.siteIssues);
   if (b.incidents !== undefined) out.incidents = trimOrNull(b.incidents);
+  if (b.incidentTime !== undefined) out.incidentTime = parseOptionalTime(b.incidentTime);
   if (b.operationalReport !== undefined) out.operationalReport = trimOrNull(b.operationalReport);
   if (b.notes !== undefined) out.notes = trimOrNull(b.notes);
   if (b.submittedBy !== undefined) out.submittedBy = trimOrNull(b.submittedBy);
 
   if (Object.keys(out).length === 0) {
     throw ApiError.badRequest(
-      "Request body must include at least one field to update (siteIssues, incidents, operationalReport, notes, submittedBy). To correct siteId, shiftTypeId, or date, create a new record instead. To change reviewStatus, use POST /:id/review."
+      "Request body must include at least one field to update (siteIssues, incidents, incidentTime, operationalReport, notes, submittedBy). To correct siteId, shiftTypeId, or date, create a new record instead. To change reviewStatus, use POST /:id/review."
     );
   }
 

@@ -27,6 +27,8 @@ import departmentsRouter from "./modules/departments/departments.routes";
 import tasksRouter from "./modules/tasks/tasks.routes";
 import departmentRequestsRouter from "./modules/department-requests/department-requests.routes";
 import generalExpensesRouter from "./modules/general-expenses/general-expenses.routes";
+import fieldReceiptsRouter from "./modules/field-receipts/field-receipts.routes";
+import departmentBudgetsRouter from "./modules/department-budgets/department-budgets.routes";
 import payrollRoutes from "./modules/payroll/payroll.routes";
 import allowanceTypesRoutes from "./modules/allowance-types/allowance-types.routes";
 import deductionTypesRoutes from "./modules/deduction-types/deduction-types.routes";
@@ -41,6 +43,7 @@ import usersRoutes from "./modules/users/users.routes";
 import salaryAdvancesRoutes from "./modules/salary-advances/salary-advances.routes";
 import { requireAuth } from "./middleware/requireAuth";
 import { checkPermissions } from "./middleware/permissions";
+import { requireDeleteConfirmation } from "./middleware/requireDeleteConfirmation";
 
 dotenv.config();
 
@@ -90,6 +93,11 @@ app.use(requireAuth);
 // See permissions.ts for the full role/route table and why each choice
 // was made.
 app.use(checkPermissions);
+
+// Password re-confirmation for ADMIN's DELETE requests (2026-09-25) — must
+// run after checkPermissions (so a role that's not even allowed to DELETE
+// this route gets that error first) and before every route module below.
+app.use(requireDeleteConfirmation);
 
 // Users module — requires ADMIN role on every route (applied per-route,
 // not here) on top of the requireAuth above. The very first user is
@@ -155,6 +163,8 @@ app.use("/api/tasks", tasksRouter);
 app.use("/api/alerts", alertsRouter);
 app.use("/api/department-requests", departmentRequestsRouter);
 app.use("/api/general-expenses", generalExpensesRouter);
+app.use("/api/field-receipts", fieldReceiptsRouter);
+app.use("/api/department-budgets", departmentBudgetsRouter);
 app.use("/api/inventory", inventoryRouter);
 
 // Invoices — invoiceNumber auto-generated (INV-<year>-<0000>), status

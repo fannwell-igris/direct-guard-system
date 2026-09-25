@@ -34,6 +34,7 @@ export async function createSalaryAdvance(input: SalaryAdvanceCreateInput) {
       amount: input.amount,
       reason: input.reason,
       repaymentMonths: input.repaymentMonths,
+      advanceType: input.advanceType,
       monthlyDeduction,
       amountRepaid: 0,
       outstandingBalance: input.amount,

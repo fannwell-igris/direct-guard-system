@@ -1,5 +1,8 @@
 import { ApiError } from "../../middleware/errorHandler";
 
+export type SalaryAdvanceType = "CURRENT_PERIOD" | "LOAN";
+const VALID_ADVANCE_TYPES: SalaryAdvanceType[] = ["CURRENT_PERIOD", "LOAN"];
+
 export interface SalaryAdvanceCreateInput {
   employeeId: string;
   advanceDate: Date;
@@ -8,6 +11,7 @@ export interface SalaryAdvanceCreateInput {
   repaymentMonths: number;
   approvedBy?: string | null;
   notes?: string | null;
+  advanceType: SalaryAdvanceType;
 }
 
 export interface SalaryAdvanceUpdateInput {
@@ -49,8 +53,20 @@ export function parseSalaryAdvanceCreate(body: unknown): SalaryAdvanceCreateInpu
   const amount = Number(b.amount);
   if (isNaN(amount) || amount <= 0) throw ApiError.badRequest("`amount` must be a positive number.");
 
-  const repaymentMonths = Number(b.repaymentMonths);
-  if (!Number.isInteger(repaymentMonths) || repaymentMonths < 1)
+  // Defaults to CURRENT_PERIOD: an early payment of THIS period's wages,
+  // auto-settled the moment payroll for that period is generated (see
+  // payroll.service.ts). LOAN is the original multi-month, manually
+  // repaid behavior.
+  const advanceType = b.advanceType !== undefined ? (b.advanceType as string) : "CURRENT_PERIOD";
+  if (!VALID_ADVANCE_TYPES.includes(advanceType as SalaryAdvanceType))
+    throw ApiError.badRequest(`\`advanceType\` must be one of: ${VALID_ADVANCE_TYPES.join(", ")}.`);
+
+  // CURRENT_PERIOD is always paid off in the one period it belongs to —
+  // repaymentMonths is forced to 1 regardless of what was sent, so the
+  // amount is never accidentally spread across future payroll runs.
+  const repaymentMonths =
+    advanceType === "CURRENT_PERIOD" ? 1 : Number(b.repaymentMonths);
+  if (advanceType === "LOAN" && (!Number.isInteger(repaymentMonths) || repaymentMonths < 1))
     throw ApiError.badRequest("`repaymentMonths` must be a positive integer.");
 
   return {
@@ -58,6 +74,7 @@ export function parseSalaryAdvanceCreate(body: unknown): SalaryAdvanceCreateInpu
     advanceDate,
     amount,
     repaymentMonths,
+    advanceType: advanceType as SalaryAdvanceType,
     reason: trimOrNull(b.reason) ?? null,
     approvedBy: trimOrNull(b.approvedBy) ?? null,
     notes: trimOrNull(b.notes) ?? null,

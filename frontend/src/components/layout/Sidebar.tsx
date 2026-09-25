@@ -6,6 +6,7 @@ import {
   ClipboardList, CheckSquare, Inbox, Wallet, Receipt, DollarSign,
   Package, UserCog, Settings as SettingsIcon, TrendingUp, MessageSquare,
   UserCheck, Target, ClipboardCheck, LayoutGrid, Navigation, Flag, BarChart3,
+  PiggyBank,
 } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { useAuth } from "../../contexts/AuthContext";
@@ -48,9 +49,11 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: "Operations Records", to: "/operations", icon: ClipboardList },
       { label: "Attendance Calendar", to: "/operations/calendar", icon: CalendarDays },
+      { label: "Field Receipts", to: "/operations/field-receipts", icon: Receipt },
       { label: "Deployment", to: "/deployment", icon: UserCheck },
       { label: "Tasks", to: "/tasks", icon: CheckSquare },
       { label: "Department Requests", to: "/department-requests", icon: Inbox },
+      { label: "Department Budgets", to: "/department-budgets", icon: PiggyBank },
     ],
   },
   {
@@ -64,6 +67,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: "Tasks", to: "/tasks", icon: CheckSquare },
       { label: "Targets", to: "/marketing/targets", icon: Flag },
       { label: "Requests", to: "/department-requests", icon: Inbox },
+      { label: "Budgets", to: "/department-budgets", icon: PiggyBank },
       { label: "Expenses", to: "/marketing/expenses", icon: DollarSign },
       { label: "Reports", to: "/marketing/reports", icon: FileText },
       { label: "Management View", to: "/marketing/management", icon: BarChart3 },
@@ -74,6 +78,7 @@ const NAV_GROUPS: NavGroup[] = [
     roles: ["ADMIN", "MANAGER", "PAYROLL"],
     items: [
       { label: "Finance Overview", to: "/finance", icon: TrendingUp },
+      { label: "Department Budgets", to: "/department-budgets", icon: PiggyBank },
       { label: "Payroll", to: "/payroll", icon: Wallet },
       { label: "Salary Advances", to: "/finance/salary-advances", icon: ClipboardList },
       { label: "Invoices & Payments", to: "/invoices", icon: Receipt },

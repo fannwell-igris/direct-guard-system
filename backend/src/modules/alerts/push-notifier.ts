@@ -19,10 +19,13 @@ const CATEGORY_TITLES: Record<AlertCategory, string> = {
   INVOICE_OVERDUE: "Invoice Overdue",
   CONTRACT_EXPIRING: "Contract Expiring",
   PROPERTY_NOT_RETURNED: "Property Not Returned",
+  PROPERTY_WITH_ABSCONDED_EMPLOYEE: "Absconded Employee — Property Not Returned",
   TASK_OVERDUE: "Task Overdue",
   LOW_STOCK: "Low Stock",
   PAYROLL_DUE: "Payroll Due",
   ROSTER_GAP: "Roster Gap",
+  SITE_UNMANNED: "Site Unmanned",
+  INVOICE_DUE: "Invoice Due",
 };
 
 function alertKey(a: Pick<Alert, "category" | "referenceId">): string {

@@ -47,6 +47,7 @@ export async function createOperationsRecord(input: OperationsRecordCreateInput)
       date: input.date,
       siteIssues: input.siteIssues,
       incidents: input.incidents,
+      incidentTime: input.incidentTime,
       operationalReport: input.operationalReport,
       notes: input.notes,
       submittedBy: input.submittedBy,

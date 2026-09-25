@@ -10,12 +10,14 @@ import RosterPage from "./pages/roster/RosterPage";
 import ContractsPage from "./pages/contracts/ContractsPage";
 import OperationsPage from "./pages/operations/OperationsPage";
 import AttendanceCalendarPage from "./pages/operations/AttendanceCalendarPage";
+import FieldReceiptsPage from "./pages/operations/FieldReceiptsPage";
 import "./App.css";
 import InventoryPage from "./pages/inventory/InventoryPage";
 import InvoicesPage from "./pages/invoices/InvoicesPage";
 import PayrollPage from "./pages/payroll/PayrollPage";
 import TasksPage from "./pages/tasks/TasksPage";
 import DepartmentRequestsPage from "./pages/departments/DepartmentRequestsPage";
+import DepartmentBudgetsPage from "./pages/departments/DepartmentBudgetsPage";
 import ExpensesPage from "./pages/expenses/ExpensesPage";
 import UsersPage from "./pages/users/UsersPage";
 import SettingsPage from "./pages/settings/SettingsPage";
@@ -34,6 +36,7 @@ import TargetsPage from "./pages/marketing/TargetsPage";
 import MarketingExpensesPage from "./pages/marketing/MarketingExpensesPage";
 import ReportsPage from "./pages/marketing/ReportsPage";
 import ManagementPage from "./pages/marketing/ManagementPage";
+import PasswordConfirmModal from "./components/PasswordConfirmModal";
 
 // NOTE (2026-09-13, MB.2): this file previously still had the default
 // Vite starter template in it -- AuthProvider/router/AppLayout/LoginPage/
@@ -50,6 +53,7 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
+        <PasswordConfirmModal />
         <Routes>
           <Route path="/login" element={<LoginPage />} />
 
@@ -65,9 +69,11 @@ function App() {
             <Route path="/contracts" element={<ContractsPage />} />
             <Route path="/operations" element={<OperationsPage />} />
             <Route path="/operations/calendar" element={<AttendanceCalendarPage />} />
+            <Route path="/operations/field-receipts" element={<FieldReceiptsPage />} />
             <Route path="/inventory" element={<InventoryPage />} />
             <Route path="/tasks" element={<TasksPage />} />
             <Route path="/department-requests" element={<DepartmentRequestsPage />} />
+            <Route path="/department-budgets" element={<DepartmentBudgetsPage />} />
             <Route path="/expenses" element={<ExpensesPage />} />
             <Route path="/users" element={<UsersPage />} />
             <Route path="/departments" element={<DepartmentsPage />} />

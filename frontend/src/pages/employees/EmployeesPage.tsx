@@ -33,7 +33,7 @@ interface Employee {
   contractEndDate: string | null;
   assignedClientId: string | null;
   assignedSiteId: string | null;
-  employmentStatus: "ACTIVE" | "INACTIVE" | "TERMINATED";
+  employmentStatus: "ACTIVE" | "INACTIVE" | "TERMINATED" | "ABSCONDED";
   napsaRegistered: boolean;
   nhimaRegistered: boolean;
   notes: string | null;
@@ -102,16 +102,17 @@ const EMPTY_FORM: EmployeeFormState = {
 
 const PAGE_SIZE = 15;
 
-type StatusFilter = "ALL" | "ACTIVE" | "INACTIVE" | "TERMINATED";
+type StatusFilter = "ALL" | "ACTIVE" | "INACTIVE" | "TERMINATED" | "ABSCONDED";
 
 const STATUS_TABS: { value: StatusFilter; label: string }[] = [
   { value: "ALL", label: "All" },
   { value: "ACTIVE", label: "Active" },
   { value: "INACTIVE", label: "Inactive" },
   { value: "TERMINATED", label: "Terminated" },
+  { value: "ABSCONDED", label: "Absconded" },
 ];
 
-const STATUS_OPTIONS: Employee["employmentStatus"][] = ["ACTIVE", "INACTIVE", "TERMINATED"];
+const STATUS_OPTIONS: Employee["employmentStatus"][] = ["ACTIVE", "INACTIVE", "TERMINATED", "ABSCONDED"];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -143,6 +144,8 @@ function statusBadgeClass(status: string) {
       return "bg-amber-100 text-amber-700";
     case "TERMINATED":
       return "bg-red-100 text-red-700";
+    case "ABSCONDED":
+      return "bg-red-200 text-red-900 font-semibold";
     default:
       return "bg-gray-100 text-gray-600";
   }

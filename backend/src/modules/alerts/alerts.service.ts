@@ -5,10 +5,13 @@ export type AlertCategory =
   | "INVOICE_OVERDUE"
   | "CONTRACT_EXPIRING"
   | "PROPERTY_NOT_RETURNED"
+  | "PROPERTY_WITH_ABSCONDED_EMPLOYEE"
   | "TASK_OVERDUE"
   | "LOW_STOCK"
   | "PAYROLL_DUE"
-  | "ROSTER_GAP";
+  | "ROSTER_GAP"
+  | "SITE_UNMANNED"
+  | "INVOICE_DUE";
 
 export interface Alert {
   category: AlertCategory;
@@ -63,6 +66,73 @@ async function invoiceOverdueAlerts(): Promise<Alert[]> {
       },
     };
   });
+}
+
+// ---- Invoice due (respects each client's own billing cycle) ----
+// Explicit instruction (2026-09-25): some clients pay several months in
+// advance and are only invoiced once a quarter (or once a year), not every
+// month. Before this, nothing in the system tracked when a client was
+// actually due to be invoiced next — Finance just had to remember.
+// ClientContract.billingFrequency already existed but was purely
+// informational (never read anywhere). This alert is the first thing that
+// actually uses it: it looks at when the client was LAST invoiced and adds
+// their contract's own billing period (1/3/12 months), so a quarterly
+// client is never nagged monthly the way a monthly one would be.
+const BILLING_PERIOD_MONTHS: Record<string, number> = {
+  MONTHLY: 1,
+  QUARTERLY: 3,
+  ANNUALLY: 12,
+  ONE_OFF: 0, // never re-fires — a one-off contract is invoiced once, period.
+};
+
+async function invoiceDueAlerts(): Promise<Alert[]> {
+  const now = new Date();
+  const contracts = await prisma.clientContract.findMany({
+    where: { status: "ACTIVE", billingFrequency: { not: "ONE_OFF" } },
+    include: { client: { select: { name: true } }, site: { select: { siteName: true } } },
+  });
+
+  const alerts: Alert[] = [];
+
+  for (const c of contracts) {
+    const periodMonths = BILLING_PERIOD_MONTHS[c.billingFrequency];
+    const lastInvoice = await prisma.invoice.findFirst({
+      where: { clientId: c.clientId, ...(c.siteId ? { siteId: c.siteId } : {}) },
+      orderBy: { invoiceDate: "desc" },
+    });
+
+    const baseDate = lastInvoice ? new Date(lastInvoice.invoiceDate) : new Date(c.startDate);
+    const nextDue = new Date(baseDate);
+    nextDue.setMonth(nextDue.getMonth() + periodMonths);
+
+    if (nextDue.getTime() > now.getTime()) continue;
+
+    const daysOverdue = daysAgo(nextDue);
+    const frequencyLabel = c.billingFrequency.charAt(0) + c.billingFrequency.slice(1).toLowerCase();
+    alerts.push({
+      category: "INVOICE_DUE",
+      severity: daysOverdue > 14 ? "HIGH" : "MEDIUM",
+      message: `${c.client.name}${c.site ? ` (${c.site.siteName})` : ""} is due for their next ${frequencyLabel.toLowerCase()} invoice${
+        lastInvoice ? ` — last invoiced ${new Date(lastInvoice.invoiceDate).toLocaleDateString("en-GB")}` : " — no invoice has been issued yet"
+      }.`,
+      referenceId: c.id,
+      referenceType: "ClientContract",
+      data: {
+        clientName: c.client.name,
+        siteName: c.site?.siteName ?? null,
+        billingFrequency: c.billingFrequency,
+        lastInvoiceDate: lastInvoice?.invoiceDate ?? null,
+        nextDueDate: nextDue,
+        // ClientContract.amount is already the amount due per billing
+        // cycle (a quarterly contract's `amount` is the quarter's total,
+        // not a monthly rate needing multiplication), same figure shown
+        // next to the frequency badge on the Contracts page.
+        suggestedAmount: Number(c.amount),
+      },
+    });
+  }
+
+  return alerts;
 }
 
 // ---- Contract expiring soon ----
@@ -157,6 +227,39 @@ async function propertyNotReturnedAlerts(): Promise<Alert[]> {
       },
     };
   });
+}
+
+// ---- Company property still with an absconded employee ----
+// Added 2026-09-25, per explicit instruction ("officers who desert the
+// site and run away with company property"). Unlike PROPERTY_NOT_RETURNED
+// above, this doesn't wait on the 7-day "taken home" threshold or even
+// require canTakeHome/takenHome to be set — uniforms/equipment are often
+// just assigned, not formally "taken home". Any item still assigned to
+// an employee marked ABSCONDED is flagged immediately, at CRITICAL
+// severity, since the person is already gone.
+async function propertyWithAbscondedEmployeeAlerts(): Promise<Alert[]> {
+  const items = await prisma.inventoryItem.findMany({
+    where: {
+      assignedToEmployeeId: { not: null },
+      assignedToEmployee: { employmentStatus: "ABSCONDED" },
+    },
+    include: {
+      assignedToEmployee: { select: { fullName: true } },
+    },
+  });
+
+  return items.map((item) => ({
+    category: "PROPERTY_WITH_ABSCONDED_EMPLOYEE",
+    severity: "CRITICAL",
+    message: `${item.name} (${item.serialNumber ?? item.id.slice(0, 8)}) is still assigned to ${item.assignedToEmployee?.fullName ?? "an employee"}, who has been marked as absconded.`,
+    referenceId: item.id,
+    referenceType: "InventoryItem",
+    data: {
+      itemName: item.name,
+      serialNumber: item.serialNumber,
+      assignedTo: item.assignedToEmployee?.fullName ?? null,
+    },
+  }));
 }
 
 // ---- Tasks overdue ----
@@ -302,16 +405,99 @@ async function rosterGapAlerts(): Promise<Alert[]> {
   return alerts;
 }
 
+// Statuses that count as "someone is actually there", mirrors the same
+// list operations.service.ts uses for its coverage-percent calculation.
+const SITE_MANNED_STATUSES = ["PRESENT", "REPLACEMENT", "EXTRA_SHIFT"];
+
+// Zambia doesn't observe DST, but computing the hour via Intl instead of a
+// hardcoded UTC+2 offset means this keeps working correctly even if the
+// server's own OS timezone changes (e.g. moving hosts/regions).
+function lusakaHourNow(): number {
+  const hourStr = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Africa/Lusaka",
+    hour: "2-digit",
+    hour12: false,
+  }).format(new Date());
+  return parseInt(hourStr, 10);
+}
+
+const SITE_UNMANNED_START_HOUR = 18;
+
+// ---- Unmanned sites (evening check) ----
+// Explicit instruction: "App must be able to send notifications after
+// 18:00 if any site is unmanned." Deliberately separate from ROSTER_GAP
+// above: ROSTER_GAP fires all day the moment nothing is scheduled (an
+// early warning), while this one only starts firing in the evening and
+// also accounts for actual attendance — a site with someone SCHEDULED but
+// marked ABSENT with no replacement logged is just as unmanned as one with
+// no roster entry at all.
+async function siteUnmannedAlerts(): Promise<Alert[]> {
+  if (lusakaHourNow() < SITE_UNMANNED_START_HOUR) return [];
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today.getTime() + 86_400_000);
+
+  const requirements = await prisma.siteRequirement.findMany({
+    include: { site: { select: { id: true, siteName: true } } },
+  });
+  const uniqueSites = new Map<string, { siteId: string; siteName: string }>();
+  for (const req of requirements) {
+    if (!uniqueSites.has(req.siteId)) {
+      uniqueSites.set(req.siteId, { siteId: req.siteId, siteName: req.site.siteName });
+    }
+  }
+
+  const alerts: Alert[] = [];
+
+  for (const { siteId, siteName } of uniqueSites.values()) {
+    const opsRecord = await prisma.operationsRecord.findFirst({
+      where: { siteId, date: { gte: today, lt: tomorrow } },
+      include: { attendanceRecords: { select: { status: true } } },
+    });
+
+    let manned: boolean;
+    if (opsRecord) {
+      // Attendance has actually been logged for today — trust it over the
+      // roster, since it reflects who really showed up.
+      manned = opsRecord.attendanceRecords.some((a) => SITE_MANNED_STATUSES.includes(a.status));
+    } else {
+      // Nothing logged yet today — fall back to whether anyone was even
+      // scheduled.
+      const rosterCount = await prisma.rosterEntry.count({
+        where: { siteId, date: { gte: today, lt: tomorrow }, status: "SCHEDULED" },
+      });
+      manned = rosterCount > 0;
+    }
+
+    if (!manned) {
+      alerts.push({
+        category: "SITE_UNMANNED",
+        severity: "CRITICAL",
+        message: `${siteName} is unmanned — no officer has been confirmed on site today, and it is now past 18:00.`,
+        referenceId: siteId,
+        referenceType: "Site",
+        data: { siteName, siteId, date: today },
+      });
+    }
+  }
+
+  return alerts;
+}
+
 // ---- Main aggregator ----
 
 const CATEGORY_RUNNERS: Record<AlertCategory, () => Promise<Alert[]>> = {
   INVOICE_OVERDUE: invoiceOverdueAlerts,
   CONTRACT_EXPIRING: contractExpiringAlerts,
   PROPERTY_NOT_RETURNED: propertyNotReturnedAlerts,
+  PROPERTY_WITH_ABSCONDED_EMPLOYEE: propertyWithAbscondedEmployeeAlerts,
   TASK_OVERDUE: taskOverdueAlerts,
   LOW_STOCK: lowStockAlerts,
   PAYROLL_DUE: payrollDueAlerts,
   ROSTER_GAP: rosterGapAlerts,
+  SITE_UNMANNED: siteUnmannedAlerts,
+  INVOICE_DUE: invoiceDueAlerts,
 };
 
 const SEVERITY_ORDER: Record<AlertSeverity, number> = {
@@ -329,6 +515,7 @@ const SEVERITY_ORDER: Record<AlertSeverity, number> = {
 // when deciding who gets a push notification for a given alert.
 export const FINANCE_CATEGORIES = new Set<AlertCategory>([
   "INVOICE_OVERDUE",
+  "INVOICE_DUE",
   "PAYROLL_DUE",
   "LOW_STOCK",
 ]);

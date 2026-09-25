@@ -187,6 +187,25 @@ const REGISTRY: RouteRule[] = [
   // been logged for their department, not create/edit expenses directly.
   { prefix: "/api/general-expenses", methods: { GET: ["ADMIN", "MANAGER", "PAYROLL", "MARKETING"], POST: ADMIN_PAYROLL, PUT: ADMIN_PAYROLL, PATCH: ADMIN_PAYROLL, DELETE: ADMIN } },
 
+  // Field Receipts (2026-09-25) — Operations logs a receipt ref# on the
+  // spot, in the field; only Admin/Payroll (Finance) can mark it
+  // reconciled/discrepancy once the physical receipt is handed in. POST
+  // is the only write Operations gets — no PUT/PATCH/DELETE, so an entry
+  // can't be quietly edited after the fact; a mistaken entry gets flagged
+  // DISCREPANCY through reconciliation instead of edited away.
+  { prefix: "/api/field-receipts", methods: { GET: ["ADMIN", "MANAGER", "OPERATIONS", "PAYROLL"], POST: ["ADMIN", "MANAGER", "OPERATIONS"], PUT: [], PATCH: [], DELETE: ADMIN } },
+
+  // Departmental Monthly Budgets (2026-09-25) — every department manages
+  // its OWN budget (create/edit/submit); Finance (PAYROLL)/Management
+  // review, approve and get company-wide visibility. This coarse rule
+  // only decides which roles may hit the module at ALL — row-level "own
+  // department only" scoping, and the Finance-only review/summary
+  // sub-routes, are enforced in department-budgets.controller.ts (the
+  // same prefix+method can't distinguish e.g. PATCH .../submit from
+  // PATCH .../review). No DELETE route exists — a budget is superseded by
+  // a new month's copy-forward, not removed.
+  { prefix: "/api/department-budgets", methods: { GET: ["ADMIN", "MANAGER", "PAYROLL", "OPERATIONS", "HR", "MARKETING"], POST: ["ADMIN", "MANAGER", "PAYROLL", "OPERATIONS", "HR", "MARKETING"], PUT: ["ADMIN", "MANAGER", "PAYROLL", "OPERATIONS", "HR", "MARKETING"], PATCH: ["ADMIN", "MANAGER", "PAYROLL", "OPERATIONS", "HR", "MARKETING"] } },
+
   // Inventory — no broad STAFF access. A future "My Assigned Assets"
   // endpoint with row-level filtering is explicitly out of scope here.
   { prefix: "/api/inventory", methods: { GET: ADMIN_MANAGER_OPS, POST: ADMIN_MANAGER_OPS, PUT: ADMIN_MANAGER_OPS, PATCH: ADMIN_MANAGER_OPS, DELETE: ADMIN_MANAGER } },
