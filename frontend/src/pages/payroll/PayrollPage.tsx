@@ -100,6 +100,7 @@ interface Payslip {
 
   employeeNumber: string | null;
   nrcNumber: string | null;
+  napsaNumber: string | null;
   contractStartDate: string | null;
   generatedAt: string;
 }
@@ -280,6 +281,7 @@ function printPayslip(payslip: Payslip, runPeriod: string) {
     { label: "Position", value: payslip.position ?? payslip.employee?.position ?? "—" },
     ...(payslip.department ? [{ label: "Department", value: payslip.department }] : []),
     ...(payslip.nrcNumber ? [{ label: "NRC No.", value: payslip.nrcNumber }] : []),
+    ...(payslip.napsaNumber ? [{ label: "NAPSA No.", value: payslip.napsaNumber }] : []),
     ...(payslip.contractStartDate
       ? [{ label: "Contract Start", value: new Date(payslip.contractStartDate).toLocaleDateString("en-GB") }]
       : []),

@@ -663,7 +663,7 @@ export async function generatePayslips(runId: string, generatedBy?: string | nul
               id: true, fullName: true, position: true, employeeNumber: true,
               contractStartDate: true, napsaRegistered: true, nhimaRegistered: true,
               department: { select: { name: true } },
-              payrollProfile: { select: { nrcNumber: true } },
+              payrollProfile: { select: { nrcNumber: true, napsaNumber: true } },
             },
           },
           allowances: { include: { allowanceType: { select: { name: true } } } },
@@ -754,6 +754,12 @@ export async function generatePayslips(runId: string, generatedBy?: string | nul
       totalEmployerContributions,
       employeeNumber: li.employee.employeeNumber,
       nrcNumber: li.employee.payrollProfile?.nrcNumber ?? null,
+      // Added 2026-09-25 alongside the payroll-profile UI — a payslip is a
+      // private, employee-specific document (same access as the payroll
+      // run that generated it), and showing the NAPSA number here lets the
+      // employee verify their pension contributions are being recorded
+      // under the correct number, same rationale as NRC No. above.
+      napsaNumber: li.employee.payrollProfile?.napsaNumber ?? null,
       contractStartDate: li.employee.contractStartDate,
     });
   }

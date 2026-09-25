@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import api from "../../api/client";
 import { useToast } from "../../contexts/ToastContext";
+import { useAuth } from "../../contexts/AuthContext";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -59,6 +60,69 @@ interface EmployeeDetail extends Employee {
   assignedSite: { id: string; siteName: string; status: string } | null;
   employeeContracts: EmployeeContract[];
   _count: { employeeContracts: number };
+}
+
+// Payroll profile: bank/mobile-money details plus statutory ID numbers
+// (TPIN, NAPSA — Zambia's Social Security/NSS equivalent, NHIMA, NRC).
+// Fetched and edited separately from the main employee record, restricted
+// to ADMIN/HR/PAYROLL to match the backend's payroll-profiles.controller.ts
+// role check.
+interface PayrollProfile {
+  bankName: string | null;
+  accountNumber: string | null;
+  branchName: string | null;
+  mobileMoneyProvider: string | null;
+  mobileMoneyNumber: string | null;
+  paymentMethod: "BANK_TRANSFER" | "MOBILE_MONEY" | "CASH" | null;
+  tpin: string | null;
+  napsaNumber: string | null;
+  nhimaNumber: string | null;
+  nrcNumber: string | null;
+  notes: string | null;
+}
+
+interface PayrollProfileFormState {
+  bankName: string;
+  accountNumber: string;
+  branchName: string;
+  mobileMoneyProvider: string;
+  mobileMoneyNumber: string;
+  paymentMethod: "" | "BANK_TRANSFER" | "MOBILE_MONEY" | "CASH";
+  tpin: string;
+  napsaNumber: string;
+  nhimaNumber: string;
+  nrcNumber: string;
+  notes: string;
+}
+
+const EMPTY_PAYROLL_PROFILE_FORM: PayrollProfileFormState = {
+  bankName: "",
+  accountNumber: "",
+  branchName: "",
+  mobileMoneyProvider: "",
+  mobileMoneyNumber: "",
+  paymentMethod: "",
+  tpin: "",
+  napsaNumber: "",
+  nhimaNumber: "",
+  nrcNumber: "",
+  notes: "",
+};
+
+function payrollProfileToForm(p: PayrollProfile): PayrollProfileFormState {
+  return {
+    bankName: p.bankName ?? "",
+    accountNumber: p.accountNumber ?? "",
+    branchName: p.branchName ?? "",
+    mobileMoneyProvider: p.mobileMoneyProvider ?? "",
+    mobileMoneyNumber: p.mobileMoneyNumber ?? "",
+    paymentMethod: p.paymentMethod ?? "",
+    tpin: p.tpin ?? "",
+    napsaNumber: p.napsaNumber ?? "",
+    nhimaNumber: p.nhimaNumber ?? "",
+    nrcNumber: p.nrcNumber ?? "",
+    notes: p.notes ?? "",
+  };
 }
 
 interface Pagination {
@@ -506,6 +570,8 @@ function EmployeeModal({
 
 export default function EmployeesPage() {
   const { toast } = useToast();
+  const { user } = useAuth();
+  const canSeePayrollProfile = user?.role === "ADMIN" || user?.role === "HR" || user?.role === "PAYROLL";
 
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
@@ -535,6 +601,14 @@ export default function EmployeesPage() {
   // Detail panel state
   const [detailEmployee, setDetailEmployee] = useState<EmployeeDetail | null>(null);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
+
+  // Payroll profile state (ADMIN/HR/PAYROLL only)
+  const [payrollProfile, setPayrollProfile] = useState<PayrollProfile | null>(null);
+  const [isLoadingPayrollProfile, setIsLoadingPayrollProfile] = useState(false);
+  const [isEditingPayrollProfile, setIsEditingPayrollProfile] = useState(false);
+  const [payrollProfileForm, setPayrollProfileForm] = useState<PayrollProfileFormState>(EMPTY_PAYROLL_PROFILE_FORM);
+  const [isSavingPayrollProfile, setIsSavingPayrollProfile] = useState(false);
+  const [payrollProfileError, setPayrollProfileError] = useState<string | null>(null);
 
   // ── Data loading ───────────────────────────────────────────────────────────
 
@@ -620,6 +694,9 @@ export default function EmployeesPage() {
   async function loadEmployeeDetail(id: string) {
     setIsLoadingDetail(true);
     setDetailEmployee(null);
+    setPayrollProfile(null);
+    setIsEditingPayrollProfile(false);
+    setPayrollProfileError(null);
     try {
       const res = await api.get(`/employees/${id}`);
       setDetailEmployee(res.data.data);
@@ -627,6 +704,58 @@ export default function EmployeesPage() {
       setError(err.response?.data?.message ?? "Failed to load employee details.");
     } finally {
       setIsLoadingDetail(false);
+    }
+    if (canSeePayrollProfile) {
+      loadPayrollProfile(id);
+    }
+  }
+
+  async function loadPayrollProfile(employeeId: string) {
+    setIsLoadingPayrollProfile(true);
+    setPayrollProfileError(null);
+    try {
+      const res = await api.get(`/employees/${employeeId}/payroll-profile`);
+      setPayrollProfile(res.data.data);
+    } catch (err: any) {
+      // Non-fatal to the rest of the detail panel — the profile section
+      // just shows its own inline error instead of blocking everything else.
+      setPayrollProfileError(err.response?.data?.message ?? "Failed to load payroll profile.");
+    } finally {
+      setIsLoadingPayrollProfile(false);
+    }
+  }
+
+  function startEditPayrollProfile() {
+    setPayrollProfileForm(payrollProfile ? payrollProfileToForm(payrollProfile) : EMPTY_PAYROLL_PROFILE_FORM);
+    setPayrollProfileError(null);
+    setIsEditingPayrollProfile(true);
+  }
+
+  async function savePayrollProfile(employeeId: string) {
+    setIsSavingPayrollProfile(true);
+    setPayrollProfileError(null);
+    try {
+      const payload = {
+        bankName: payrollProfileForm.bankName.trim() || null,
+        accountNumber: payrollProfileForm.accountNumber.trim() || null,
+        branchName: payrollProfileForm.branchName.trim() || null,
+        mobileMoneyProvider: payrollProfileForm.mobileMoneyProvider.trim() || null,
+        mobileMoneyNumber: payrollProfileForm.mobileMoneyNumber.trim() || null,
+        paymentMethod: payrollProfileForm.paymentMethod || null,
+        tpin: payrollProfileForm.tpin.trim() || null,
+        napsaNumber: payrollProfileForm.napsaNumber.trim() || null,
+        nhimaNumber: payrollProfileForm.nhimaNumber.trim() || null,
+        nrcNumber: payrollProfileForm.nrcNumber.trim() || null,
+        notes: payrollProfileForm.notes.trim() || null,
+      };
+      const res = await api.put(`/employees/${employeeId}/payroll-profile`, payload);
+      setPayrollProfile(res.data.data);
+      setIsEditingPayrollProfile(false);
+      toast("success", "Payroll profile updated");
+    } catch (err: any) {
+      setPayrollProfileError(err.response?.data?.message ?? "Failed to save payroll profile.");
+    } finally {
+      setIsSavingPayrollProfile(false);
     }
   }
 
@@ -1028,6 +1157,226 @@ export default function EmployeesPage() {
                       </span>
                     </div>
                   </div>
+
+                  {/* Payroll profile — bank/mobile-money details + statutory
+                      ID numbers (TPIN, NAPSA/NSS, NHIMA, NRC). ADMIN/HR/PAYROLL
+                      only, matching the backend's payroll-profiles role check. */}
+                  {canSeePayrollProfile && (
+                    <div className="border-t border-gray-100 pt-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
+                          Payroll Profile
+                        </p>
+                        {!isEditingPayrollProfile && payrollProfile && (
+                          <button
+                            onClick={startEditPayrollProfile}
+                            className="text-xs font-medium text-magen-green-dark hover:underline flex items-center gap-1"
+                          >
+                            <Pencil size={12} /> Edit
+                          </button>
+                        )}
+                      </div>
+
+                      {isLoadingPayrollProfile ? (
+                        <p className="text-xs text-gray-400 py-2">Loading payroll profile…</p>
+                      ) : isEditingPayrollProfile ? (
+                        <div className="space-y-2">
+                          {payrollProfileError && (
+                            <p className="text-xs text-red-600 bg-red-50 rounded-lg px-2 py-1.5 border border-red-100">
+                              {payrollProfileError}
+                            </p>
+                          )}
+                          <div className="grid grid-cols-2 gap-2">
+                            <label className="text-xs text-gray-500">
+                              NAPSA No. (Social Security)
+                              <input
+                                type="text"
+                                value={payrollProfileForm.napsaNumber}
+                                onChange={(e) => setPayrollProfileForm({ ...payrollProfileForm, napsaNumber: e.target.value })}
+                                className="input-field mt-0.5 text-sm"
+                              />
+                            </label>
+                            <label className="text-xs text-gray-500">
+                              NHIMA No.
+                              <input
+                                type="text"
+                                value={payrollProfileForm.nhimaNumber}
+                                onChange={(e) => setPayrollProfileForm({ ...payrollProfileForm, nhimaNumber: e.target.value })}
+                                className="input-field mt-0.5 text-sm"
+                              />
+                            </label>
+                            <label className="text-xs text-gray-500">
+                              TPIN
+                              <input
+                                type="text"
+                                value={payrollProfileForm.tpin}
+                                onChange={(e) => setPayrollProfileForm({ ...payrollProfileForm, tpin: e.target.value })}
+                                className="input-field mt-0.5 text-sm"
+                              />
+                            </label>
+                            <label className="text-xs text-gray-500">
+                              NRC No.
+                              <input
+                                type="text"
+                                value={payrollProfileForm.nrcNumber}
+                                onChange={(e) => setPayrollProfileForm({ ...payrollProfileForm, nrcNumber: e.target.value })}
+                                className="input-field mt-0.5 text-sm"
+                              />
+                            </label>
+                            <label className="text-xs text-gray-500 col-span-2">
+                              Payment method
+                              <select
+                                value={payrollProfileForm.paymentMethod}
+                                onChange={(e) =>
+                                  setPayrollProfileForm({
+                                    ...payrollProfileForm,
+                                    paymentMethod: e.target.value as PayrollProfileFormState["paymentMethod"],
+                                  })
+                                }
+                                className="input-field mt-0.5 text-sm"
+                              >
+                                <option value="">— Not set —</option>
+                                <option value="BANK_TRANSFER">Bank transfer</option>
+                                <option value="MOBILE_MONEY">Mobile money</option>
+                                <option value="CASH">Cash</option>
+                              </select>
+                            </label>
+                            {payrollProfileForm.paymentMethod === "BANK_TRANSFER" && (
+                              <>
+                                <label className="text-xs text-gray-500">
+                                  Bank name
+                                  <input
+                                    type="text"
+                                    value={payrollProfileForm.bankName}
+                                    onChange={(e) => setPayrollProfileForm({ ...payrollProfileForm, bankName: e.target.value })}
+                                    className="input-field mt-0.5 text-sm"
+                                  />
+                                </label>
+                                <label className="text-xs text-gray-500">
+                                  Branch
+                                  <input
+                                    type="text"
+                                    value={payrollProfileForm.branchName}
+                                    onChange={(e) => setPayrollProfileForm({ ...payrollProfileForm, branchName: e.target.value })}
+                                    className="input-field mt-0.5 text-sm"
+                                  />
+                                </label>
+                                <label className="text-xs text-gray-500 col-span-2">
+                                  Account number
+                                  <input
+                                    type="text"
+                                    value={payrollProfileForm.accountNumber}
+                                    onChange={(e) => setPayrollProfileForm({ ...payrollProfileForm, accountNumber: e.target.value })}
+                                    className="input-field mt-0.5 text-sm"
+                                  />
+                                </label>
+                              </>
+                            )}
+                            {payrollProfileForm.paymentMethod === "MOBILE_MONEY" && (
+                              <>
+                                <label className="text-xs text-gray-500">
+                                  Provider
+                                  <input
+                                    type="text"
+                                    value={payrollProfileForm.mobileMoneyProvider}
+                                    onChange={(e) =>
+                                      setPayrollProfileForm({ ...payrollProfileForm, mobileMoneyProvider: e.target.value })
+                                    }
+                                    className="input-field mt-0.5 text-sm"
+                                  />
+                                </label>
+                                <label className="text-xs text-gray-500">
+                                  Mobile money number
+                                  <input
+                                    type="text"
+                                    value={payrollProfileForm.mobileMoneyNumber}
+                                    onChange={(e) =>
+                                      setPayrollProfileForm({ ...payrollProfileForm, mobileMoneyNumber: e.target.value })
+                                    }
+                                    className="input-field mt-0.5 text-sm"
+                                  />
+                                </label>
+                              </>
+                            )}
+                            <label className="text-xs text-gray-500 col-span-2">
+                              Notes
+                              <textarea
+                                value={payrollProfileForm.notes}
+                                onChange={(e) => setPayrollProfileForm({ ...payrollProfileForm, notes: e.target.value })}
+                                className="input-field mt-0.5 text-sm"
+                                rows={2}
+                              />
+                            </label>
+                          </div>
+                          <div className="flex gap-2 pt-1">
+                            <button
+                              onClick={() => savePayrollProfile(detailEmployee.id)}
+                              disabled={isSavingPayrollProfile}
+                              className="btn-primary text-xs px-3 py-1.5"
+                            >
+                              {isSavingPayrollProfile ? "Saving…" : "Save"}
+                            </button>
+                            <button
+                              onClick={() => setIsEditingPayrollProfile(false)}
+                              disabled={isSavingPayrollProfile}
+                              className="text-xs px-3 py-1.5 text-gray-500 hover:text-gray-700"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : payrollProfileError ? (
+                        <p className="text-xs text-red-600 bg-red-50 rounded-lg px-2 py-1.5 border border-red-100">
+                          {payrollProfileError}
+                        </p>
+                      ) : payrollProfile ? (
+                        <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-gray-600">
+                          <div>
+                            <span className="text-gray-400">NAPSA No.: </span>
+                            {payrollProfile.napsaNumber || <span className="text-gray-300">—</span>}
+                          </div>
+                          <div>
+                            <span className="text-gray-400">NHIMA No.: </span>
+                            {payrollProfile.nhimaNumber || <span className="text-gray-300">—</span>}
+                          </div>
+                          <div>
+                            <span className="text-gray-400">TPIN: </span>
+                            {payrollProfile.tpin || <span className="text-gray-300">—</span>}
+                          </div>
+                          <div>
+                            <span className="text-gray-400">NRC No.: </span>
+                            {payrollProfile.nrcNumber || <span className="text-gray-300">—</span>}
+                          </div>
+                          <div className="col-span-2">
+                            <span className="text-gray-400">Payment method: </span>
+                            {payrollProfile.paymentMethod === "BANK_TRANSFER"
+                              ? `Bank transfer — ${payrollProfile.bankName ?? "?"} ${
+                                  payrollProfile.accountNumber ? `(${payrollProfile.accountNumber})` : ""
+                                }`
+                              : payrollProfile.paymentMethod === "MOBILE_MONEY"
+                              ? `Mobile money — ${payrollProfile.mobileMoneyProvider ?? "?"} ${
+                                  payrollProfile.mobileMoneyNumber ?? ""
+                                }`
+                              : payrollProfile.paymentMethod === "CASH"
+                              ? "Cash"
+                              : <span className="text-gray-300">Not set</span>}
+                          </div>
+                          {payrollProfile.notes && (
+                            <p className="col-span-2 text-gray-500 bg-gray-50 rounded-lg px-2 py-1.5 border border-gray-100 mt-1">
+                              {payrollProfile.notes}
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <button
+                          onClick={startEditPayrollProfile}
+                          className="text-xs text-magen-green-dark hover:underline"
+                        >
+                          + Add payroll profile
+                        </button>
+                      )}
+                    </div>
+                  )}
 
                   {/* Contracts */}
                   <div className="border-t border-gray-100 pt-3">

@@ -1466,6 +1466,7 @@ model PayslipRecord {
   // employee's record changes later.
   employeeNumber String?
   nrcNumber      String?
+  napsaNumber    String?
   contractStartDate DateTime?
   // No leave-tracking module exists yet (no balance/accrual data anywhere
   // in the system), so this stays null until one is built — never
