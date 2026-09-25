@@ -7,7 +7,8 @@ const router = Router();
 // GET /api/alerts?category=X   - filter by category:
 //   INVOICE_OVERDUE | CONTRACT_EXPIRING | PROPERTY_NOT_RETURNED |
 //   PROPERTY_WITH_ABSCONDED_EMPLOYEE | TASK_OVERDUE | LOW_STOCK |
-//   PAYROLL_DUE | ROSTER_GAP | SITE_UNMANNED
+//   PAYROLL_DUE | ROSTER_GAP | SITE_UNMANNED | INVOICE_DUE |
+//   INVOICE_PAID | CONTRACT_ENDED | DEPARTMENT_REQUEST_PENDING
 //
 // No POST/PUT/DELETE — alerts are live-calculated, not stored.
 // An alert disappears only when the underlying issue is resolved.

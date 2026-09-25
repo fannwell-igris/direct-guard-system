@@ -26,6 +26,9 @@ const CATEGORY_TITLES: Record<AlertCategory, string> = {
   ROSTER_GAP: "Roster Gap",
   SITE_UNMANNED: "Site Unmanned",
   INVOICE_DUE: "Invoice Due",
+  INVOICE_PAID: "Invoice Paid",
+  CONTRACT_ENDED: "Contract Ended",
+  DEPARTMENT_REQUEST_PENDING: "New Department Request",
 };
 
 function alertKey(a: Pick<Alert, "category" | "referenceId">): string {

@@ -11,7 +11,10 @@ export type AlertCategory =
   | "PAYROLL_DUE"
   | "ROSTER_GAP"
   | "SITE_UNMANNED"
-  | "INVOICE_DUE";
+  | "INVOICE_DUE"
+  | "INVOICE_PAID"
+  | "CONTRACT_ENDED"
+  | "DEPARTMENT_REQUEST_PENDING";
 
 export interface Alert {
   category: AlertCategory;
@@ -66,6 +69,107 @@ async function invoiceOverdueAlerts(): Promise<Alert[]> {
       },
     };
   });
+}
+
+// ---- Invoice paid ----
+// Added 2026-09-25 per explicit instruction ("invoice paid notification").
+// Informational — lets Finance/Admin see at a glance which invoices have
+// just cleared, without having to go looking. Only invoices paid in the
+// last 3 days are surfaced, since PAID is permanent and would otherwise
+// pile up forever.
+const INVOICE_PAID_RECENT_DAYS = 3;
+
+async function invoicePaidAlerts(): Promise<Alert[]> {
+  const cutoff = new Date(Date.now() - INVOICE_PAID_RECENT_DAYS * 86_400_000);
+  const invoices = await prisma.invoice.findMany({
+    where: { status: "PAID", lastUpdated: { gte: cutoff } },
+    include: { client: { select: { name: true } } },
+    orderBy: { lastUpdated: "desc" },
+  });
+
+  return invoices.map((inv) => ({
+    category: "INVOICE_PAID",
+    severity: "LOW",
+    message: `Invoice ${inv.invoiceNumber} for ${inv.client.name} has been paid in full (ZMW ${Number(inv.amount).toLocaleString()}).`,
+    referenceId: inv.id,
+    referenceType: "Invoice",
+    data: {
+      invoiceNumber: inv.invoiceNumber,
+      clientName: inv.client.name,
+      amount: inv.amount,
+      paidAround: inv.lastUpdated,
+    },
+  }));
+}
+
+// ---- Contract ended ----
+// Added 2026-09-25 per explicit instruction ("contract ended"). Distinct
+// from CONTRACT_EXPIRING (which warns BEFORE the end date) — this fires
+// once the contract's own calculated status has actually flipped to
+// EXPIRED, so it doesn't quietly fall off Finance/Admin's radar the
+// moment it's no longer "expiring soon".
+async function contractEndedAlerts(): Promise<Alert[]> {
+  const contracts = await prisma.clientContract.findMany({
+    where: { status: "EXPIRED" },
+    include: { client: { select: { name: true } }, site: { select: { siteName: true } } },
+    orderBy: { endDate: "desc" },
+  });
+
+  return contracts.map((cc) => {
+    const daysSince = daysAgo(cc.endDate);
+    return {
+      category: "CONTRACT_ENDED",
+      severity: daysSince > 14 ? "HIGH" : "MEDIUM",
+      message: `Contract for ${cc.client.name}${cc.site ? ` (${cc.site.siteName})` : ""} ended ${daysSince === 0 ? "today" : `${daysSince} day${daysSince === 1 ? "" : "s"} ago`} — renew or mark inactive.`,
+      referenceId: cc.id,
+      referenceType: "ClientContract",
+      data: {
+        clientName: cc.client.name,
+        siteName: cc.site?.siteName ?? null,
+        endDate: cc.endDate,
+        daysSince,
+      },
+    };
+  });
+}
+
+// ---- Department requests awaiting Admin/Management review ----
+// Added 2026-09-25 per explicit instruction ("Admin receives notifications
+// from other departments — Requests etc"). Every PENDING DepartmentRequest
+// (a department asking Admin/Management for something — budget, approval,
+// equipment, etc.) shows up here until it's actioned. Visible only to
+// ADMIN/MANAGER (see MANAGEMENT_CATEGORIES below) — this is exactly the
+// kind of cross-department item ordinary staff shouldn't see.
+const REQUEST_PRIORITY_SEVERITY: Record<string, AlertSeverity> = {
+  CRITICAL: "CRITICAL",
+  URGENT: "HIGH",
+  HIGH: "HIGH",
+  NORMAL: "MEDIUM",
+  LOW: "LOW",
+};
+
+async function departmentRequestPendingAlerts(): Promise<Alert[]> {
+  const requests = await prisma.departmentRequest.findMany({
+    where: { status: "PENDING" },
+    include: { department: { select: { name: true } } },
+    orderBy: [{ priority: "desc" }, { dateCreated: "asc" }],
+  });
+
+  return requests.map((r) => ({
+    category: "DEPARTMENT_REQUEST_PENDING",
+    severity: REQUEST_PRIORITY_SEVERITY[r.priority] ?? "MEDIUM",
+    message: `${r.department.name} submitted a request: "${r.title}" (${r.priority.toLowerCase()} priority) — awaiting review.`,
+    referenceId: r.id,
+    referenceType: "DepartmentRequest",
+    data: {
+      departmentName: r.department.name,
+      title: r.title,
+      priority: r.priority,
+      estimatedCost: r.estimatedCost,
+      submittedBy: r.submittedBy,
+      dateCreated: r.dateCreated,
+    },
+  }));
 }
 
 // ---- Invoice due (respects each client's own billing cycle) ----
@@ -498,6 +602,9 @@ const CATEGORY_RUNNERS: Record<AlertCategory, () => Promise<Alert[]>> = {
   ROSTER_GAP: rosterGapAlerts,
   SITE_UNMANNED: siteUnmannedAlerts,
   INVOICE_DUE: invoiceDueAlerts,
+  INVOICE_PAID: invoicePaidAlerts,
+  CONTRACT_ENDED: contractEndedAlerts,
+  DEPARTMENT_REQUEST_PENDING: departmentRequestPendingAlerts,
 };
 
 const SEVERITY_ORDER: Record<AlertSeverity, number> = {
@@ -516,23 +623,40 @@ const SEVERITY_ORDER: Record<AlertSeverity, number> = {
 export const FINANCE_CATEGORIES = new Set<AlertCategory>([
   "INVOICE_OVERDUE",
   "INVOICE_DUE",
+  "INVOICE_PAID",
   "PAYROLL_DUE",
   "LOW_STOCK",
 ]);
 
 export const FINANCE_ROLES = new Set(["ADMIN", "MANAGER", "PAYROLL"]);
 
+/**
+ * Categories that are cross-department, Admin/Management-facing items
+ * (e.g. another department's request awaiting review) — added
+ * 2026-09-25. Ordinary STAFF/PAYROLL/etc. roles never see these; only
+ * ADMIN and MANAGER do, same audience that actually reviews/approves
+ * DepartmentRequests (see department-requests module).
+ */
+export const MANAGEMENT_CATEGORIES = new Set<AlertCategory>([
+  "DEPARTMENT_REQUEST_PENDING",
+]);
+export const MANAGEMENT_ROLES = new Set(["ADMIN", "MANAGER"]);
+
 export async function getAlerts(category?: AlertCategory, role = "STAFF"): Promise<Alert[]> {
   const canSeeFinance = FINANCE_ROLES.has(role);
+  const canSeeManagement = MANAGEMENT_ROLES.has(role);
 
   let categories: AlertCategory[];
   if (category) {
-    // Single-category filter: respect it but still gate finance categories
+    // Single-category filter: respect it but still gate finance/management categories
     if (FINANCE_CATEGORIES.has(category) && !canSeeFinance) return [];
+    if (MANAGEMENT_CATEGORIES.has(category) && !canSeeManagement) return [];
     categories = [category];
   } else {
     categories = (Object.keys(CATEGORY_RUNNERS) as AlertCategory[]).filter(
-      (c) => canSeeFinance || !FINANCE_CATEGORIES.has(c)
+      (c) =>
+        (canSeeFinance || !FINANCE_CATEGORIES.has(c)) &&
+        (canSeeManagement || !MANAGEMENT_CATEGORIES.has(c))
     );
   }
 

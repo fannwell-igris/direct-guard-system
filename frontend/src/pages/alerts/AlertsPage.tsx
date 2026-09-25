@@ -3,6 +3,7 @@ import {
   AlertTriangle, AlertCircle, Info, RefreshCw,
   FileText, FileCheck, Package, CheckSquare,
   BarChart2, DollarSign, MapPin, ShieldAlert,
+  CheckCircle2, FileX, Inbox,
 } from "lucide-react";
 import api from "../../api/client";
 
@@ -17,7 +18,10 @@ type Category =
   | "PAYROLL_DUE"
   | "ROSTER_GAP"
   | "SITE_UNMANNED"
-  | "INVOICE_DUE";
+  | "INVOICE_DUE"
+  | "INVOICE_PAID"
+  | "CONTRACT_ENDED"
+  | "DEPARTMENT_REQUEST_PENDING";
 
 interface Alert {
   category: Category;
@@ -54,19 +58,25 @@ const CATEGORY_CONFIG: Record<Category, { label: string; icon: React.ElementType
   ROSTER_GAP:            { label: "Roster Gaps",              icon: MapPin },
   SITE_UNMANNED:         { label: "Sites Unmanned (after 18:00)", icon: ShieldAlert },
   INVOICE_DUE:           { label: "Invoice Due",                icon: DollarSign },
+  INVOICE_PAID:          { label: "Invoices Paid",              icon: CheckCircle2 },
+  CONTRACT_ENDED:        { label: "Contracts Ended",            icon: FileX },
+  DEPARTMENT_REQUEST_PENDING: { label: "Department Requests",   icon: Inbox },
 };
 
 const CATEGORY_ORDER: Category[] = [
   "SITE_UNMANNED",
   "PROPERTY_WITH_ABSCONDED_EMPLOYEE",
+  "DEPARTMENT_REQUEST_PENDING",
   "INVOICE_DUE",
   "INVOICE_OVERDUE",
+  "CONTRACT_ENDED",
   "PAYROLL_DUE",
   "ROSTER_GAP",
   "CONTRACT_EXPIRING",
   "TASK_OVERDUE",
   "PROPERTY_NOT_RETURNED",
   "LOW_STOCK",
+  "INVOICE_PAID",
 ];
 
 // ---- Component ----
