@@ -167,6 +167,49 @@ export async function cancelInvoice(id: string) {
   return prisma.invoice.update({ where: { id }, data: { status: "CANCELLED" } });
 }
 
+// Only a DRAFT or CANCELLED invoice can ever be hard-deleted — anything
+// else (ISSUED, PARTIAL, PAID, OVERDUE) is real financial history and
+// must be cancelled first (see cancelInvoice above), never deleted
+// outright. Added 2026-09-25, per explicit instruction: trial/test
+// invoices created before go-live needed a way to be cleared out, and
+// separately the Admin wanted the ability to delete a cancelled invoice
+// rather than have it linger forever. This sits behind the existing
+// Admin password-confirmation middleware (requireDeleteConfirmation) like
+// every other delete in the system.
+const DELETABLE_STATUSES: InvoiceStatus[] = ["DRAFT", "CANCELLED"];
+
+export async function deleteInvoice(id: string) {
+  const existing = await prisma.invoice.findUnique({ where: { id } });
+  if (!existing) {
+    throw ApiError.notFound(`Invoice ${id} not found.`);
+  }
+  if (!DELETABLE_STATUSES.includes(existing.status)) {
+    throw ApiError.badRequest(
+      `Invoice ${existing.invoiceNumber} is ${existing.status} and cannot be deleted directly — cancel it first (only while it has no payments), then delete.`
+    );
+  }
+  // Belt and suspenders: cancelInvoice already requires amountPaid === 0,
+  // but a DRAFT invoice can technically pick up a payment (see
+  // recalculateInvoice's comment below), so this is checked independently
+  // of status.
+  if (Number(existing.amountPaid) > 0) {
+    throw ApiError.badRequest(
+      `Invoice ${existing.invoiceNumber} has payments recorded against it and cannot be deleted.`
+    );
+  }
+
+  try {
+    await prisma.invoice.delete({ where: { id } });
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2003") {
+      throw ApiError.badRequest(
+        `Invoice ${existing.invoiceNumber} still has related records (e.g. payments) and cannot be deleted.`
+      );
+    }
+    throw err;
+  }
+}
+
 /**
  * Recalculates amountPaid/outstandingBalance/status from the invoice's
  * actual Payments — called after every payment create/edit/delete, per

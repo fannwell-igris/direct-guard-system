@@ -18,9 +18,15 @@ import {
   Clock,
   AlertTriangle,
   Printer,
+  Trash2,
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import Modal from "../../components/ui/Modal";
+// This page calls the backend with plain `fetch`, not the shared axios
+// client, so it doesn't get the password-confirmation prompt for free the
+// way pages built on that client do (see api/client.ts's interceptor) —
+// wired in by hand below for the new delete action instead.
+import { requestPasswordConfirmation } from "../../lib/passwordConfirmController";
 import magenLogoUrl from "../../assets/magen-logo.svg";
 
 // Magen Security's own registration/contact details for the invoice
@@ -657,6 +663,39 @@ export default function InvoicesPage() {
     }
   }
 
+  async function handleDeleteInvoice() {
+    if (!selectedInvoice) return;
+    if (!window.confirm(`Permanently delete invoice ${selectedInvoice.invoiceNumber}? This cannot be undone.`)) return;
+
+    setActionLoading(true);
+    setActionError(null);
+    try {
+      let password = "";
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const res = await fetch(`${API}/invoices/${selectedInvoice.id}`, {
+          method: "DELETE",
+          headers: password ? { ...authHeader, "x-confirm-password": password } : authHeader,
+        });
+        if (res.ok) break;
+        const err = await res.json().catch(() => ({}));
+        if (err.code === "PASSWORD_CONFIRMATION_REQUIRED" || err.code === "PASSWORD_CONFIRMATION_INVALID") {
+          const entered = await requestPasswordConfirmation();
+          if (entered === null) return; // user cancelled the prompt
+          password = entered;
+          continue; // retry the DELETE with the password attached
+        }
+        throw new Error(err.message || `Server error ${res.status}`);
+      }
+      setSelectedInvoice(null);
+      loadInvoices(page);
+    } catch (e: unknown) {
+      setActionError(e instanceof Error ? e.message : "Delete failed.");
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
   // ─── Payment form ─────────────────────────────────────────────────────────
   async function handlePaymentSubmit(e: FormEvent) {
     e.preventDefault();
@@ -1121,6 +1160,15 @@ export default function InvoicesPage() {
                             disabled={actionLoading}
                           >
                             <XCircle size={12} /> Cancel
+                          </button>
+                        )}
+                        {user?.role === "ADMIN" && (selectedInvoice.status === "DRAFT" || selectedInvoice.status === "CANCELLED") && (
+                          <button
+                            className="btn-danger text-xs flex items-center gap-1"
+                            onClick={handleDeleteInvoice}
+                            disabled={actionLoading}
+                          >
+                            <Trash2 size={12} /> Delete
                           </button>
                         )}
                       </div>

@@ -35,3 +35,8 @@ export const cancelInvoice = asyncHandler(async (req: Request, res: Response) =>
   const invoice = await service.cancelInvoice(req.params.id);
   res.status(200).json({ status: "ok", data: invoice });
 });
+
+export const deleteInvoice = asyncHandler(async (req: Request, res: Response) => {
+  await service.deleteInvoice(req.params.id);
+  res.status(200).json({ status: "ok" });
+});

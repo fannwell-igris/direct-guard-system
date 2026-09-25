@@ -20,6 +20,14 @@ const router = Router();
 // POST  /api/invoices/:id/issue        - DRAFT -> ISSUED, one-time
 // POST  /api/invoices/:id/cancel       - -> CANCELLED, only while
 //                                         amountPaid is still 0; terminal
+// DELETE /api/invoices/:id             - hard delete; only DRAFT/CANCELLED
+//                                         invoices with no payments (added
+//                                         2026-09-25, for clearing out
+//                                         trial/test invoices). ADMIN only
+//                                         (permissions.ts) + requires the
+//                                         requester's own password
+//                                         (requireDeleteConfirmation,
+//                                         global middleware).
 //
 // POST  /api/invoices/:id/payments     - record a payment (nested, per
 //                                         the same pattern used for
@@ -35,6 +43,7 @@ router.get("/:id", controller.getInvoice);
 router.put("/:id", controller.updateInvoice);
 router.post("/:id/issue", controller.issueInvoice);
 router.post("/:id/cancel", controller.cancelInvoice);
+router.delete("/:id", controller.deleteInvoice);
 router.post("/:id/payments", paymentsController.createPayment);
 router.get("/:id/payments", paymentsController.listPaymentsForInvoice);
 

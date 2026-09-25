@@ -177,6 +177,9 @@ const REGISTRY: RouteRule[] = [
   // system's Finance role) only, per explicit instruction (2026-09-23):
   // "Only the Admin and Finance can edit things in Finance." MANAGER keeps
   // GET/view access but lost POST/PUT/PATCH here.
+  // DELETE added (2026-09-25, explicit instruction): ADMIN only — hard
+  // deletes a DRAFT/CANCELLED invoice (see invoices.service.ts), and goes
+  // through requireDeleteConfirmation's password re-check on top of this.
   { prefix: "/api/invoices", methods: { GET: ADMIN_MANAGER_PAYROLL, POST: ADMIN_PAYROLL, PUT: ADMIN_PAYROLL, PATCH: ADMIN_PAYROLL, DELETE: ADMIN } },
   { prefix: "/api/payments", methods: { GET: ADMIN_MANAGER_PAYROLL, POST: ADMIN_PAYROLL, PUT: ADMIN_PAYROLL, PATCH: ADMIN_PAYROLL, DELETE: ADMIN } },
   { prefix: "/api/operational-costs", methods: { GET: ADMIN_MANAGER_PAYROLL, POST: ADMIN_PAYROLL, PUT: ADMIN_PAYROLL, PATCH: ADMIN_PAYROLL, DELETE: ADMIN } },
