@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
+import PasswordInput from "../../components/ui/PasswordInput";
 
 // "Remember me" only ever stores the email locally, pre-filled on the next
 // visit — never the password. Saving the password itself is left to the
@@ -76,10 +77,9 @@ export default function LoginPage() {
           <label htmlFor="password" className="text-sm font-medium text-gray-700">
             Password
           </label>
-          <input
+          <PasswordInput
             id="password"
             name="password"
-            type="password"
             autoComplete="current-password"
             required
             value={password}

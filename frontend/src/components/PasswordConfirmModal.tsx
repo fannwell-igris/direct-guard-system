@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import Modal from "./ui/Modal";
+import PasswordInput from "./ui/PasswordInput";
 import { _registerShowListener, _resolvePendingPassword } from "../lib/passwordConfirmController";
 
 /**
@@ -42,9 +43,8 @@ export default function PasswordConfirmModal() {
           This permanently deletes data and can't be undone. Re-enter your
           password to confirm.
         </p>
-        <input
+        <PasswordInput
           autoFocus
-          type="password"
           required
           value={password}
           onChange={(e) => setPassword(e.target.value)}

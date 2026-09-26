@@ -3,6 +3,7 @@ import type { FormEvent } from "react";
 import { UserCog, Plus } from "lucide-react";
 import api from "../../api/client";
 import Modal from "../../components/ui/Modal";
+import PasswordInput from "../../components/ui/PasswordInput";
 
 interface User {
   id: string;
@@ -284,7 +285,7 @@ export default function UsersPage() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Password *</label>
-                  <input type="password" required value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className="input" placeholder="Minimum 8 characters" />
+                  <PasswordInput required autoComplete="new-password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className="input" placeholder="Minimum 8 characters" />
                 </div>
               </>
             )}
@@ -332,7 +333,7 @@ export default function UsersPage() {
           <form onSubmit={handleResetPassword} className="space-y-3">
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">New Password *</label>
-              <input type="password" required value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="input" placeholder="Minimum 8 characters" />
+              <PasswordInput required autoComplete="new-password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="input" placeholder="Minimum 8 characters" />
             </div>
             <div className="flex gap-2">
               <button type="submit" disabled={isResetting} className="btn-primary">
