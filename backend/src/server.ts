@@ -1,4 +1,5 @@
 import employeeLoansRouter from "./modules/employee-loans/employee-loans.routes";
+import demoResetRouter from "./modules/demo-reset/demo-reset.routes";
 import settingsRouter from "./modules/settings/settings.routes";
 import dashboardRouter from "./modules/dashboard/dashboard.routes";
 import alertsRouter from "./modules/alerts/alerts.routes";
@@ -214,6 +215,12 @@ app.use("/api/field-visits", fieldVisitsRoutes);
 // new Targets piece — monthly goals per marketer, compared against live
 // actuals computed at read time.
 app.use("/api/marketing-targets", marketingTargetsRoutes);
+
+// Demo reset — wipes all transactional data in one shot so staff can start
+// fresh after a training session. ADMIN only + password re-confirmation.
+// Must sit before errorHandler but has no ordering requirement relative to
+// other route modules.
+app.use("/api/demo-reset", demoResetRouter);
 
 // Must be the LAST app.use() — Express only routes errors here if it's
 // registered after every other route/middleware.
