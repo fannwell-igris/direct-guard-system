@@ -71,7 +71,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // possibly a different one next) navigates to /login. No-op on
     // web/desktop.
     window.AndroidNative?.onLoggedOut?.();
-    window.location.href = "/login";
+    // No window.location.href redirect here — AppLayout's route guard
+    // (<Navigate to="/login">) handles the redirect automatically once
+    // `user` is null. Using window.location caused a full page reload
+    // in the Electron desktop app, breaking logout there.
   };
 
   return (
