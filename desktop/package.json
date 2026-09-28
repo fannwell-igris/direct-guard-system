@@ -1,7 +1,7 @@
 {
   "name": "magen-cms-desktop",
   "version": "1.0.0",
-  "description": "Desktop app for the Magen Security Group Company Management System",
+  "description": "Magen CMS",
   "main": "main.js",
   "author": "Magen Security Limited",
   "license": "UNLICENSED",
