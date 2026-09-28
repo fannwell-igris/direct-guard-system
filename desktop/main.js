@@ -103,6 +103,13 @@ function createWindow() {
     },
   });
 
+  // Lock the window title to "Magen CMS" regardless of what the web page's
+  // <title> tag says — otherwise the React app title overwrites it and
+  // Task Manager shows the full page description instead of the app name.
+  mainWindow.on("page-title-updated", (event) => {
+    event.preventDefault();
+  });
+
   mainWindow.once("ready-to-show", finishSplash);
 
   // If the CMS URL fails to load (e.g. no internet on launch), don't leave
