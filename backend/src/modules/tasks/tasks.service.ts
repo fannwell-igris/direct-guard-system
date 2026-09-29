@@ -5,6 +5,9 @@ import { TaskCreateInput, TaskUpdateInput, TaskListQuery } from "./tasks.validat
 
 const NON_TERMINAL_STATUSES: TaskStatus[] = ["OPEN", "IN_PROGRESS", "ON_HOLD"];
 
+/** Roles that can see all tasks across every department. */
+const ADMIN_ROLES = ["ADMIN", "SUPERADMIN"];
+
 /**
  * OVERDUE is never stored - it's a calculated DISPLAY status, same
  * principle as ContractStatus/coverage %. A task's real, stored status
@@ -40,28 +43,52 @@ export async function createTask(input: TaskCreateInput, _changedBy: string) {
   return withEffectiveStatus(task);
 }
 
-export async function listTasks(query: TaskListQuery) {
+/**
+ * Caller context passed to listTasks so it can scope results:
+ * - ADMIN / SUPERADMIN → all tasks
+ * - Everyone else      → only tasks belonging to their own department
+ *
+ * If the caller has no departmentId (e.g. a STAFF user not yet assigned
+ * to a department), they see only unassigned tasks plus any tasks
+ * explicitly assigned to them via assignedToEmployeeId — a safe fallback
+ * that prevents total blindness without leaking other departments' work.
+ */
+export interface CallerContext {
+  role: string;
+  departmentId: string | null | undefined;
+}
+
+export async function listTasks(query: TaskListQuery, caller: CallerContext) {
   const now = new Date();
   const where: Prisma.TaskWhereInput = {};
-  if (query.departmentId) where.departmentId = query.departmentId;
+
+  // ── Department scoping ────────────────────────────────────────────────
+  if (ADMIN_ROLES.includes(caller.role)) {
+    // Admins: respect the optional ?departmentId filter from the query string
+    if (query.departmentId) where.departmentId = query.departmentId;
+  } else if (caller.departmentId) {
+    // Non-admin with a department: always restrict to their department.
+    // Any ?departmentId filter in the query string is silently ignored —
+    // they can't escape their own scope by passing a different id.
+    where.departmentId = caller.departmentId;
+  } else {
+    // Non-admin with NO department (edge case): show nothing rather than
+    // leaking everything. Front-end should prompt them to contact an admin.
+    where.departmentId = "__none__"; // matches nothing
+  }
+
   if (query.assignedToEmployeeId) where.assignedToEmployeeId = query.assignedToEmployeeId;
   if (query.priority) where.priority = query.priority;
 
   // Status filtering has to account for OVERDUE being calculated, not
   // stored - see withEffectiveStatus above.
   if (query.status === "OVERDUE") {
-    // "Overdue" means: stored status is still non-terminal, AND the due
-    // date has already passed.
     where.status = { in: NON_TERMINAL_STATUSES };
     where.dueDate = { lt: now };
   } else if (query.status && NON_TERMINAL_STATUSES.includes(query.status)) {
-    // Filtering by a specific non-terminal status (e.g. ?status=OPEN)
-    // should EXCLUDE tasks that are now effectively overdue - those only
-    // show under ?status=OVERDUE, not under their stored status too.
     where.status = query.status;
     where.OR = [{ dueDate: null }, { dueDate: { gte: now } }];
   } else if (query.status) {
-    // COMPLETED / CANCELLED - due date is irrelevant, simple equality.
     where.status = query.status;
   }
 
@@ -95,7 +122,7 @@ export async function listTasks(query: TaskListQuery) {
  * this is the monthly-report-friendly view: who moved this task through
  * which statuses, and when.
  */
-export async function getTaskById(id: string) {
+export async function getTaskById(id: string, caller: CallerContext) {
   const task = await prisma.task.findUnique({
     where: { id },
     include: {
@@ -104,6 +131,12 @@ export async function getTaskById(id: string) {
     },
   });
   if (!task) throw ApiError.notFound(`Task ${id} not found.`);
+
+  // Non-admins can only view tasks in their own department
+  if (!ADMIN_ROLES.includes(caller.role) && task.departmentId !== caller.departmentId) {
+    throw ApiError.forbidden("You do not have access to this task.");
+  }
+
   return withEffectiveStatus(task);
 }
 
@@ -117,10 +150,16 @@ export async function updateTask(
   id: string,
   input: TaskUpdateInput,
   _changedBy: string,
-  _statusChangeNote?: string | null
+  _statusChangeNote?: string | null,
+  caller?: CallerContext
 ) {
   const existing = await prisma.task.findUnique({ where: { id } });
   if (!existing) throw ApiError.notFound(`Task ${id} not found.`);
+
+  // Non-admins can only update tasks in their own department
+  if (caller && !ADMIN_ROLES.includes(caller.role) && existing.departmentId !== caller.departmentId) {
+    throw ApiError.forbidden("You do not have access to this task.");
+  }
 
   if (input.departmentId) await ensureDepartmentExists(input.departmentId);
   if (input.assignedToEmployeeId) await ensureEmployeeExists(input.assignedToEmployeeId);
