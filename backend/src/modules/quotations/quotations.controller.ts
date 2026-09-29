@@ -4,7 +4,9 @@ import * as service from "./quotations.service";
 import { parseQuotationCreate, parseQuotationUpdate, parseListQuery } from "./quotations.validation";
 
 export const createQuotation = asyncHandler(async (req: Request, res: Response) => {
-  const input = parseQuotationCreate(req.body);
+  // preparedBy is always taken from the authenticated user — never from the request body
+  const preparedBy = req.user!.fullName ?? req.user!.email;
+  const input = parseQuotationCreate(req.body, preparedBy);
   const quotation = await service.createQuotation(input);
   res.status(201).json({ status: "ok", data: quotation });
 });

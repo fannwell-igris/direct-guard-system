@@ -6,7 +6,7 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
-  Building2,
+  User,
   MapPin,
   Calendar,
   FileText,
@@ -17,6 +17,7 @@ import {
   AlertCircle,
   Trash2,
   Printer,
+  Minus,
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import Modal from "../../components/ui/Modal";
@@ -34,30 +35,24 @@ const COMPANY_EMAILS = ["info@magensecurityltd.com", "sales@magensecurityltd.com
 
 type QuotationStatus = "DRAFT" | "SENT" | "ACCEPTED" | "REJECTED" | "EXPIRED";
 
-interface Client {
-  id: string;
-  name: string;
-}
-
-interface Site {
-  id: string;
-  siteName: string;
-  clientId?: string;
+interface LineItem {
+  description: string;
+  amount: number;
 }
 
 interface Quotation {
   id: string;
   quotationNumber: string;
-  clientId: string;
-  siteId: string | null;
+  customerName: string;
+  customerLocation: string | null;
   quotationDate: string;
   validUntil: string | null;
-  billingPeriod: string | null;
+  lineItems: LineItem[];
+  discount: string | number | null;
   amount: string | number;
+  preparedBy: string;
   status: QuotationStatus;
   notes: string | null;
-  client: { id: string; name: string };
-  site: { id: string; siteName: string } | null;
 }
 
 interface Pagination {
@@ -67,13 +62,18 @@ interface Pagination {
   totalPages: number;
 }
 
+interface LineItemDraft {
+  description: string;
+  amount: string;
+}
+
 interface FormState {
-  clientId: string;
-  siteId: string;
+  customerName: string;
+  customerLocation: string;
   quotationDate: string;
   validUntil: string;
-  billingPeriod: string;
-  amount: string;
+  lineItems: LineItemDraft[];
+  discount: string;
   notes: string;
   startingNumber: string;
 }
@@ -92,13 +92,15 @@ const STATUS_TABS: { label: string; value: QuotationStatus | "" }[] = [
   { label: "Expired", value: "EXPIRED" },
 ];
 
+const EMPTY_LINE_ITEM: LineItemDraft = { description: "", amount: "" };
+
 const EMPTY_FORM: FormState = {
-  clientId: "",
-  siteId: "",
+  customerName: "",
+  customerLocation: "",
   quotationDate: new Date().toISOString().slice(0, 10),
   validUntil: "",
-  billingPeriod: "",
-  amount: "",
+  lineItems: [{ ...EMPTY_LINE_ITEM }],
+  discount: "",
   notes: "",
   startingNumber: "",
 };
@@ -108,7 +110,7 @@ const EMPTY_FORM: FormState = {
 function formatCurrency(val: string | number | null | undefined): string {
   const n = Number(val);
   if (isNaN(n)) return "—";
-  return `ZMW ${n.toLocaleString("en-ZM", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `K ${n.toLocaleString("en-ZM", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function formatDate(dateStr: string | null | undefined): string {
@@ -136,11 +138,32 @@ function statusConfig(status: QuotationStatus) {
   }
 }
 
+function statusConfigPlain(status: QuotationStatus) {
+  switch (status) {
+    case "DRAFT": return { label: "Draft", bg: "#f3f4f6", fg: "#374151" };
+    case "SENT": return { label: "Sent", bg: "#eff6ff", fg: "#1d4ed8" };
+    case "ACCEPTED": return { label: "Accepted", bg: "#f0fdf4", fg: "#15803d" };
+    case "REJECTED": return { label: "Rejected", bg: "#fef2f2", fg: "#dc2626" };
+    case "EXPIRED": return { label: "Expired", bg: "#fffbeb", fg: "#b45309" };
+  }
+}
+
+function calcSubtotal(items: LineItemDraft[]): number {
+  return items.reduce((sum, li) => {
+    const n = parseFloat(li.amount);
+    return sum + (isNaN(n) ? 0 : n);
+  }, 0);
+}
+
 // ─── Print helper ─────────────────────────────────────────────────────────────
 
-function printQuotation(q: Quotation, preparedByName?: string | null) {
+function printQuotation(q: Quotation) {
   const generatedDate = new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" });
   const cfg = statusConfigPlain(q.status);
+  const lineItems: LineItem[] = Array.isArray(q.lineItems) ? q.lineItems : [];
+  const subtotal = lineItems.reduce((sum, li) => sum + Number(li.amount), 0);
+  const discount = Number(q.discount ?? 0);
+  const total = Math.max(0, subtotal - discount);
 
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -178,7 +201,8 @@ function printQuotation(q: Quotation, preparedByName?: string | null) {
   .totals table { width: 100%; border-collapse: collapse; }
   .totals td { padding: 6px 10px; font-size: 11.5px; border: 1px solid #d8dee6; }
   .totals td.label { background: #003770; color: #fff; font-weight: 700; text-transform: uppercase; font-size: 9.5px; letter-spacing: 0.3px; }
-  .totals td.num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; }
+  .totals td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .totals tr.grand td.num { font-weight: 700; }
   .notes { margin-top: 22px; font-size: 11px; color: #555; }
   .notes h3 { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #999; margin-bottom: 4px; }
   .signatures { margin-top: 46px; display: flex; flex-direction: column; gap: 22px; width: 300px; }
@@ -210,8 +234,8 @@ function printQuotation(q: Quotation, preparedByName?: string | null) {
     <div class="customer-box">
       <div class="bar">Quoted To</div>
       <div class="body">
-        <strong>${q.client.name}</strong>
-        ${q.site ? `<br /><span style="color:#666">${q.site.siteName}</span>` : ""}
+        <strong>${q.customerName}</strong>
+        ${q.customerLocation ? `<br /><span style="color:#666">${q.customerLocation}</span>` : ""}
       </div>
     </div>
 
@@ -225,8 +249,7 @@ function printQuotation(q: Quotation, preparedByName?: string | null) {
         <td>${formatDate(q.quotationDate)}</td>
       </tr>
       ${q.validUntil ? `<tr><td class="label">Valid Until</td><td>${formatDate(q.validUntil)}</td></tr>` : ""}
-      ${q.billingPeriod ? `<tr><td class="label">Period</td><td>${q.billingPeriod}</td></tr>` : ""}
-      ${preparedByName ? `<tr><td class="label">Prepared By</td><td>${preparedByName}</td></tr>` : ""}
+      <tr><td class="label">Prepared By</td><td>${q.preparedBy}</td></tr>
       <tr>
         <td class="label">Generated</td>
         <td>${generatedDate}</td>
@@ -243,21 +266,28 @@ function printQuotation(q: Quotation, preparedByName?: string | null) {
       </tr>
     </thead>
     <tbody>
+      ${lineItems.map((li, i) => `
       <tr>
-        <td class="rownum">1</td>
-        <td>
-          Security Services${q.billingPeriod ? ` — ${q.billingPeriod}` : ""}${q.site ? ` at ${q.site.siteName}` : ""}
-        </td>
-        <td class="num">${formatCurrency(q.amount)}</td>
-      </tr>
+        <td class="rownum">${i + 1}</td>
+        <td>${li.description}</td>
+        <td class="num">${formatCurrency(li.amount)}</td>
+      </tr>`).join("")}
     </tbody>
   </table>
 
   <div class="totals">
     <table>
       <tr>
-        <td class="label">Total Amount</td>
-        <td class="num">${formatCurrency(q.amount)}</td>
+        <td class="label">Sub Total</td>
+        <td class="num">${formatCurrency(subtotal)}</td>
+      </tr>
+      <tr>
+        <td class="label">Discount</td>
+        <td class="num">${discount > 0 ? formatCurrency(discount) : "—"}</td>
+      </tr>
+      <tr class="grand">
+        <td class="label">Total</td>
+        <td class="num">${formatCurrency(total)}</td>
       </tr>
     </table>
   </div>
@@ -266,11 +296,19 @@ function printQuotation(q: Quotation, preparedByName?: string | null) {
 
   <div class="signatures">
     <div class="sig-row">
-      <span class="sig-label">Authorised By:</span>
+      <span class="sig-label">Prepared By:</span>
+      <span class="sig-line">${q.preparedBy}</span>
+    </div>
+    <div class="sig-row">
+      <span class="sig-label">Signature:</span>
       <span class="sig-line">&nbsp;</span>
     </div>
     <div class="sig-row">
-      <span class="sig-label">Client Signature:</span>
+      <span class="sig-label">Received By:</span>
+      <span class="sig-line">&nbsp;</span>
+    </div>
+    <div class="sig-row">
+      <span class="sig-label">Signature:</span>
       <span class="sig-line">&nbsp;</span>
     </div>
   </div>
@@ -298,16 +336,6 @@ function printQuotation(q: Quotation, preparedByName?: string | null) {
   };
 }
 
-function statusConfigPlain(status: QuotationStatus) {
-  switch (status) {
-    case "DRAFT": return { label: "Draft", bg: "#f3f4f6", fg: "#374151" };
-    case "SENT": return { label: "Sent", bg: "#eff6ff", fg: "#1d4ed8" };
-    case "ACCEPTED": return { label: "Accepted", bg: "#f0fdf4", fg: "#15803d" };
-    case "REJECTED": return { label: "Rejected", bg: "#fef2f2", fg: "#dc2626" };
-    case "EXPIRED": return { label: "Expired", bg: "#fffbeb", fg: "#b45309" };
-  }
-}
-
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function QuotationsPage() {
@@ -317,7 +345,6 @@ export default function QuotationsPage() {
   const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [pagination, setPagination] = useState<Pagination>({ page: 1, pageSize: PAGE_SIZE, total: 0, totalPages: 1 });
   const [statusFilter, setStatusFilter] = useState<QuotationStatus | "">("");
-  const [clientFilter, setClientFilter] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -334,11 +361,13 @@ export default function QuotationsPage() {
   // Auto-number preview
   const [nextNumber, setNextNumber] = useState<string>("");
 
-  // Reference data
-  const [clients, setClients] = useState<Client[]>([]);
-  const [sites, setSites] = useState<Site[]>([]);
-
   const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+
+  // ── Derived totals ──────────────────────────────────────────────────────────
+
+  const subtotal = calcSubtotal(form.lineItems);
+  const discountNum = parseFloat(form.discount) || 0;
+  const total = Math.max(0, subtotal - discountNum);
 
   // ── Fetch list ──────────────────────────────────────────────────────────────
 
@@ -349,7 +378,6 @@ export default function QuotationsPage() {
       try {
         const params = new URLSearchParams({ page: String(page), pageSize: String(PAGE_SIZE) });
         if (statusFilter) params.set("status", statusFilter);
-        if (clientFilter) params.set("clientId", clientFilter);
         const res = await fetch(`${API}/quotations?${params}`, { headers });
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || "Failed to load quotations.");
@@ -361,23 +389,10 @@ export default function QuotationsPage() {
         setLoading(false);
       }
     },
-    [token, statusFilter, clientFilter]
+    [token, statusFilter]
   );
 
   useEffect(() => { fetchQuotations(1); }, [fetchQuotations]);
-
-  // ── Reference data ──────────────────────────────────────────────────────────
-
-  useEffect(() => {
-    fetch(`${API}/clients?pageSize=500`, { headers })
-      .then((r) => r.json())
-      .then((j) => setClients(j.data ?? []))
-      .catch(() => {});
-    fetch(`${API}/sites?pageSize=500`, { headers })
-      .then((r) => r.json())
-      .then((j) => setSites(j.data ?? []))
-      .catch(() => {});
-  }, [token]);
 
   // ── Auto-number preview ─────────────────────────────────────────────────────
 
@@ -390,12 +405,6 @@ export default function QuotationsPage() {
       .catch(() => {});
   }, [showForm, editId, form.quotationDate, token]);
 
-  // ── Sites filtered to chosen client ─────────────────────────────────────────
-
-  const filteredSites = form.clientId
-    ? sites.filter((s) => s.clientId === form.clientId || !s.clientId)
-    : sites;
-
   // ── Form helpers ────────────────────────────────────────────────────────────
 
   function openNew() {
@@ -407,13 +416,17 @@ export default function QuotationsPage() {
 
   function openEdit(q: Quotation) {
     setEditId(q.id);
+    const lineItems: LineItemDraft[] =
+      Array.isArray(q.lineItems) && q.lineItems.length > 0
+        ? q.lineItems.map((li) => ({ description: li.description, amount: String(li.amount) }))
+        : [{ ...EMPTY_LINE_ITEM }];
     setForm({
-      clientId: q.clientId,
-      siteId: q.siteId ?? "",
+      customerName: q.customerName,
+      customerLocation: q.customerLocation ?? "",
       quotationDate: toDateInput(q.quotationDate),
       validUntil: toDateInput(q.validUntil),
-      billingPeriod: q.billingPeriod ?? "",
-      amount: String(Number(q.amount)),
+      lineItems,
+      discount: q.discount != null ? String(Number(q.discount)) : "",
       notes: q.notes ?? "",
       startingNumber: "",
     });
@@ -427,12 +440,22 @@ export default function QuotationsPage() {
     setFormError(null);
   }
 
-  function field(name: keyof FormState) {
-    return {
-      value: form[name],
-      onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
-        setForm((f) => ({ ...f, [name]: e.target.value })),
-    };
+  function setLineItem(index: number, key: keyof LineItemDraft, value: string) {
+    setForm((f) => {
+      const items = f.lineItems.map((li, i) => i === index ? { ...li, [key]: value } : li);
+      return { ...f, lineItems: items };
+    });
+  }
+
+  function addLineItem() {
+    setForm((f) => ({ ...f, lineItems: [...f.lineItems, { ...EMPTY_LINE_ITEM }] }));
+  }
+
+  function removeLineItem(index: number) {
+    setForm((f) => {
+      const items = f.lineItems.filter((_, i) => i !== index);
+      return { ...f, lineItems: items.length > 0 ? items : [{ ...EMPTY_LINE_ITEM }] };
+    });
   }
 
   // ── Submit ──────────────────────────────────────────────────────────────────
@@ -442,13 +465,23 @@ export default function QuotationsPage() {
     setFormError(null);
     setSubmitting(true);
     try {
+      const lineItems = form.lineItems
+        .filter((li) => li.description.trim() || li.amount)
+        .map((li) => ({ description: li.description.trim(), amount: parseFloat(li.amount) || 0 }));
+
+      if (lineItems.length === 0) {
+        setFormError("At least one line item with a description is required.");
+        setSubmitting(false);
+        return;
+      }
+
       const body: Record<string, unknown> = {
-        clientId: form.clientId,
-        siteId: form.siteId || null,
+        customerName: form.customerName.trim(),
+        customerLocation: form.customerLocation.trim() || null,
         quotationDate: form.quotationDate,
         validUntil: form.validUntil || null,
-        billingPeriod: form.billingPeriod.trim() || null,
-        amount: parseFloat(form.amount),
+        lineItems,
+        discount: form.discount ? parseFloat(form.discount) : null,
         notes: form.notes.trim() || null,
       };
       if (!editId && form.startingNumber.trim()) {
@@ -492,10 +525,7 @@ export default function QuotationsPage() {
     const confirmed = await requestPasswordConfirmation();
     if (!confirmed) return;
     try {
-      const res = await fetch(`${API}/quotations/${q.id}`, {
-        method: "DELETE",
-        headers,
-      });
+      const res = await fetch(`${API}/quotations/${q.id}`, { method: "DELETE", headers });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Delete failed.");
       if (selected?.id === q.id) setSelected(null);
@@ -527,36 +557,21 @@ export default function QuotationsPage() {
           </button>
         </div>
 
-        {/* Filters */}
-        <div className="flex flex-wrap gap-3">
-          {/* Status tabs */}
-          <div className="flex bg-gray-100 rounded-lg p-1 gap-0.5">
-            {STATUS_TABS.map((tab) => (
-              <button
-                key={tab.value}
-                onClick={() => { setStatusFilter(tab.value); fetchQuotations(1); }}
-                className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
-                  statusFilter === tab.value
-                    ? "bg-white text-gray-900 shadow-sm"
-                    : "text-gray-500 hover:text-gray-700"
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Client filter */}
-          <select
-            value={clientFilter}
-            onChange={(e) => { setClientFilter(e.target.value); fetchQuotations(1); }}
-            className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white"
-          >
-            <option value="">All clients</option>
-            {clients.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
+        {/* Status tabs */}
+        <div className="flex bg-gray-100 rounded-lg p-1 gap-0.5 flex-wrap">
+          {STATUS_TABS.map((tab) => (
+            <button
+              key={tab.value}
+              onClick={() => { setStatusFilter(tab.value); fetchQuotations(1); }}
+              className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                statusFilter === tab.value
+                  ? "bg-white text-gray-900 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
 
         {/* List */}
@@ -596,8 +611,10 @@ export default function QuotationsPage() {
                         </span>
                       </div>
                       <div className="flex items-center gap-3 mt-1 text-xs text-gray-500 flex-wrap">
-                        <span className="flex items-center gap-1"><Building2 size={11} /> {q.client.name}</span>
-                        {q.site && <span className="flex items-center gap-1"><MapPin size={11} /> {q.site.siteName}</span>}
+                        <span className="flex items-center gap-1"><User size={11} /> {q.customerName}</span>
+                        {q.customerLocation && (
+                          <span className="flex items-center gap-1"><MapPin size={11} /> {q.customerLocation}</span>
+                        )}
                         <span className="flex items-center gap-1"><Calendar size={11} /> {formatDate(q.quotationDate)}</span>
                       </div>
                     </div>
@@ -665,13 +682,13 @@ export default function QuotationsPage() {
           {/* Key details */}
           <div className="space-y-2 text-sm">
             <div className="flex items-start gap-2">
-              <Building2 size={14} className="mt-0.5 text-gray-400 flex-shrink-0" />
-              <span className="font-medium text-gray-900">{selected.client.name}</span>
+              <User size={14} className="mt-0.5 text-gray-400 flex-shrink-0" />
+              <span className="font-medium text-gray-900">{selected.customerName}</span>
             </div>
-            {selected.site && (
+            {selected.customerLocation && (
               <div className="flex items-start gap-2">
                 <MapPin size={14} className="mt-0.5 text-gray-400 flex-shrink-0" />
-                <span className="text-gray-700">{selected.site.siteName}</span>
+                <span className="text-gray-700">{selected.customerLocation}</span>
               </div>
             )}
             <div className="flex items-center gap-2">
@@ -684,18 +701,53 @@ export default function QuotationsPage() {
                 <span className="text-gray-700">Valid until {formatDate(selected.validUntil)}</span>
               </div>
             )}
-            {selected.billingPeriod && (
-              <div className="flex items-center gap-2">
-                <Calendar size={14} className="text-gray-400 flex-shrink-0" />
-                <span className="text-gray-700">{selected.billingPeriod}</span>
-              </div>
-            )}
+            <div className="flex items-center gap-2">
+              <FileText size={14} className="text-gray-400 flex-shrink-0" />
+              <span className="text-gray-500">Prepared by {selected.preparedBy}</span>
+            </div>
           </div>
 
-          {/* Amount */}
-          <div className="bg-gray-50 rounded-xl p-3 text-center">
-            <div className="text-xs text-gray-500 mb-1">Total Amount</div>
-            <div className="text-xl font-bold text-gray-900">{formatCurrency(selected.amount)}</div>
+          {/* Line items */}
+          {Array.isArray(selected.lineItems) && selected.lineItems.length > 0 && (
+            <div className="border border-gray-100 rounded-xl overflow-hidden text-sm">
+              <div className="bg-gray-50 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide text-gray-500">
+                Line Items
+              </div>
+              {selected.lineItems.map((li, i) => (
+                <div key={i} className="flex items-start justify-between gap-2 px-3 py-2 border-t border-gray-100 first:border-t-0">
+                  <span className="text-gray-700 min-w-0">{li.description}</span>
+                  <span className="font-mono font-semibold text-gray-900 flex-shrink-0">{formatCurrency(li.amount)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Totals */}
+          <div className="bg-gray-50 rounded-xl p-3 space-y-1.5 text-sm">
+            {(() => {
+              const lineItems: LineItem[] = Array.isArray(selected.lineItems) ? selected.lineItems : [];
+              const sub = lineItems.reduce((s, li) => s + Number(li.amount), 0);
+              const disc = Number(selected.discount ?? 0);
+              const tot = Math.max(0, sub - disc);
+              return (
+                <>
+                  <div className="flex justify-between text-gray-500">
+                    <span>Sub Total</span>
+                    <span>{formatCurrency(sub)}</span>
+                  </div>
+                  {disc > 0 && (
+                    <div className="flex justify-between text-gray-500">
+                      <span>Discount</span>
+                      <span>− {formatCurrency(disc)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between font-bold text-gray-900 border-t border-gray-200 pt-1.5">
+                    <span>Total</span>
+                    <span>{formatCurrency(tot)}</span>
+                  </div>
+                </>
+              );
+            })()}
           </div>
 
           {/* Notes */}
@@ -710,13 +762,13 @@ export default function QuotationsPage() {
           <div className="flex flex-col gap-2 pt-1">
             {/* Print */}
             <button
-              onClick={() => printQuotation(selected, user?.fullName)}
+              onClick={() => printQuotation(selected)}
               className="flex items-center gap-2 w-full justify-center px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors"
             >
               <Printer size={14} /> Print Quotation
             </button>
 
-            {/* Status transitions — only for non-terminal states */}
+            {/* Status transitions */}
             {(selected.status === "DRAFT" || selected.status === "SENT") && (
               <div className="flex gap-2">
                 {selected.status === "DRAFT" && (
@@ -778,46 +830,130 @@ export default function QuotationsPage() {
       {showForm && (
         <Modal onClose={closeForm} title={editId ? "Edit Quotation" : "New Quotation"}>
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Client */}
+            {/* Customer name */}
             <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1">Client *</label>
-              <select required {...field("clientId")} onChange={(e) => { setForm(f => ({ ...f, clientId: e.target.value, siteId: "" })); }} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
-                <option value="">Select client…</option>
-                {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Customer Name *</label>
+              <input
+                required
+                type="text"
+                placeholder="e.g. Dawn Hollinrake"
+                value={form.customerName}
+                onChange={(e) => setForm((f) => ({ ...f, customerName: e.target.value }))}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+              />
             </div>
 
-            {/* Site */}
+            {/* Customer location */}
             <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1">Site (optional)</label>
-              <select {...field("siteId")} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
-                <option value="">No specific site</option>
-                {filteredSites.map((s) => <option key={s.id} value={s.id}>{s.siteName}</option>)}
-              </select>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Location (optional)</label>
+              <input
+                type="text"
+                placeholder="e.g. Lusaka"
+                value={form.customerLocation}
+                onChange={(e) => setForm((f) => ({ ...f, customerLocation: e.target.value }))}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+              />
             </div>
 
             {/* Dates */}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1">Quotation Date *</label>
-                <input required type="date" {...field("quotationDate")} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+                <input
+                  required
+                  type="date"
+                  value={form.quotationDate}
+                  onChange={(e) => setForm((f) => ({ ...f, quotationDate: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1">Valid Until</label>
-                <input type="date" {...field("validUntil")} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+                <input
+                  type="date"
+                  value={form.validUntil}
+                  onChange={(e) => setForm((f) => ({ ...f, validUntil: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                />
               </div>
             </div>
 
-            {/* Billing period */}
+            {/* Prepared by (read-only) */}
             <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1">Billing Period</label>
-              <input type="text" placeholder="e.g. September 2026" {...field("billingPeriod")} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Prepared By</label>
+              <input
+                type="text"
+                value={user?.fullName ?? ""}
+                readOnly
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-500 cursor-not-allowed"
+              />
             </div>
 
-            {/* Amount */}
+            {/* Line items */}
             <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1">Amount (ZMW) *</label>
-              <input required type="number" min="0.01" step="0.01" placeholder="0.00" {...field("amount")} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+              <label className="block text-xs font-semibold text-gray-600 mb-2">Line Items *</label>
+              <div className="space-y-2">
+                {form.lineItems.map((li, i) => (
+                  <div key={i} className="flex gap-2 items-start">
+                    <input
+                      type="text"
+                      placeholder="Description"
+                      value={li.description}
+                      onChange={(e) => setLineItem(i, "description", e.target.value)}
+                      className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm min-w-0"
+                    />
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="Amount"
+                      value={li.amount}
+                      onChange={(e) => setLineItem(i, "amount", e.target.value)}
+                      className="w-28 border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                    />
+                    {form.lineItems.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeLineItem(i)}
+                        className="p-2 text-gray-400 hover:text-red-500 transition-colors flex-shrink-0"
+                      >
+                        <Minus size={14} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={addLineItem}
+                className="mt-2 flex items-center gap-1 text-xs text-magen-green hover:text-magen-green-dark font-semibold"
+              >
+                <Plus size={13} /> Add Line Item
+              </button>
+            </div>
+
+            {/* Totals preview */}
+            <div className="bg-gray-50 rounded-xl p-3 text-sm space-y-1">
+              <div className="flex justify-between text-gray-500">
+                <span>Sub Total</span>
+                <span>{formatCurrency(subtotal)}</span>
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-gray-500 flex-shrink-0">Discount</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={form.discount}
+                  onChange={(e) => setForm((f) => ({ ...f, discount: e.target.value }))}
+                  className="w-28 border border-gray-200 rounded-lg px-2 py-1 text-sm text-right bg-white"
+                />
+              </div>
+              <div className="flex justify-between font-bold text-gray-900 border-t border-gray-200 pt-1">
+                <span>Total</span>
+                <span>{formatCurrency(total)}</span>
+              </div>
             </div>
 
             {/* Starting number — only on new quotations */}
@@ -835,8 +971,9 @@ export default function QuotationsPage() {
                   type="number"
                   min="1"
                   step="1"
-                  placeholder={`Leave blank to continue from ${nextNumber || "last number"}`}
-                  {...field("startingNumber")}
+                  placeholder={`Leave blank to use ${nextNumber || "next in sequence"}`}
+                  value={form.startingNumber}
+                  onChange={(e) => setForm((f) => ({ ...f, startingNumber: e.target.value }))}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
                 />
                 <p className="text-[11px] text-gray-400">
@@ -848,7 +985,12 @@ export default function QuotationsPage() {
             {/* Notes */}
             <div>
               <label className="block text-xs font-semibold text-gray-600 mb-1">Notes</label>
-              <textarea rows={3} {...field("notes")} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none" />
+              <textarea
+                rows={3}
+                value={form.notes}
+                onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none"
+              />
             </div>
 
             {/* Error */}

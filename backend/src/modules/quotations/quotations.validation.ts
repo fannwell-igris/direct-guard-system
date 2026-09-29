@@ -2,36 +2,52 @@ import { ApiError } from "../../middleware/errorHandler";
 
 export type QuotationStatus = "DRAFT" | "SENT" | "ACCEPTED" | "REJECTED" | "EXPIRED";
 
+// ─── Line item ─────────────────────────────────────────────────────────────────
+
+export interface LineItem {
+  description: string;
+  amount: number;
+}
+
+// ─── Create / Update inputs ────────────────────────────────────────────────────
+
 export interface QuotationCreateInput {
-  clientId: string;
-  siteId?: string | null;
+  customerName: string;
+  customerLocation?: string | null;
   quotationDate: Date;
   validUntil?: Date | null;
-  billingPeriod?: string | null;
+  lineItems: LineItem[];
+  discount?: number | null;
+  /** Computed server-side: subtotal − discount */
   amount: number;
+  preparedBy: string;
   notes?: string | null;
-  /** If provided, uses this number; otherwise auto-generates from sequence. */
+  /** If provided, overrides the running sequence for that year. */
   startingNumber?: number | null;
 }
 
 export interface QuotationUpdateInput {
-  siteId?: string | null;
+  customerName?: string;
+  customerLocation?: string | null;
   quotationDate?: Date;
   validUntil?: Date | null;
-  billingPeriod?: string | null;
+  lineItems?: LineItem[];
+  discount?: number | null;
   amount?: number;
   notes?: string | null;
 }
 
+// ─── List query ────────────────────────────────────────────────────────────────
+
 export interface QuotationListQuery {
-  clientId?: string;
-  siteId?: string;
   status?: string;
   dateFrom?: Date;
   dateTo?: Date;
   page: number;
   pageSize: number;
 }
+
+// ─── Small parse helpers ───────────────────────────────────────────────────────
 
 function trimOrNull(v: unknown): string | null | undefined {
   if (v === undefined) return undefined;
@@ -41,10 +57,10 @@ function trimOrNull(v: unknown): string | null | undefined {
   return trimmed === "" ? null : trimmed;
 }
 
-function parseRequiredId(v: unknown, fieldName: string): string {
-  const id = typeof v === "string" ? v.trim() : "";
-  if (!id) throw ApiError.badRequest(`\`${fieldName}\` is required.`);
-  return id;
+function parseRequiredString(v: unknown, fieldName: string): string {
+  const s = typeof v === "string" ? v.trim() : "";
+  if (!s) throw ApiError.badRequest(`\`${fieldName}\` is required.`);
+  return s;
 }
 
 function parseRequiredDate(v: unknown, fieldName: string): Date {
@@ -67,35 +83,68 @@ function parseOptionalDate(v: unknown, fieldName: string): Date | null {
   return d;
 }
 
-function parseAmount(v: unknown, fieldName: string): number {
+function parseOptionalDecimal(v: unknown, fieldName: string): number | null {
+  if (v === undefined || v === null || v === "") return null;
   const n = typeof v === "number" ? v : Number(v);
-  if (v === undefined || v === null || v === "" || Number.isNaN(n)) {
-    throw ApiError.badRequest(`\`${fieldName}\` is required and must be a number.`);
-  }
-  if (n <= 0) throw ApiError.badRequest(`\`${fieldName}\` must be greater than zero.`);
+  if (Number.isNaN(n)) throw ApiError.badRequest(`\`${fieldName}\` must be a number.`);
+  if (n < 0) throw ApiError.badRequest(`\`${fieldName}\` cannot be negative.`);
   return n;
 }
 
 /**
- * Validates and normalises the body for POST /quotations.
- * `quotationNumber` is never accepted from the client — always auto-generated.
- * `startingNumber` is optional; if provided it overrides the running sequence
- * for that year (and future ones will continue from there).
+ * Validates the `lineItems` array.
+ * Each item must have a non-empty `description` and a non-negative `amount`.
+ * At least one line item is required.
  */
-export function parseQuotationCreate(body: unknown): QuotationCreateInput {
+function parseLineItems(v: unknown): LineItem[] {
+  if (!Array.isArray(v) || v.length === 0) {
+    throw ApiError.badRequest("`lineItems` must be a non-empty array.");
+  }
+  return v.map((item, i) => {
+    if (typeof item !== "object" || item === null) {
+      throw ApiError.badRequest(`lineItems[${i}] must be an object.`);
+    }
+    const obj = item as Record<string, unknown>;
+    const description = typeof obj.description === "string" ? obj.description.trim() : "";
+    if (!description) throw ApiError.badRequest(`lineItems[${i}].description is required.`);
+    const amount = typeof obj.amount === "number" ? obj.amount : Number(obj.amount);
+    if (Number.isNaN(amount) || amount < 0) {
+      throw ApiError.badRequest(`lineItems[${i}].amount must be a non-negative number.`);
+    }
+    return { description, amount };
+  });
+}
+
+// ─── Public validators ─────────────────────────────────────────────────────────
+
+/**
+ * Validates and normalises the body for POST /quotations.
+ * `preparedBy` is NOT accepted from the client body — the controller injects
+ * it from `req.user.fullName`.
+ * `quotationNumber` is always auto-generated.
+ */
+export function parseQuotationCreate(
+  body: unknown,
+  preparedBy: string
+): QuotationCreateInput {
   if (typeof body !== "object" || body === null) {
     throw ApiError.badRequest("Request body must be a JSON object.");
   }
   const b = body as Record<string, unknown>;
 
-  const clientId = parseRequiredId(b.clientId, "clientId");
-  const siteId = b.siteId !== undefined ? trimOrNull(b.siteId) : null;
+  const customerName = parseRequiredString(b.customerName, "customerName");
+  const customerLocation = trimOrNull(b.customerLocation) ?? null;
   const quotationDate = parseRequiredDate(b.quotationDate, "quotationDate");
   const validUntil = parseOptionalDate(b.validUntil, "validUntil");
   if (validUntil && validUntil.getTime() < quotationDate.getTime()) {
     throw ApiError.badRequest("`validUntil` cannot be before `quotationDate`.");
   }
-  const amount = parseAmount(b.amount, "amount");
+
+  const lineItems = parseLineItems(b.lineItems);
+  const discount = parseOptionalDecimal(b.discount, "discount");
+
+  const subtotal = lineItems.reduce((sum, li) => sum + li.amount, 0);
+  const amount = discount != null ? Math.max(0, subtotal - discount) : subtotal;
 
   let startingNumber: number | null = null;
   if (b.startingNumber !== undefined && b.startingNumber !== null && b.startingNumber !== "") {
@@ -107,12 +156,14 @@ export function parseQuotationCreate(body: unknown): QuotationCreateInput {
   }
 
   return {
-    clientId,
-    siteId: siteId ?? null,
+    customerName,
+    customerLocation,
     quotationDate,
-    validUntil: validUntil ?? null,
-    billingPeriod: trimOrNull(b.billingPeriod) ?? null,
+    validUntil,
+    lineItems,
+    discount: discount ?? null,
     amount,
+    preparedBy,
     notes: trimOrNull(b.notes) ?? null,
     startingNumber,
   };
@@ -120,8 +171,7 @@ export function parseQuotationCreate(body: unknown): QuotationCreateInput {
 
 /**
  * Validates and normalises the body for PUT /quotations/:id.
- * status is never editable here — only via POST /:id/send, /:id/accept,
- * /:id/reject, or /:id/expire.
+ * Status changes use the dedicated POST /:id/send, accept, reject, expire routes.
  */
 export function parseQuotationUpdate(body: unknown): QuotationUpdateInput {
   if (typeof body !== "object" || body === null) {
@@ -130,20 +180,37 @@ export function parseQuotationUpdate(body: unknown): QuotationUpdateInput {
   const b = body as Record<string, unknown>;
   const out: QuotationUpdateInput = {};
 
-  if (b.siteId !== undefined) out.siteId = trimOrNull(b.siteId);
+  if (b.customerName !== undefined) {
+    out.customerName = parseRequiredString(b.customerName, "customerName");
+  }
+  if (b.customerLocation !== undefined) out.customerLocation = trimOrNull(b.customerLocation);
   if (b.quotationDate !== undefined) out.quotationDate = parseRequiredDate(b.quotationDate, "quotationDate");
   if (b.validUntil !== undefined) out.validUntil = parseOptionalDate(b.validUntil, "validUntil");
-  if (b.billingPeriod !== undefined) out.billingPeriod = trimOrNull(b.billingPeriod);
-  if (b.amount !== undefined) out.amount = parseAmount(b.amount, "amount");
   if (b.notes !== undefined) out.notes = trimOrNull(b.notes);
+
+  if (b.lineItems !== undefined) {
+    out.lineItems = parseLineItems(b.lineItems);
+  }
+  if (b.discount !== undefined) out.discount = parseOptionalDecimal(b.discount, "discount");
+
+  // Recompute amount if line items or discount changed
+  if (out.lineItems !== undefined) {
+    const subtotal = out.lineItems.reduce((sum, li) => sum + li.amount, 0);
+    const disc = out.discount !== undefined ? (out.discount ?? 0) : 0;
+    out.amount = Math.max(0, subtotal - disc);
+  } else if (out.discount !== undefined) {
+    // discount changed but no new line items — amount will be recomputed in service
+    out.amount = undefined;
+  }
 
   if (out.quotationDate && out.validUntil && out.validUntil.getTime() < out.quotationDate.getTime()) {
     throw ApiError.badRequest("`validUntil` cannot be before `quotationDate`.");
   }
 
-  if (Object.keys(out).length === 0) {
+  const keys = Object.keys(out).filter((k) => out[k as keyof QuotationUpdateInput] !== undefined);
+  if (keys.length === 0) {
     throw ApiError.badRequest(
-      "Request body must include at least one field to update. To change status, use POST /:id/send, /:id/accept, /:id/reject, or /:id/expire."
+      "Request body must include at least one field to update. To change status use POST /:id/send, /:id/accept, /:id/reject, or /:id/expire."
     );
   }
   return out;
@@ -153,20 +220,6 @@ const VALID_STATUSES: QuotationStatus[] = ["DRAFT", "SENT", "ACCEPTED", "REJECTE
 
 export function parseListQuery(query: Record<string, unknown>): QuotationListQuery {
   const result: QuotationListQuery = { page: 1, pageSize: 20 };
-
-  const strFilter = (key: string): string | undefined => {
-    const v = query[key];
-    if (v === undefined) return undefined;
-    if (typeof v !== "string" || v.trim() === "") {
-      throw ApiError.badRequest(`\`${key}\` filter must be a non-empty string.`);
-    }
-    return v.trim();
-  };
-
-  const clientId = strFilter("clientId");
-  if (clientId) result.clientId = clientId;
-  const siteId = strFilter("siteId");
-  if (siteId) result.siteId = siteId;
 
   if (query.status !== undefined) {
     if (typeof query.status !== "string" || !(VALID_STATUSES as string[]).includes(query.status)) {

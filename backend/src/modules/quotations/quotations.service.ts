@@ -7,6 +7,7 @@ import {
   QuotationUpdateInput,
   QuotationListQuery,
   QuotationStatus,
+  LineItem,
 } from "./quotations.validation";
 
 /**
@@ -15,19 +16,10 @@ import {
  * If `input.startingNumber` is set, the sequence for that year is first
  * advanced to that number, then the quotation is issued at that number.
  * Subsequent quotations continue from there automatically.
- *
- * This matches the invoice-numbering approach (settings.finance.
- * quotationNumberSequences) so admins can view/override the counter in
- * Settings > Finance at any time.
  */
 export async function createQuotation(input: QuotationCreateInput) {
-  await ensureClientExists(input.clientId);
-  if (input.siteId) await ensureSiteExists(input.siteId);
-
   const year = input.quotationDate.getUTCFullYear();
 
-  // If the caller explicitly set a starting number, honour it by advancing
-  // the sequence for this year before generating the number.
   if (input.startingNumber !== null && input.startingNumber !== undefined) {
     await setQuotationNumberSequence(year, input.startingNumber);
   }
@@ -37,18 +29,16 @@ export async function createQuotation(input: QuotationCreateInput) {
   return prisma.quotation.create({
     data: {
       quotationNumber,
-      clientId: input.clientId,
-      siteId: input.siteId ?? null,
+      customerName: input.customerName,
+      customerLocation: input.customerLocation ?? null,
       quotationDate: input.quotationDate,
       validUntil: input.validUntil ?? null,
-      billingPeriod: input.billingPeriod ?? null,
+      lineItems: input.lineItems as unknown as Prisma.JsonArray,
+      discount: input.discount ?? null,
       amount: input.amount,
+      preparedBy: input.preparedBy,
       notes: input.notes ?? null,
       // status defaults to DRAFT per schema
-    },
-    include: {
-      client: { select: { id: true, name: true } },
-      site: { select: { id: true, siteName: true } },
     },
   });
 }
@@ -64,10 +54,6 @@ export async function listQuotations(query: QuotationListQuery) {
       orderBy: { quotationDate: "desc" },
       skip: (query.page - 1) * query.pageSize,
       take: query.pageSize,
-      include: {
-        client: { select: { id: true, name: true } },
-        site: { select: { id: true, siteName: true } },
-      },
     }),
   ]);
 
@@ -84,13 +70,7 @@ export async function listQuotations(query: QuotationListQuery) {
 
 /** Fetches a single quotation by id. */
 export async function getQuotationById(id: string) {
-  const quotation = await prisma.quotation.findUnique({
-    where: { id },
-    include: {
-      client: { select: { id: true, name: true, status: true } },
-      site: { select: { id: true, siteName: true, status: true } },
-    },
-  });
+  const quotation = await prisma.quotation.findUnique({ where: { id } });
   if (!quotation) throw ApiError.notFound(`Quotation ${id} not found.`);
   return quotation;
 }
@@ -99,7 +79,7 @@ export async function getQuotationById(id: string) {
 export async function updateQuotation(id: string, input: QuotationUpdateInput) {
   const existing = await prisma.quotation.findUnique({
     where: { id },
-    select: { id: true, status: true },
+    select: { id: true, status: true, lineItems: true, discount: true },
   });
   if (!existing) throw ApiError.notFound(`Quotation ${id} not found.`);
   if (existing.status !== "DRAFT") {
@@ -108,16 +88,33 @@ export async function updateQuotation(id: string, input: QuotationUpdateInput) {
     );
   }
 
-  if (input.siteId) await ensureSiteExists(input.siteId);
+  // If discount changed but lineItems weren't sent, recompute amount from existing line items
+  const data: Prisma.QuotationUpdateInput = {};
+  if (input.customerName !== undefined) data.customerName = input.customerName;
+  if (input.customerLocation !== undefined) data.customerLocation = input.customerLocation;
+  if (input.quotationDate !== undefined) data.quotationDate = input.quotationDate;
+  if (input.validUntil !== undefined) data.validUntil = input.validUntil;
+  if (input.notes !== undefined) data.notes = input.notes;
+  if (input.lineItems !== undefined) {
+    data.lineItems = input.lineItems as unknown as Prisma.JsonArray;
+  }
+  if (input.discount !== undefined) data.discount = input.discount;
 
-  return prisma.quotation.update({
-    where: { id },
-    data: input,
-    include: {
-      client: { select: { id: true, name: true } },
-      site: { select: { id: true, siteName: true } },
-    },
-  });
+  // Recompute amount when lineItems or discount changes
+  if (input.lineItems !== undefined || input.discount !== undefined) {
+    const lineItems: LineItem[] =
+      input.lineItems !== undefined
+        ? input.lineItems
+        : (existing.lineItems as unknown as LineItem[]);
+    const disc =
+      input.discount !== undefined
+        ? (input.discount ?? 0)
+        : Number(existing.discount ?? 0);
+    const subtotal = lineItems.reduce((sum, li) => sum + li.amount, 0);
+    data.amount = Math.max(0, subtotal - disc);
+  }
+
+  return prisma.quotation.update({ where: { id }, data });
 }
 
 /** Transitions DRAFT → SENT. */
@@ -133,10 +130,7 @@ export async function acceptQuotation(id: string) {
       `Quotation is ${q.status}. Only DRAFT or SENT quotations can be accepted.`
     );
   }
-  return prisma.quotation.update({
-    where: { id },
-    data: { status: "ACCEPTED" },
-  });
+  return prisma.quotation.update({ where: { id }, data: { status: "ACCEPTED" } });
 }
 
 /** Transitions DRAFT or SENT → REJECTED. */
@@ -147,10 +141,7 @@ export async function rejectQuotation(id: string) {
       `Quotation is ${q.status}. Only DRAFT or SENT quotations can be rejected.`
     );
   }
-  return prisma.quotation.update({
-    where: { id },
-    data: { status: "REJECTED" },
-  });
+  return prisma.quotation.update({ where: { id }, data: { status: "REJECTED" } });
 }
 
 /** Transitions DRAFT or SENT → EXPIRED. */
@@ -161,15 +152,11 @@ export async function expireQuotation(id: string) {
       `Quotation is ${q.status}. Only DRAFT or SENT quotations can be expired.`
     );
   }
-  return prisma.quotation.update({
-    where: { id },
-    data: { status: "EXPIRED" },
-  });
+  return prisma.quotation.update({ where: { id }, data: { status: "EXPIRED" } });
 }
 
 /**
- * Hard-deletes a quotation. Only DRAFT quotations may be deleted —
- * everything else has been sent to a client and must be kept for records.
+ * Hard-deletes a quotation. Only DRAFT quotations may be deleted.
  */
 export async function deleteQuotation(id: string) {
   const existing = await prisma.quotation.findUnique({
@@ -189,8 +176,7 @@ export async function deleteQuotation(id: string) {
 
 /**
  * Read-only peek at the number the NEXT quotation for this year would get,
- * without reserving/incrementing it — used by the New Quotation form to
- * show the auto-generated number live before the quotation is created.
+ * without reserving/incrementing it — used by the New Quotation form.
  */
 export async function peekNextQuotationNumber(quotationDate: Date): Promise<string> {
   const year = quotationDate.getUTCFullYear();
@@ -201,12 +187,10 @@ export async function peekNextQuotationNumber(quotationDate: Date): Promise<stri
   return `QUO-${year}-${String(next).padStart(4, "0")}`;
 }
 
-// ---- helpers ----
+// ── helpers ────────────────────────────────────────────────────────────────────
 
 function buildWhere(query: QuotationListQuery): Prisma.QuotationWhereInput {
   const where: Prisma.QuotationWhereInput = {};
-  if (query.clientId) where.clientId = query.clientId;
-  if (query.siteId) where.siteId = query.siteId;
   if (query.status) where.status = query.status as QuotationStatus;
   if (query.dateFrom || query.dateTo) {
     where.quotationDate = {
@@ -241,9 +225,6 @@ async function transitionStatus(
 // Quotation numbering — same pattern as Invoice numbering.
 // Counter is stored in the "finance" settings section under
 // finance.quotationNumberSequences (e.g. { "2026": 5 }).
-// Each value is the NEXT sequence number to hand out for that year.
-// A year with no entry yet starts at 1.
-// Settings > Finance lets an Admin view/override this directly.
 
 async function generateQuotationNumber(quotationDate: Date): Promise<string> {
   const year = quotationDate.getUTCFullYear();
@@ -263,14 +244,4 @@ async function setQuotationNumberSequence(year: number, nextNumber: number): Pro
   };
   const sequences = { ...(finance.quotationNumberSequences ?? {}), [String(year)]: nextNumber };
   await settingsService.updateSection("finance", { quotationNumberSequences: sequences });
-}
-
-async function ensureClientExists(clientId: string) {
-  const exists = await prisma.client.findUnique({ where: { id: clientId }, select: { id: true } });
-  if (!exists) throw ApiError.badRequest(`Client ${clientId} does not exist.`);
-}
-
-async function ensureSiteExists(siteId: string) {
-  const exists = await prisma.site.findUnique({ where: { id: siteId }, select: { id: true } });
-  if (!exists) throw ApiError.badRequest(`Site ${siteId} does not exist.`);
 }
