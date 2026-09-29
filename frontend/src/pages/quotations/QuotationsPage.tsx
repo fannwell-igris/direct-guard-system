@@ -492,7 +492,7 @@ export default function QuotationsPage() {
       const method = editId ? "PUT" : "POST";
       const res = await fetch(url, { method, headers, body: JSON.stringify(body) });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Save failed.");
+      if (!res.ok) throw new Error(json.message || json.error || "Save failed.");
 
       closeForm();
       fetchQuotations(pagination.page);
