@@ -15,6 +15,8 @@ import {
   CheckCircle2,
   XCircle,
   Trash2,
+  CalendarDays,
+  PlusCircle,
 } from "lucide-react";
 import api from "../../api/client";
 import { useToast } from "../../contexts/ToastContext";
@@ -688,6 +690,18 @@ export default function EmployeesPage() {
   const [detailEmployee, setDetailEmployee] = useState<EmployeeDetail | null>(null);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
 
+  // Leave balance state
+  interface LeaveBalance { accrued: number; used: number; balance: number; }
+  interface LeaveDeduction { id: string; days: number; deductionDate: string; reason: string | null; recordedBy: string | null; dateCreated: string; }
+  const [leaveBalance, setLeaveBalance] = useState<LeaveBalance | null>(null);
+  const [leaveDeductions, setLeaveDeductions] = useState<LeaveDeduction[]>([]);
+  const [isLoadingLeave, setIsLoadingLeave] = useState(false);
+  const [leaveError, setLeaveError] = useState<string | null>(null);
+  const [showLeavePanel, setShowLeavePanel] = useState(false);
+  const [deductForm, setDeductForm] = useState({ days: "", date: "", reason: "" });
+  const [isAddingDeduction, setIsAddingDeduction] = useState(false);
+  const [showDeductForm, setShowDeductForm] = useState(false);
+
   // Payroll profile state (ADMIN/HR/PAYROLL only)
   const [payrollProfile, setPayrollProfile] = useState<PayrollProfile | null>(null);
   const [isLoadingPayrollProfile, setIsLoadingPayrollProfile] = useState(false);
@@ -773,19 +787,77 @@ export default function EmployeesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter, clientFilter, siteFilter, sortBy, sortOrder]);
 
-  async function handleSearch() {
-    setPage(1);
-    await loadEmployees(1);
-  }
+  // Live search — fires 300 ms after the user stops typing, so the list
+  // updates as they type without hammering the API on every keystroke.
+  useEffect(() => {
+    if (!didInitRef.current) return;
+    const timer = setTimeout(() => {
+      setPage(1);
+      loadEmployees(1);
+    }, 300);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search]);
 
   function handlePageChange(newPage: number) {
     setPage(newPage);
     loadEmployees(newPage);
   }
 
+  async function loadLeave(employeeId: string) {
+    setIsLoadingLeave(true);
+    setLeaveError(null);
+    try {
+      const [balRes, dedRes] = await Promise.all([
+        api.get(`/employees/${employeeId}/leave/balance`),
+        api.get(`/employees/${employeeId}/leave/deductions`),
+      ]);
+      setLeaveBalance(balRes.data.data);
+      setLeaveDeductions(dedRes.data.data);
+    } catch (err: any) {
+      setLeaveError(err.response?.data?.message ?? "Failed to load leave data.");
+    } finally {
+      setIsLoadingLeave(false);
+    }
+  }
+
+  async function handleAddDeduction(employeeId: string) {
+    if (!deductForm.days || !deductForm.date) return;
+    setIsAddingDeduction(true);
+    setLeaveError(null);
+    try {
+      await api.post(`/employees/${employeeId}/leave/deductions`, {
+        days: Number(deductForm.days),
+        deductionDate: deductForm.date,
+        reason: deductForm.reason || null,
+        recordedBy: user?.name ?? null,
+      });
+      setDeductForm({ days: "", date: "", reason: "" });
+      setShowDeductForm(false);
+      await loadLeave(employeeId);
+    } catch (err: any) {
+      setLeaveError(err.response?.data?.message ?? "Failed to add deduction.");
+    } finally {
+      setIsAddingDeduction(false);
+    }
+  }
+
+  async function handleDeleteDeduction(deductionId: string, employeeId: string) {
+    if (!confirm("Remove this deduction? The days will be returned to the balance.")) return;
+    try {
+      await api.delete(`/employees/${employeeId}/leave/deductions/${deductionId}`);
+      await loadLeave(employeeId);
+    } catch (err: any) {
+      setLeaveError(err.response?.data?.message ?? "Failed to delete deduction.");
+    }
+  }
+
   async function loadEmployeeDetail(id: string) {
     setIsLoadingDetail(true);
     setDetailEmployee(null);
+    setShowLeavePanel(false);
+    setLeaveBalance(null);
+    setLeaveDeductions([]);
     setPayrollProfile(null);
     setIsEditingPayrollProfile(false);
     setPayrollProfileError(null);
@@ -1031,7 +1103,6 @@ export default function EmployeesPage() {
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
               placeholder="Search by name, position, phone…"
               className="input w-64"
             />
@@ -1071,9 +1142,6 @@ export default function EmployeesPage() {
               title={sortOrder === "asc" ? "Ascending — click for descending" : "Descending — click for ascending"}
             >
               {sortOrder === "asc" ? "A→Z" : "Z→A"}
-            </button>
-            <button onClick={handleSearch} className="btn-secondary">
-              Search
             </button>
           </div>
 
@@ -1614,6 +1682,146 @@ export default function EmployeesPage() {
                         ))
                       )}
                     </div>
+                  </div>
+
+                  {/* Leave Balance */}
+                  <div className="border-t border-gray-100 pt-3">
+                    <button
+                      onClick={() => {
+                        if (!showLeavePanel) {
+                          loadLeave(detailEmployee.id);
+                        }
+                        setShowLeavePanel((v) => !v);
+                      }}
+                      className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 w-full mb-2"
+                    >
+                      <CalendarDays size={14} className="text-magen-green" />
+                      Leave Balance
+                      <span className="ml-auto text-xs text-gray-400">{showLeavePanel ? "▲" : "▼"}</span>
+                    </button>
+
+                    {showLeavePanel && (
+                      <div className="space-y-3">
+                        {isLoadingLeave ? (
+                          <p className="text-xs text-gray-400 text-center py-3">Loading leave data…</p>
+                        ) : leaveError ? (
+                          <p className="text-xs text-red-600 bg-red-50 rounded-lg px-2 py-1.5 border border-red-100">
+                            {leaveError}
+                          </p>
+                        ) : leaveBalance ? (
+                          <>
+                            {/* Balance tiles */}
+                            <div className="grid grid-cols-3 gap-2 text-center">
+                              <div className="bg-blue-50 rounded-lg p-2">
+                                <p className="text-lg font-bold text-blue-700">{leaveBalance.accrued}</p>
+                                <p className="text-[10px] text-blue-500 mt-0.5">Accrued</p>
+                              </div>
+                              <div className="bg-amber-50 rounded-lg p-2">
+                                <p className="text-lg font-bold text-amber-700">{leaveBalance.used}</p>
+                                <p className="text-[10px] text-amber-500 mt-0.5">Used</p>
+                              </div>
+                              <div className={`rounded-lg p-2 ${leaveBalance.balance >= 0 ? "bg-magen-green-light" : "bg-red-50"}`}>
+                                <p className={`text-lg font-bold ${leaveBalance.balance >= 0 ? "text-magen-green-dark" : "text-red-700"}`}>
+                                  {leaveBalance.balance}
+                                </p>
+                                <p className={`text-[10px] mt-0.5 ${leaveBalance.balance >= 0 ? "text-magen-green" : "text-red-500"}`}>Balance</p>
+                              </div>
+                            </div>
+
+                            {/* Deduction history */}
+                            {leaveDeductions.length > 0 && (
+                              <div className="space-y-1">
+                                <p className="text-xs font-medium text-gray-500">Deductions</p>
+                                {leaveDeductions.map((d) => (
+                                  <div key={d.id} className="flex items-start justify-between bg-gray-50 rounded-lg px-2.5 py-1.5 border border-gray-100">
+                                    <div className="min-w-0">
+                                      <p className="text-xs font-medium text-gray-800">
+                                        {d.days} day{Number(d.days) !== 1 ? "s" : ""}
+                                        <span className="ml-1.5 text-gray-400 font-normal">
+                                          {new Date(d.deductionDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
+                                        </span>
+                                      </p>
+                                      {d.reason && <p className="text-[11px] text-gray-500 mt-0.5 truncate">{d.reason}</p>}
+                                      {d.recordedBy && <p className="text-[10px] text-gray-400">Recorded by: {d.recordedBy}</p>}
+                                    </div>
+                                    <button
+                                      onClick={() => handleDeleteDeduction(d.id, detailEmployee.id)}
+                                      className="ml-2 text-red-400 hover:text-red-600 flex-shrink-0 mt-0.5"
+                                      title="Delete deduction"
+                                    >
+                                      <Trash2 size={12} />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* Add deduction */}
+                            {showDeductForm ? (
+                              <div className="bg-gray-50 rounded-lg p-2.5 border border-gray-100 space-y-2">
+                                <p className="text-xs font-medium text-gray-700">Record leave deduction</p>
+                                <div className="grid grid-cols-2 gap-2">
+                                  <label className="text-xs text-gray-500">
+                                    Days taken
+                                    <input
+                                      type="number"
+                                      min="0.5"
+                                      step="0.5"
+                                      value={deductForm.days}
+                                      onChange={(e) => setDeductForm({ ...deductForm, days: e.target.value })}
+                                      className="input-field mt-0.5 text-sm"
+                                      placeholder="e.g. 2"
+                                    />
+                                  </label>
+                                  <label className="text-xs text-gray-500">
+                                    Date of leave
+                                    <input
+                                      type="date"
+                                      value={deductForm.date}
+                                      onChange={(e) => setDeductForm({ ...deductForm, date: e.target.value })}
+                                      className="input-field mt-0.5 text-sm"
+                                    />
+                                  </label>
+                                </div>
+                                <label className="text-xs text-gray-500">
+                                  Reason (optional)
+                                  <input
+                                    type="text"
+                                    value={deductForm.reason}
+                                    onChange={(e) => setDeductForm({ ...deductForm, reason: e.target.value })}
+                                    className="input-field mt-0.5 text-sm"
+                                    placeholder="Annual leave, sick leave…"
+                                  />
+                                </label>
+                                <div className="flex gap-2 pt-1">
+                                  <button
+                                    onClick={() => handleAddDeduction(detailEmployee.id)}
+                                    disabled={isAddingDeduction}
+                                    className="btn-primary text-xs px-3 py-1.5"
+                                  >
+                                    {isAddingDeduction ? "Saving…" : "Save"}
+                                  </button>
+                                  <button
+                                    onClick={() => { setShowDeductForm(false); setDeductForm({ days: "", date: "", reason: "" }); }}
+                                    disabled={isAddingDeduction}
+                                    className="text-xs px-3 py-1.5 text-gray-500 hover:text-gray-700"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => setShowDeductForm(true)}
+                                className="flex items-center gap-1 text-xs text-magen-green hover:text-magen-green-dark font-medium"
+                              >
+                                <PlusCircle size={13} /> Record deduction
+                              </button>
+                            )}
+                          </>
+                        ) : null}
+                      </div>
+                    )}
                   </div>
 
                   {/* Quick actions */}

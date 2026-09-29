@@ -2,10 +2,12 @@ import { Router } from "express";
 
 import * as employeesController from "./employees.controller";
 import { uploadPhoto } from "../../middleware/uploadMiddleware";
+import leaveRouter from "../leave/leave.routes";
 
 const router = Router();
 import payrollProfileRouter from "../payroll-profiles/payroll-profiles.routes";
 router.use("/:employeeId/payroll-profile", payrollProfileRouter);
+router.use("/:employeeId/leave", leaveRouter);
 
 // GET    /api/employees                   - list, with ?search=&employmentStatus=&assignedClientId=&assignedSiteId=&page=&pageSize=
 // POST   /api/employees                   - create (fullName required; assignedClientId/assignedSiteId optional, must reference existing records if given)

@@ -290,6 +290,9 @@ model Employee {
   stockMovementsIssued StockMovement[]
   takeHomeLogs         ItemTakeHomeLog[]
 
+  leaveAccruals   LeaveAccrual[]
+  leaveDeductions LeaveDeduction[]
+
   // Back-relation for the optional User.employeeId link (RBAC row-level
   // filtering). Optional 1:1 - most Employees will NOT have a User account.
   user                 User?
@@ -1807,4 +1810,47 @@ model Quotation {
   @@index([siteId])
   @@index([status])
   @@map("quotations")
+}
+
+// ---------- LEAVE MANAGEMENT ----------
+// 2 days accrue per calendar month per active employee, starting from their
+// contractStartDate (or dateAdded if no contract date). Unused days carry
+// forward indefinitely. Accrual entries (LeaveAccrual) are written lazily
+// when the leave panel is opened — any months between the last recorded
+// accrual and today are written in one batch, so no scheduled job is needed.
+// Deductions (LeaveDeduction) record when days are knocked off the balance.
+// The current balance is always: sum(LeaveAccrual.days) - sum(LeaveDeduction.days).
+
+model LeaveAccrual {
+  id         String   @id @default(uuid())
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  accrualYear  Int  // calendar year
+  accrualMonth Int  // 1-12
+
+  days        Decimal @default(2) @db.Decimal(5, 2)
+  dateCreated DateTime @default(now())
+
+  @@unique([employeeId, accrualYear, accrualMonth])
+  @@index([employeeId])
+  @@map("leave_accruals")
+}
+
+model LeaveDeduction {
+  id         String   @id @default(uuid())
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  days        Decimal  @db.Decimal(5, 2)  // days knocked off (positive number)
+  deductionDate DateTime  // the date the leave/deduction applies to
+  reason      String?   // e.g. "Annual leave", "Sick leave", "Public holiday", etc.
+  recordedBy  String?   // name or userId of whoever entered this
+
+  dateCreated DateTime @default(now())
+  lastUpdated DateTime @updatedAt
+
+  @@index([employeeId])
+  @@index([deductionDate])
+  @@map("leave_deductions")
 }
