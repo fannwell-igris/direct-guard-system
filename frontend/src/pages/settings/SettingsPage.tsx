@@ -80,12 +80,6 @@ export default function SettingsPage() {
   const [wipeError, setWipeError] = useState<string | null>(null);
   const [wipeResult, setWipeResult] = useState<{ deletedInvoices: number; deletedPayments: number } | null>(null);
 
-  // Demo reset state
-  const [demoResetConfirmText, setDemoResetConfirmText] = useState("");
-  const [demoResetting, setDemoResetting] = useState(false);
-  const [demoResetError, setDemoResetError] = useState<string | null>(null);
-  const [demoResetResult, setDemoResetResult] = useState<{ total: number } | null>(null);
-
   const currentYear = new Date().getFullYear();
 
   async function loadInvoicing() {
@@ -121,25 +115,6 @@ export default function SettingsPage() {
   }
 
   const WIPE_PHRASE = "DELETE ALL INVOICES";
-  const DEMO_RESET_PHRASE = "RESET ALL DATA";
-
-  async function handleDemoReset() {
-    if (demoResetConfirmText !== DEMO_RESET_PHRASE) return;
-    setDemoResetting(true);
-    setDemoResetError(null);
-    setDemoResetResult(null);
-    try {
-      const res = await api.delete("/demo-reset", {
-        data: { confirm: "WIPE_ALL_DATA" },
-      });
-      setDemoResetResult({ total: res.data.data.total });
-      setDemoResetConfirmText("");
-    } catch (err: any) {
-      setDemoResetError(err.response?.data?.message ?? "Failed to reset data.");
-    } finally {
-      setDemoResetting(false);
-    }
-  }
 
   async function handleWipeAll() {
     if (wipeConfirmText !== WIPE_PHRASE) return;

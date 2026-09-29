@@ -831,7 +831,7 @@ export default function EmployeesPage() {
         days: Number(deductForm.days),
         deductionDate: deductForm.date,
         reason: deductForm.reason || null,
-        recordedBy: user?.name ?? null,
+        recordedBy: user?.fullName ?? null,
       });
       setDeductForm({ days: "", date: "", reason: "" });
       setShowDeductForm(false);
