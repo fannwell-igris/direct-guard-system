@@ -61,6 +61,18 @@ function fmt(n: string | number) {
   return `K ${Number(n).toLocaleString("en-ZM", { minimumFractionDigits: 2 })}`;
 }
 
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+function monthKey(dateStr: string) {
+  const d = new Date(dateStr);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function monthLabel(key: string) {
+  const [y, m] = key.split("-");
+  return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString("en-GB", { month: "long", year: "numeric" });
+}
+
 export default function DepartmentRequestsPage() {
   const [requests, setRequests] = useState<DepartmentRequest[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -70,6 +82,25 @@ export default function DepartmentRequestsPage() {
   // Filters
   const [statusFilter, setStatusFilter] = useState("");
   const [deptFilter, setDeptFilter] = useState("");
+
+  // Request History modal
+  const [showHistory, setShowHistory] = useState(false);
+  const [history, setHistory] = useState<DepartmentRequest[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+
+  async function openHistory() {
+    setShowHistory(true);
+    if (history.length > 0) return; // already loaded
+    setIsLoadingHistory(true); setHistoryError(null);
+    try {
+      // Fetch all requests with no filters so we get the complete history
+      const res = await api.get("/department-requests", { params: { pageSize: 500 } });
+      setHistory(res.data.data);
+    } catch (err: any) {
+      setHistoryError(err.response?.data?.message ?? "Failed to load history.");
+    } finally { setIsLoadingHistory(false); }
+  }
 
   // Form
   const [editingId, setEditingId] = useState<string | "new" | null>(null);
@@ -171,6 +202,12 @@ export default function DepartmentRequestsPage() {
           {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
         </select>
         <button onClick={loadRequests} className="text-sm border border-gray-300 rounded px-3 py-2 hover:bg-gray-100">Filter</button>
+        <button
+          onClick={openHistory}
+          className="text-sm border border-gray-300 rounded px-3 py-2 hover:bg-gray-100 ml-auto"
+        >
+          Request History
+        </button>
       </div>
 
       {/* Form */}
@@ -332,6 +369,85 @@ export default function DepartmentRequestsPage() {
           </div>
         )}
       </div>
+
+      {/* ── Request History Modal ── */}
+      {showHistory && (
+        <div className="fixed inset-0 z-50 flex items-start justify-end bg-black/30 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-xl h-[90vh] flex flex-col overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
+              <div>
+                <h2 className="text-base font-semibold text-gray-900">Request History</h2>
+                <p className="text-xs text-gray-400 mt-0.5">All requests, grouped by month</p>
+              </div>
+              <button
+                onClick={() => setShowHistory(false)}
+                className="text-gray-400 hover:text-gray-600 text-lg leading-none"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-6">
+              {isLoadingHistory ? (
+                <p className="text-sm text-gray-400 text-center py-10">Loading…</p>
+              ) : historyError ? (
+                <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded px-3 py-2">{historyError}</p>
+              ) : history.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-10">No requests on record.</p>
+              ) : (() => {
+                // Group by month (dateCreated)
+                const groups: Record<string, DepartmentRequest[]> = {};
+                for (const r of history) {
+                  const k = monthKey(r.dateCreated);
+                  (groups[k] ??= []).push(r);
+                }
+                // Sort months newest first
+                const sortedKeys = Object.keys(groups).sort((a, b) => b.localeCompare(a));
+
+                return sortedKeys.map((key) => (
+                  <div key={key}>
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+                      {monthLabel(key)}
+                      <span className="ml-2 font-normal normal-case text-gray-300">
+                        {groups[key].length} request{groups[key].length !== 1 ? "s" : ""}
+                      </span>
+                    </p>
+                    <div className="space-y-2">
+                      {groups[key].map((req) => (
+                        <div
+                          key={req.id}
+                          className="flex items-start justify-between gap-3 bg-gray-50 border border-gray-100 rounded-lg px-3 py-2.5"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium text-gray-800 truncate">{req.title}</p>
+                            <p className="text-xs text-gray-400 mt-0.5">
+                              {req.department?.name ?? "—"}
+                              {req.submittedBy ? ` · ${req.submittedBy}` : ""}
+                            </p>
+                            {req.estimatedCost && (
+                              <p className="text-xs text-gray-500 mt-0.5">{fmt(req.estimatedCost)}</p>
+                            )}
+                          </div>
+                          <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${statusClass(req.status)}`}>
+                              {req.status}
+                            </span>
+                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${priorityClass(req.priority)}`}>
+                              {req.priority}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ));
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
