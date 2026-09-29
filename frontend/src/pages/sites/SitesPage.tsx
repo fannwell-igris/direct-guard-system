@@ -361,10 +361,16 @@ export default function SitesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter, clientFilter]);
 
-  async function handleSearch() {
-    setPage(1);
-    await loadSites(1);
-  }
+  // Live search — fires 300 ms after the user stops typing.
+  useEffect(() => {
+    if (!didInitRef.current) return;
+    const timer = setTimeout(() => {
+      setPage(1);
+      loadSites(1);
+    }, 300);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search]);
 
   function handlePageChange(newPage: number) {
     setPage(newPage);
@@ -507,7 +513,6 @@ export default function SitesPage() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleSearch()}
             placeholder="Search by site name or location…"
             className="input w-64"
           />
@@ -525,9 +530,6 @@ export default function SitesPage() {
               </option>
             ))}
           </select>
-          <button onClick={handleSearch} className="btn-secondary">
-            Search
-          </button>
         </div>
 
         {/* Error banner */}

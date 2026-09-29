@@ -360,10 +360,16 @@ export default function ClientsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter]);
 
-  async function handleSearch() {
-    setPage(1);
-    await loadClients(1);
-  }
+  // Live search — fires 300 ms after the user stops typing.
+  useEffect(() => {
+    if (!didInitRef.current) return;
+    const timer = setTimeout(() => {
+      setPage(1);
+      loadClients(1);
+    }, 300);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search]);
 
   function handlePageChange(newPage: number) {
     setPage(newPage);
@@ -510,13 +516,9 @@ export default function ClientsPage() {
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
               placeholder="Search by name, location, phone, email…"
               className="input w-72"
             />
-            <button onClick={handleSearch} className="btn-secondary">
-              Search
-            </button>
           </div>
 
           {/* Error banner */}

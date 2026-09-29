@@ -9,6 +9,7 @@ import {
   X,
   Phone,
   MapPin,
+  Mail,
   FileText,
   ClipboardList,
   CheckCircle2,
@@ -30,6 +31,8 @@ interface Employee {
   employeeNumber: string | null;
   position: string | null;
   phone: string | null;
+  email: string | null;
+  address: string | null;
   salary: string | null;
   contractStartDate: string | null;
   contractEndDate: string | null;
@@ -38,6 +41,9 @@ interface Employee {
   employmentStatus: "ACTIVE" | "INACTIVE" | "TERMINATED" | "ABSCONDED";
   napsaRegistered: boolean;
   nhimaRegistered: boolean;
+  nextOfKinName: string | null;
+  nextOfKinRelationship: string | null;
+  nextOfKinPhone: string | null;
   notes: string | null;
   photoFilename: string | null;
   assignedClient?: { id: string; name: string } | null;
@@ -138,6 +144,8 @@ interface EmployeeFormState {
   employeeNumber: string;
   position: string;
   phone: string;
+  email: string;
+  address: string;
   salary: string;
   contractStartDate: string;
   contractEndDate: string;
@@ -145,6 +153,9 @@ interface EmployeeFormState {
   assignedSiteId: string;
   napsaRegistered: boolean;
   nhimaRegistered: boolean;
+  nextOfKinName: string;
+  nextOfKinRelationship: string;
+  nextOfKinPhone: string;
   notes: string;
 }
 
@@ -155,6 +166,8 @@ const EMPTY_FORM: EmployeeFormState = {
   employeeNumber: "",
   position: "",
   phone: "",
+  email: "",
+  address: "",
   salary: "",
   contractStartDate: "",
   contractEndDate: "",
@@ -162,6 +175,9 @@ const EMPTY_FORM: EmployeeFormState = {
   assignedSiteId: "",
   napsaRegistered: false,
   nhimaRegistered: false,
+  nextOfKinName: "",
+  nextOfKinRelationship: "",
+  nextOfKinPhone: "",
   notes: "",
 };
 
@@ -461,6 +477,27 @@ function EmployeeModal({
                   value={form.phone}
                   onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
                   className="input"
+                  placeholder="+260 97 000 0000"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-gray-700">Email</label>
+                <input
+                  type="email"
+                  value={form.email}
+                  onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+                  className="input"
+                  placeholder="employee@example.com"
+                />
+              </div>
+
+              <div className="space-y-1 col-span-2">
+                <label className="text-sm font-medium text-gray-700">Address</label>
+                <input
+                  value={form.address}
+                  onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
+                  className="input"
+                  placeholder="Street, area, city"
                 />
               </div>
 
@@ -550,6 +587,40 @@ function EmployeeModal({
                 />
                 NHIMA Registered
               </label>
+            </div>
+
+            {/* Next of Kin */}
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Next of Kin</p>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-gray-700">Name</label>
+                  <input
+                    value={form.nextOfKinName}
+                    onChange={(e) => setForm((f) => ({ ...f, nextOfKinName: e.target.value }))}
+                    className="input"
+                    placeholder="Full name"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-gray-700">Relationship</label>
+                  <input
+                    value={form.nextOfKinRelationship}
+                    onChange={(e) => setForm((f) => ({ ...f, nextOfKinRelationship: e.target.value }))}
+                    className="input"
+                    placeholder="e.g. Spouse, Parent, Sibling"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-gray-700">Phone</label>
+                  <input
+                    value={form.nextOfKinPhone}
+                    onChange={(e) => setForm((f) => ({ ...f, nextOfKinPhone: e.target.value }))}
+                    className="input"
+                    placeholder="+260 97 000 0000"
+                  />
+                </div>
+              </div>
             </div>
 
             <div className="space-y-1">
@@ -820,6 +891,8 @@ export default function EmployeesPage() {
       employeeNumber: emp.employeeNumber ?? "",
       position: emp.position ?? "",
       phone: emp.phone ?? "",
+      email: emp.email ?? "",
+      address: emp.address ?? "",
       salary: emp.salary ?? "",
       contractStartDate: emp.contractStartDate ? emp.contractStartDate.slice(0, 10) : "",
       contractEndDate: emp.contractEndDate ? emp.contractEndDate.slice(0, 10) : "",
@@ -827,6 +900,9 @@ export default function EmployeesPage() {
       assignedSiteId: emp.assignedSiteId ?? "",
       napsaRegistered: emp.napsaRegistered,
       nhimaRegistered: emp.nhimaRegistered,
+      nextOfKinName: emp.nextOfKinName ?? "",
+      nextOfKinRelationship: emp.nextOfKinRelationship ?? "",
+      nextOfKinPhone: emp.nextOfKinPhone ?? "",
       notes: emp.notes ?? "",
     });
     setFormError(null);
@@ -850,6 +926,8 @@ export default function EmployeesPage() {
       employeeNumber: form.employeeNumber.trim() || null,
       position: form.position.trim() || null,
       phone: form.phone.trim() || null,
+      email: form.email.trim() || null,
+      address: form.address.trim() || null,
       salary: form.salary.trim() ? Number(form.salary) : null,
       contractStartDate: form.contractStartDate || null,
       contractEndDate: form.contractEndDate || null,
@@ -857,6 +935,9 @@ export default function EmployeesPage() {
       assignedSiteId: form.assignedSiteId || null,
       napsaRegistered: form.napsaRegistered,
       nhimaRegistered: form.nhimaRegistered,
+      nextOfKinName: form.nextOfKinName.trim() || null,
+      nextOfKinRelationship: form.nextOfKinRelationship.trim() || null,
+      nextOfKinPhone: form.nextOfKinPhone.trim() || null,
       notes: form.notes.trim() || null,
     };
 
@@ -1182,6 +1263,20 @@ export default function EmployeesPage() {
                         <span>{detailEmployee.phone}</span>
                       </div>
                     )}
+                    {detailEmployee.email && (
+                      <div className="flex items-center gap-2">
+                        <Mail size={13} className="text-gray-400 flex-shrink-0" />
+                        <a href={`mailto:${detailEmployee.email}`} className="text-blue-600 hover:underline truncate">
+                          {detailEmployee.email}
+                        </a>
+                      </div>
+                    )}
+                    {detailEmployee.address && (
+                      <div className="flex items-start gap-2">
+                        <MapPin size={13} className="text-gray-400 flex-shrink-0 mt-0.5" />
+                        <span className="text-xs leading-relaxed">{detailEmployee.address}</span>
+                      </div>
+                    )}
                     {detailEmployee.assignedClient && (
                       <div className="flex items-center gap-2">
                         <MapPin size={13} className="text-gray-400 flex-shrink-0" />
@@ -1237,6 +1332,22 @@ export default function EmployeesPage() {
                       </span>
                     </div>
                   </div>
+
+                  {/* Next of Kin */}
+                  {(detailEmployee.nextOfKinName || detailEmployee.nextOfKinPhone) && (
+                    <div className="border-t border-gray-100 pt-3 space-y-0.5">
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Next of Kin</p>
+                      {detailEmployee.nextOfKinName && (
+                        <p className="text-sm text-gray-700">{detailEmployee.nextOfKinName}{detailEmployee.nextOfKinRelationship ? ` (${detailEmployee.nextOfKinRelationship})` : ""}</p>
+                      )}
+                      {detailEmployee.nextOfKinPhone && (
+                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                          <Phone size={13} className="text-gray-400 flex-shrink-0" />
+                          <span>{detailEmployee.nextOfKinPhone}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* Payroll profile — bank/mobile-money details + statutory
                       ID numbers (TPIN, NAPSA/NSS, NHIMA, NRC). ADMIN/HR/PAYROLL
