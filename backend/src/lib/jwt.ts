@@ -14,6 +14,7 @@ const TOKEN_EXPIRY = "24h";
 export interface AuthTokenPayload {
   userId: string;
   email: string;
+  fullName?: string;
   role: string;
   departmentId?: string | null;
 }
