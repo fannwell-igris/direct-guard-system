@@ -163,6 +163,13 @@ enum DepartmentRequestStatus {
   REJECTED
   FULFILLED
 }
+
+enum ContractType {
+  PROBATION
+  PERMANENT
+  FIXED_TERM
+  ANNUAL
+}
 // ---------- CORE MODELS ----------
 
 model Client {
@@ -342,6 +349,7 @@ model EmployeeContract {
   extraShiftRate Decimal? @db.Decimal(12, 2) // optional override; defaults to shiftRate
 
   status        ContractStatus @default(ACTIVE)
+  contractType  ContractType?
 
   notes         String?
   dateCreated   DateTime @default(now())
@@ -1332,6 +1340,11 @@ model User {
   fieldVisits          FieldVisit[]           @relation("FieldVisitMarketer")
   marketingTargets     MarketingTarget[]      @relation("MarketingTargetMarketer")
 
+  // Messages
+  createdThreads       MessageThread[]        @relation("ThreadCreator")
+  threadParticipations MessageThreadParticipant[]
+  sentMessages         Message[]              @relation("MessageSender")
+
   @@map("users")
 }
 
@@ -1853,4 +1866,48 @@ model LeaveDeduction {
   @@index([employeeId])
   @@index([deductionDate])
   @@map("leave_deductions")
+}
+
+// ---------- MESSAGES ----------
+
+model MessageThread {
+  id          String   @id @default(uuid())
+  subject     String
+  createdById String
+  createdBy   User     @relation("ThreadCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt   DateTime @default(now())
+  lastUpdated DateTime @default(now())
+
+  participants MessageThreadParticipant[]
+  messages     Message[]
+
+  @@map("message_threads")
+}
+
+model MessageThreadParticipant {
+  id       String @id @default(uuid())
+  threadId String
+  thread   MessageThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  userId   String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  joinedAt DateTime @default(now())
+
+  @@unique([threadId, userId])
+  @@index([userId])
+  @@map("message_thread_participants")
+}
+
+model Message {
+  id       String @id @default(uuid())
+  threadId String
+  thread   MessageThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  senderId String
+  sender   User   @relation("MessageSender", fields: [senderId], references: [id], onDelete: Restrict)
+  body     String
+  readBy   String[] // array of userIds who have read this message
+  sentAt   DateTime @default(now())
+
+  @@index([threadId])
+  @@index([sentAt])
+  @@map("messages")
 }

@@ -12,7 +12,7 @@ const HR_ROLES = new Set(["ADMIN", "MANAGER", "HR", "PAYROLL"]);
 // ---- Types ----
 
 interface MainDashboard {
-  counts: { activeClients: number; activeSites: number; activeEmployees: number };
+  counts: { activeClients: number; activeSites: number; activeEmployees: number; activeGuards: number };
   revenue: { thisMonth: number; lastMonth: number; changePercent: number | null } | null;
   outstandingBalance: number | null;
   expenses: { thisMonth: number } | null;
@@ -259,10 +259,11 @@ export default function DashboardPage() {
           ) : main ? (
             <div className="space-y-6">
               {/* Stat cards — visible to all roles */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <StatCard label="Active Clients" value={main.counts.activeClients} icon={Building2} bg="bg-emerald-50" iconBg="bg-emerald-600" />
                 <StatCard label="Active Sites" value={main.counts.activeSites} icon={MapPin} bg="bg-blue-50" iconBg="bg-blue-500" />
                 <StatCard label="Active Employees" value={main.counts.activeEmployees} icon={Users} bg="bg-amber-50" iconBg="bg-amber-500" />
+                <StatCard label="Active Guards" value={main.counts.activeGuards} icon={Users} bg="bg-indigo-50" iconBg="bg-indigo-500" />
               </div>
 
               {/* Finance cards — finance roles only */}

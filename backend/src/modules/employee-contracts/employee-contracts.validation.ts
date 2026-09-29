@@ -1,4 +1,4 @@
-import { PayType } from "@prisma/client";
+import { PayType, ContractType } from "@prisma/client";
 import { ApiError } from "../../middleware/errorHandler";
 
 export interface EmployeeContractCreateInput {
@@ -9,6 +9,7 @@ export interface EmployeeContractCreateInput {
   salary?: number | null;
   shiftRate?: number | null;
   extraShiftRate?: number | null;
+  contractType?: ContractType | null;
   notes?: string | null;
 }
 
@@ -20,6 +21,7 @@ export interface EmployeeContractUpdateInput {
   salary?: number | null;
   shiftRate?: number | null;
   extraShiftRate?: number | null;
+  contractType?: ContractType | null;
   notes?: string | null;
 }
 
@@ -69,12 +71,23 @@ function parseOptionalAmount(v: unknown, fieldName: string): number | null | und
 }
 
 const VALID_PAY_TYPES = Object.values(PayType);
+const VALID_CONTRACT_TYPES = Object.values(ContractType);
 
 function parsePayType(v: unknown): PayType {
   if (typeof v !== "string" || !VALID_PAY_TYPES.includes(v as PayType)) {
     throw ApiError.badRequest(`\`payType\` must be one of: ${VALID_PAY_TYPES.join(", ")}.`);
   }
   return v as PayType;
+}
+
+function parseContractType(v: unknown): ContractType | null {
+  if (v === null || v === "") return null;
+  if (typeof v !== "string" || !VALID_CONTRACT_TYPES.includes(v as ContractType)) {
+    throw ApiError.badRequest(
+      `\`contractType\` must be one of: ${VALID_CONTRACT_TYPES.join(", ")}.`
+    );
+  }
+  return v as ContractType;
 }
 
 /**
@@ -130,6 +143,7 @@ export function parseEmployeeContractCreate(body: unknown): EmployeeContractCrea
     salary,
     shiftRate,
     extraShiftRate,
+    contractType: b.contractType !== undefined ? parseContractType(b.contractType) : null,
     notes: trimOrNull(b.notes) ?? null,
   };
 }
@@ -165,6 +179,7 @@ export function parseEmployeeContractUpdate(body: unknown): EmployeeContractUpda
   if (b.shiftRate !== undefined) out.shiftRate = parseOptionalAmount(b.shiftRate, "shiftRate") ?? null;
   if (b.extraShiftRate !== undefined)
     out.extraShiftRate = parseOptionalAmount(b.extraShiftRate, "extraShiftRate") ?? null;
+  if (b.contractType !== undefined) out.contractType = parseContractType(b.contractType);
   if (b.notes !== undefined) out.notes = trimOrNull(b.notes);
 
   if (Object.keys(out).length === 0) {

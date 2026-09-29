@@ -31,6 +31,7 @@ export async function createEmployeeContract(input: EmployeeContractCreateInput)
       salary: input.salary,
       shiftRate: input.shiftRate,
       extraShiftRate: input.extraShiftRate,
+      contractType: input.contractType ?? null,
       notes: input.notes,
       status,
     },

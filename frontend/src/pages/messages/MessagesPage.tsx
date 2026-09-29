@@ -2,30 +2,26 @@
  * MessagesPage.tsx
  *
  * Internal messaging / communication between staff users.
- *
- * NOTE (2026-09-19): The messages backend API has not yet been built.
- *   This page runs in a local-state demo mode (no HTTP calls are made).
- *   When GET/POST /api/messages is implemented, replace the demo state
- *   initializer and the `sendMessage` handler with real fetch calls and
- *   remove the DEMO_* constants.
+ * Wired to the real /api/messages backend (GET/POST threads + messages).
  *
  * Layout: two-pane — left rail = conversations list, right = thread view.
  * On narrow screens the rail is shown until a thread is opened, then the
  * thread fills the viewport (back button returns to the rail).
  */
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import type { FormEvent } from "react";
 import {
   MessageSquare, Send, Search, Plus, X, ChevronLeft,
-  Circle, CheckCheck,
+  CheckCheck, Loader2,
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { cn } from "../../lib/utils";
+import api from "../../api/client";
 
 // ─── types ───────────────────────────────────────────────────────────────────
 
-interface Message {
+interface ApiMessage {
   id: string;
   threadId: string;
   senderId: string;
@@ -35,104 +31,20 @@ interface Message {
   readBy: string[]; // list of userIds who have read it
 }
 
-interface Thread {
+interface ApiThread {
   id: string;
-  participantIds: string[];
-  participantNames: string[];
   subject: string;
-  lastMessage: string;
+  participantNames: string[];
+  lastMessage: string | null;
   lastMessageAt: string;
   unread: number;
 }
 
-// ─── demo seed data ──────────────────────────────────────────────────────────
-
-const ME_ID = "current-user";
-const ME_NAME = "You";
-
-const DEMO_THREADS: Thread[] = [
-  {
-    id: "t1",
-    participantIds: [ME_ID, "u2"],
-    participantNames: ["Benjamin Mwila"],
-    subject: "Site coverage — Levy Mall",
-    lastMessage: "Guard #3 is confirmed for tomorrow's morning shift.",
-    lastMessageAt: new Date(Date.now() - 1000 * 60 * 8).toISOString(),
-    unread: 2,
-  },
-  {
-    id: "t2",
-    participantIds: [ME_ID, "u3"],
-    participantNames: ["Grace Phiri"],
-    subject: "Invoice INV-0042 payment",
-    lastMessage: "The client confirmed payment was sent via EFT.",
-    lastMessageAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
-    unread: 0,
-  },
-  {
-    id: "t3",
-    participantIds: [ME_ID, "u4", "u5"],
-    participantNames: ["James Banda", "Sandra Tembo"],
-    subject: "Roster — weekend shift cover",
-    lastMessage: "Can someone cover the Sunday night shift at Arcades?",
-    lastMessageAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-    unread: 0,
-  },
-];
-
-const DEMO_MESSAGES: Record<string, Message[]> = {
-  t1: [
-    {
-      id: "m1", threadId: "t1", senderId: "u2", senderName: "Benjamin Mwila",
-      body: "Hi, just checking in on the Levy Mall roster for tomorrow.",
-      sentAt: new Date(Date.now() - 1000 * 60 * 30).toISOString(), readBy: [ME_ID],
-    },
-    {
-      id: "m2", threadId: "t1", senderId: ME_ID, senderName: ME_NAME,
-      body: "We have 3 guards confirmed. Checking on the 4th now.",
-      sentAt: new Date(Date.now() - 1000 * 60 * 20).toISOString(), readBy: [ME_ID, "u2"],
-    },
-    {
-      id: "m3", threadId: "t1", senderId: "u2", senderName: "Benjamin Mwila",
-      body: "Thanks. Let me know if you need a replacement.",
-      sentAt: new Date(Date.now() - 1000 * 60 * 15).toISOString(), readBy: [],
-    },
-    {
-      id: "m4", threadId: "t1", senderId: "u2", senderName: "Benjamin Mwila",
-      body: "Guard #3 is confirmed for tomorrow's morning shift.",
-      sentAt: new Date(Date.now() - 1000 * 60 * 8).toISOString(), readBy: [],
-    },
-  ],
-  t2: [
-    {
-      id: "m5", threadId: "t2", senderId: "u3", senderName: "Grace Phiri",
-      body: "Following up on invoice INV-0042 for Shoprite Longacres.",
-      sentAt: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(), readBy: [ME_ID],
-    },
-    {
-      id: "m6", threadId: "t2", senderId: ME_ID, senderName: ME_NAME,
-      body: "It was sent to the client on Monday. Awaiting confirmation.",
-      sentAt: new Date(Date.now() - 1000 * 60 * 60 * 4).toISOString(), readBy: [ME_ID, "u3"],
-    },
-    {
-      id: "m7", threadId: "t2", senderId: "u3", senderName: "Grace Phiri",
-      body: "The client confirmed payment was sent via EFT.",
-      sentAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(), readBy: [ME_ID],
-    },
-  ],
-  t3: [
-    {
-      id: "m8", threadId: "t3", senderId: "u4", senderName: "James Banda",
-      body: "Good morning team. We have a gap on the Sunday night shift at Arcades.",
-      sentAt: new Date(Date.now() - 1000 * 60 * 60 * 26).toISOString(), readBy: [ME_ID],
-    },
-    {
-      id: "m9", threadId: "t3", senderId: "u5", senderName: "Sandra Tembo",
-      body: "Can someone cover the Sunday night shift at Arcades?",
-      sentAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(), readBy: [ME_ID],
-    },
-  ],
-};
+interface ApiUser {
+  id: string;
+  fullName: string;
+  email: string;
+}
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -144,10 +56,6 @@ function timeAgo(isoStr: string): string {
   const hrs = Math.floor(mins / 60);
   if (hrs < 24) return `${hrs}h ago`;
   return new Date(isoStr).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
-}
-
-function threadParticipants(thread: Thread): string {
-  return thread.participantNames.join(", ");
 }
 
 function initials(name: string): string {
@@ -183,15 +91,26 @@ function Avatar({ name, size = "md" }: { name: string; size?: "sm" | "md" | "lg"
 
 interface NewThreadModalProps {
   onClose: () => void;
-  onCreate: (subject: string, participantName: string, body: string) => void;
+  onCreate: (subject: string, participantIds: string[], body: string) => Promise<void>;
 }
 
 function NewThreadModal({ onClose, onCreate }: NewThreadModalProps) {
   const [subject, setSubject] = useState("");
-  const [participant, setParticipant] = useState("");
   const [body, setBody] = useState("");
+  const [userSearch, setUserSearch] = useState("");
+  const [users, setUsers] = useState<ApiUser[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(true);
+  const [selectedUsers, setSelectedUsers] = useState<ApiUser[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Close on Escape
+  useEffect(() => {
+    api.get<{ data: ApiUser[] }>("/messages/users")
+      .then((res) => setUsers(res.data.data ?? []))
+      .catch(() => setUsers([]))
+      .finally(() => setLoadingUsers(false));
+  }, []);
+
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
@@ -200,10 +119,24 @@ function NewThreadModal({ onClose, onCreate }: NewThreadModalProps) {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
-  function handleSubmit(e: FormEvent) {
+  const filteredUsers = users.filter(
+    (u) =>
+      !selectedUsers.find((s) => s.id === u.id) &&
+      (u.fullName.toLowerCase().includes(userSearch.toLowerCase()) ||
+        u.email.toLowerCase().includes(userSearch.toLowerCase()))
+  );
+
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!subject.trim() || !participant.trim() || !body.trim()) return;
-    onCreate(subject.trim(), participant.trim(), body.trim());
+    if (!subject.trim() || selectedUsers.length === 0 || !body.trim()) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      await onCreate(subject.trim(), selectedUsers.map((u) => u.id), body.trim());
+    } catch (err: any) {
+      setError(err?.response?.data?.error ?? "Failed to create conversation.");
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -216,17 +149,56 @@ function NewThreadModal({ onClose, onCreate }: NewThreadModalProps) {
           </button>
         </div>
         <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
+          {error && (
+            <div className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{error}</div>
+          )}
+
+          {/* Recipient picker */}
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">To</label>
+            {selectedUsers.length > 0 && (
+              <div className="flex flex-wrap gap-1 mb-2">
+                {selectedUsers.map((u) => (
+                  <span key={u.id} className="inline-flex items-center gap-1 text-xs bg-magen-green-light text-magen-navy px-2 py-0.5 rounded-full">
+                    {u.fullName}
+                    <button type="button" onClick={() => setSelectedUsers((p) => p.filter((s) => s.id !== u.id))}>
+                      <X size={10} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
             <input
               type="text"
-              placeholder="Recipient name or username"
-              value={participant}
-              onChange={(e) => setParticipant(e.target.value)}
+              placeholder={loadingUsers ? "Loading users…" : "Search by name or email…"}
+              value={userSearch}
+              onChange={(e) => setUserSearch(e.target.value)}
               className="input"
-              required
+              disabled={loadingUsers}
             />
+            {userSearch.trim() && filteredUsers.length > 0 && (
+              <div className="border border-gray-200 rounded-lg mt-1 max-h-36 overflow-y-auto shadow-sm">
+                {filteredUsers.slice(0, 8).map((u) => (
+                  <button
+                    key={u.id}
+                    type="button"
+                    onClick={() => { setSelectedUsers((p) => [...p, u]); setUserSearch(""); }}
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2"
+                  >
+                    <Avatar name={u.fullName} size="sm" />
+                    <div>
+                      <div className="text-gray-800 font-medium">{u.fullName}</div>
+                      <div className="text-xs text-gray-400">{u.email}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+            {userSearch.trim() && filteredUsers.length === 0 && !loadingUsers && (
+              <p className="text-xs text-gray-400 mt-1">No users found.</p>
+            )}
           </div>
+
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">Subject</label>
             <input
@@ -251,8 +223,13 @@ function NewThreadModal({ onClose, onCreate }: NewThreadModalProps) {
           </div>
           <div className="flex justify-end gap-2 pt-1">
             <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
-            <button type="submit" className="btn-primary">
-              <Send size={14} /> Send Message
+            <button
+              type="submit"
+              disabled={submitting || selectedUsers.length === 0 || !subject.trim() || !body.trim()}
+              className="btn-primary"
+            >
+              {submitting ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+              Send Message
             </button>
           </div>
         </form>
@@ -266,13 +243,15 @@ function NewThreadModal({ onClose, onCreate }: NewThreadModalProps) {
 export default function MessagesPage() {
   const { user } = useAuth();
 
-  const [threads, setThreads] = useState<Thread[]>(DEMO_THREADS);
-  const [messages, setMessages] = useState<Record<string, Message[]>>(DEMO_MESSAGES);
+  const [threads, setThreads] = useState<ApiThread[]>([]);
+  const [messages, setMessages] = useState<Record<string, ApiMessage[]>>({});
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [draftBody, setDraftBody] = useState("");
   const [showNewThread, setShowNewThread] = useState(false);
   const [sending, setSending] = useState(false);
+  const [loadingThreads, setLoadingThreads] = useState(true);
+  const [loadingMessages, setLoadingMessages] = useState(false);
 
   // Mobile: show thread list or thread view
   const [mobileView, setMobileView] = useState<"list" | "thread">("list");
@@ -287,72 +266,84 @@ export default function MessagesPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [threadMessages.length]);
 
-  // Mark thread as read when opened
-  function openThread(threadId: string) {
+  // Load thread list on mount
+  const loadThreads = useCallback(async () => {
+    try {
+      const res = await api.get<{ data: ApiThread[] }>("/messages/threads");
+      setThreads(res.data.data ?? []);
+    } catch {
+      // silent — will show empty state
+    } finally {
+      setLoadingThreads(false);
+    }
+  }, []);
+
+  useEffect(() => { loadThreads(); }, [loadThreads]);
+
+  // Load messages when a thread is opened
+  async function openThread(threadId: string) {
     setSelectedThreadId(threadId);
     setMobileView("thread");
     setDraftBody("");
-    setThreads((prev) =>
-      prev.map((t) => (t.id === threadId ? { ...t, unread: 0 } : t))
-    );
+
+    // Mark as read locally immediately
+    setThreads((prev) => prev.map((t) => (t.id === threadId ? { ...t, unread: 0 } : t)));
+
+    // Only fetch if we don't already have messages for this thread
+    if (!messages[threadId]) {
+      setLoadingMessages(true);
+      try {
+        const res = await api.get<{ data: ApiMessage[] }>(`/messages/threads/${threadId}/messages`);
+        setMessages((prev) => ({ ...prev, [threadId]: res.data.data ?? [] }));
+      } catch {
+        setMessages((prev) => ({ ...prev, [threadId]: [] }));
+      } finally {
+        setLoadingMessages(false);
+      }
+    }
   }
 
-  function sendMessage(e: FormEvent) {
+  async function sendMessage(e: FormEvent) {
     e.preventDefault();
-    if (!draftBody.trim() || !selectedThreadId) return;
+    if (!draftBody.trim() || !selectedThreadId || sending) return;
     setSending(true);
 
-    const newMsg: Message = {
-      id: `m-${Date.now()}`,
-      threadId: selectedThreadId,
-      senderId: ME_ID,
-      senderName: user?.email ?? ME_NAME,
-      body: draftBody.trim(),
-      sentAt: new Date().toISOString(),
-      readBy: [ME_ID],
-    };
-
-    setMessages((prev) => ({
-      ...prev,
-      [selectedThreadId]: [...(prev[selectedThreadId] ?? []), newMsg],
-    }));
-
-    setThreads((prev) =>
-      prev.map((t) =>
-        t.id === selectedThreadId
-          ? { ...t, lastMessage: newMsg.body, lastMessageAt: newMsg.sentAt }
-          : t
-      )
-    );
-
+    const body = draftBody.trim();
     setDraftBody("");
-    setSending(false);
+
+    try {
+      const res = await api.post<{ data: ApiMessage }>(`/messages/threads/${selectedThreadId}/messages`, { body });
+      const newMsg = res.data.data;
+      setMessages((prev) => ({
+        ...prev,
+        [selectedThreadId]: [...(prev[selectedThreadId] ?? []), newMsg],
+      }));
+      setThreads((prev) =>
+        prev.map((t) =>
+          t.id === selectedThreadId
+            ? { ...t, lastMessage: newMsg.body, lastMessageAt: newMsg.sentAt }
+            : t
+        )
+      );
+    } catch {
+      // Restore draft if send failed
+      setDraftBody(body);
+    } finally {
+      setSending(false);
+    }
   }
 
-  function createThread(subject: string, participantName: string, body: string) {
-    const newThreadId = `t-${Date.now()}`;
-    const newThread: Thread = {
-      id: newThreadId,
-      participantIds: [ME_ID, `u-${Date.now()}`],
-      participantNames: [participantName],
+  async function createThread(subject: string, participantIds: string[], body: string) {
+    const res = await api.post<{ data: { thread: ApiThread; message: ApiMessage } }>("/messages/threads", {
       subject,
-      lastMessage: body,
-      lastMessageAt: new Date().toISOString(),
-      unread: 0,
-    };
-    const newMsg: Message = {
-      id: `m-${Date.now()}`,
-      threadId: newThreadId,
-      senderId: ME_ID,
-      senderName: user?.email ?? ME_NAME,
+      participantIds,
       body,
-      sentAt: new Date().toISOString(),
-      readBy: [ME_ID],
-    };
-    setThreads((prev) => [newThread, ...prev]);
-    setMessages((prev) => ({ ...prev, [newThreadId]: [newMsg] }));
+    });
+    const { thread, message } = res.data.data;
+    setThreads((prev) => [thread, ...prev]);
+    setMessages((prev) => ({ ...prev, [thread.id]: [message] }));
     setShowNewThread(false);
-    openThread(newThreadId);
+    openThread(thread.id);
   }
 
   const filteredThreads = search.trim()
@@ -376,7 +367,6 @@ export default function MessagesPage() {
         <div
           className={cn(
             "flex flex-col w-72 flex-shrink-0 border-r border-gray-100",
-            // Mobile: hide rail when viewing a thread
             mobileView === "thread" ? "hidden md:flex" : "flex"
           )}
         >
@@ -415,10 +405,19 @@ export default function MessagesPage() {
 
           {/* Thread list */}
           <div className="flex-1 overflow-y-auto">
-            {filteredThreads.length === 0 ? (
+            {loadingThreads ? (
+              <div className="flex items-center justify-center py-16">
+                <Loader2 size={20} className="animate-spin text-gray-300" />
+              </div>
+            ) : filteredThreads.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 px-4 text-center text-gray-400">
                 <MessageSquare size={28} className="mb-2 opacity-30" />
-                <p className="text-sm">No conversations found</p>
+                <p className="text-sm">{search.trim() ? "No conversations found" : "No messages yet"}</p>
+                {!search.trim() && (
+                  <button onClick={() => setShowNewThread(true)} className="text-xs text-magen-green mt-2 hover:underline">
+                    Start a conversation
+                  </button>
+                )}
               </div>
             ) : (
               filteredThreads.map((thread) => {
@@ -437,7 +436,7 @@ export default function MessagesPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-baseline justify-between gap-1 mb-0.5">
                         <span className={cn("text-sm truncate", thread.unread > 0 ? "font-semibold text-gray-900" : "font-medium text-gray-700")}>
-                          {threadParticipants(thread)}
+                          {thread.participantNames.join(", ")}
                         </span>
                         <span className="text-xs text-gray-400 whitespace-nowrap flex-shrink-0">
                           {timeAgo(thread.lastMessageAt)}
@@ -447,7 +446,7 @@ export default function MessagesPage() {
                         {thread.subject}
                       </p>
                       <div className="flex items-center justify-between mt-0.5">
-                        <p className="text-xs text-gray-400 truncate">{thread.lastMessage}</p>
+                        <p className="text-xs text-gray-400 truncate">{thread.lastMessage ?? ""}</p>
                         {thread.unread > 0 && (
                           <span className="ml-2 inline-flex items-center justify-center w-4 h-4 rounded-full bg-magen-green text-white text-xs font-bold flex-shrink-0">
                             {thread.unread}
@@ -473,7 +472,6 @@ export default function MessagesPage() {
             <>
               {/* Thread header */}
               <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100">
-                {/* Mobile back button */}
                 <button
                   onClick={() => { setMobileView("list"); setSelectedThreadId(null); }}
                   className="md:hidden p-1 rounded text-gray-500 hover:bg-gray-100"
@@ -483,50 +481,56 @@ export default function MessagesPage() {
                 <Avatar name={selectedThread.participantNames[0] ?? "?"} size="lg" />
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-gray-900 text-sm truncate">
-                    {threadParticipants(selectedThread)}
+                    {selectedThread.participantNames.join(", ")}
                   </p>
                   <p className="text-xs text-gray-500 truncate">{selectedThread.subject}</p>
-                </div>
-                <div className="flex items-center gap-1 text-xs text-gray-400">
-                  <Circle size={6} className="fill-green-500 text-green-500" />
-                  Online
                 </div>
               </div>
 
               {/* Messages list */}
               <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-                {threadMessages.map((msg) => {
-                  const isMe = msg.senderId === ME_ID;
-                  return (
-                    <div key={msg.id} className={cn("flex items-end gap-2", isMe ? "flex-row-reverse" : "flex-row")}>
-                      {!isMe && <Avatar name={msg.senderName} size="sm" />}
-                      <div className={cn("max-w-[70%]")}>
-                        {!isMe && (
-                          <p className="text-xs text-gray-500 mb-1 ml-1">{msg.senderName}</p>
-                        )}
-                        <div
-                          className={cn(
-                            "px-3 py-2 rounded-2xl text-sm leading-relaxed",
-                            isMe
-                              ? "bg-magen-navy text-white rounded-br-sm"
-                              : "bg-gray-100 text-gray-800 rounded-bl-sm"
+                {loadingMessages ? (
+                  <div className="flex items-center justify-center py-16">
+                    <Loader2 size={20} className="animate-spin text-gray-300" />
+                  </div>
+                ) : threadMessages.length === 0 ? (
+                  <div className="flex items-center justify-center py-12 text-gray-300 text-sm">
+                    No messages yet. Say something!
+                  </div>
+                ) : (
+                  threadMessages.map((msg) => {
+                    const isMe = msg.senderId === user?.id;
+                    return (
+                      <div key={msg.id} className={cn("flex items-end gap-2", isMe ? "flex-row-reverse" : "flex-row")}>
+                        {!isMe && <Avatar name={msg.senderName} size="sm" />}
+                        <div className="max-w-[70%]">
+                          {!isMe && (
+                            <p className="text-xs text-gray-500 mb-1 ml-1">{msg.senderName}</p>
                           )}
-                        >
-                          {msg.body}
-                        </div>
-                        <div className={cn("flex items-center gap-1 mt-1", isMe ? "justify-end" : "justify-start")}>
-                          <span className="text-xs text-gray-400">{timeAgo(msg.sentAt)}</span>
-                          {isMe && (
-                            <CheckCheck
-                              size={12}
-                              className={msg.readBy.length > 1 ? "text-magen-green" : "text-gray-300"}
-                            />
-                          )}
+                          <div
+                            className={cn(
+                              "px-3 py-2 rounded-2xl text-sm leading-relaxed",
+                              isMe
+                                ? "bg-magen-navy text-white rounded-br-sm"
+                                : "bg-gray-100 text-gray-800 rounded-bl-sm"
+                            )}
+                          >
+                            {msg.body}
+                          </div>
+                          <div className={cn("flex items-center gap-1 mt-1", isMe ? "justify-end" : "justify-start")}>
+                            <span className="text-xs text-gray-400">{timeAgo(msg.sentAt)}</span>
+                            {isMe && (
+                              <CheckCheck
+                                size={12}
+                                className={msg.readBy.length > 1 ? "text-magen-green" : "text-gray-300"}
+                              />
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })
+                )}
                 <div ref={messagesEndRef} />
               </div>
 
@@ -552,7 +556,7 @@ export default function MessagesPage() {
                     disabled={!draftBody.trim() || sending}
                     className="btn-primary py-2.5 px-3"
                   >
-                    <Send size={15} />
+                    {sending ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
                   </button>
                 </form>
                 <p className="text-xs text-gray-400 mt-1">Press Enter to send, Shift+Enter for new line</p>
@@ -575,9 +579,6 @@ export default function MessagesPage() {
                 <Plus size={15} />
                 New Conversation
               </button>
-              <p className="text-xs text-gray-300 mt-6">
-                Messages API coming soon — currently showing demo data.
-              </p>
             </div>
           )}
         </div>

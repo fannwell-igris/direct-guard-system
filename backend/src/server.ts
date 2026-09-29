@@ -47,6 +47,7 @@ import salaryAdvancesRoutes from "./modules/salary-advances/salary-advances.rout
 import { requireAuth } from "./middleware/requireAuth";
 import { checkPermissions } from "./middleware/permissions";
 import { requireDeleteConfirmation } from "./middleware/requireDeleteConfirmation";
+import messagesRoutes from "./modules/messages/messages.routes";
 
 dotenv.config();
 
@@ -193,6 +194,9 @@ app.use("/api/payments", paymentsRoutes);
 app.use("/api/quotations", quotationsRoutes);
 
 app.use("/api/salary-advances", salaryAdvancesRoutes);
+
+// Messages — internal messaging between staff users.
+app.use("/api/messages", messagesRoutes);
 
 // Push notification device-token registration — see push-tokens.routes.ts.
 app.use("/api/push-tokens", pushTokensRoutes);

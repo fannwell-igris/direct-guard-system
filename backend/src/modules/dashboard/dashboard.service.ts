@@ -51,10 +51,19 @@ export async function getMainDashboard(role: string) {
   const canSeeFinance = FINANCE_ROLES.has(role);
 
   // --- Counts (all roles) ---
-  const [activeClients, activeSites, activeEmployees] = await Promise.all([
+  const [activeClients, activeSites, activeEmployees, activeGuards] = await Promise.all([
     prisma.client.count({ where: { status: "ACTIVE" } }),
     prisma.site.count({ where: { status: "ACTIVE" } }),
     prisma.employee.count({ where: { employmentStatus: "ACTIVE" } }),
+    prisma.employee.count({
+      where: {
+        employmentStatus: "ACTIVE",
+        OR: [
+          { position: { contains: "guard", mode: "insensitive" } },
+          { position: { contains: "officer", mode: "insensitive" } },
+        ],
+      },
+    }),
   ]);
 
   // --- Alert counts (all roles — operational awareness, no financial detail) ---
@@ -78,7 +87,7 @@ export async function getMainDashboard(role: string) {
   if (!canSeeFinance) {
     // Non-finance roles get counts + non-financial alerts only
     return {
-      counts: { activeClients, activeSites, activeEmployees },
+      counts: { activeClients, activeSites, activeEmployees, activeGuards },
       revenue: null,
       outstandingBalance: null,
       expenses: null,
@@ -200,7 +209,7 @@ export async function getMainDashboard(role: string) {
   }
 
   return {
-    counts: { activeClients, activeSites, activeEmployees },
+    counts: { activeClients, activeSites, activeEmployees, activeGuards },
     revenue: {
       thisMonth: revenueThisMonth,
       lastMonth: revenueLastMonth,

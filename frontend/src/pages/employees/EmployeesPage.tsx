@@ -62,6 +62,7 @@ interface EmployeeContract {
   payType: string;
   salary: number | null;
   shiftRate: number | null;
+  contractType: string | null;
 }
 
 interface EmployeeDetail extends Employee {
@@ -1678,6 +1679,22 @@ export default function EmployeesPage() {
                                 ? `Shift rate: ${formatCurrency(contract.shiftRate)}`
                                 : `Salary: ${formatCurrency(contract.salary)}`}
                             </p>
+                            {contract.contractType && (
+                              <span className={
+                                "inline-block mt-1 text-xs font-medium px-2 py-0.5 rounded-full " +
+                                (contract.contractType === "PROBATION"
+                                  ? "bg-yellow-50 text-yellow-700"
+                                  : contract.contractType === "PERMANENT"
+                                  ? "bg-green-50 text-green-700"
+                                  : contract.contractType === "FIXED_TERM"
+                                  ? "bg-blue-50 text-blue-700"
+                                  : "bg-purple-50 text-purple-700") // ANNUAL
+                              }>
+                                {contract.contractType === "FIXED_TERM"
+                                  ? "Fixed Term"
+                                  : contract.contractType.charAt(0) + contract.contractType.slice(1).toLowerCase()}
+                              </span>
+                            )}
                           </div>
                         ))
                       )}
