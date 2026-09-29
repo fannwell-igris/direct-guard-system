@@ -38,6 +38,7 @@ import statutoryRulesRoutes from "./modules/statutory-rules/statutory-rules.rout
 import operationalCostsRoutes from "./modules/operational-costs/operational-costs.routes";
 import invoicesRoutes from "./modules/invoices/invoices.routes";
 import paymentsRoutes from "./modules/payments/payments.routes";
+import quotationsRoutes from "./modules/quotations/quotations.routes";
 import { errorHandler } from "./middleware/errorHandler";
 import inventoryRouter from "./modules/inventory/inventory.routes";
 import authRoutes from "./modules/auth/auth.routes";
@@ -183,6 +184,14 @@ app.use("/api/invoices", invoicesRoutes);
 // instead. Unlike most models here, Payment supports real deletion (a
 // genuine correction) — see payments.service.ts.
 app.use("/api/payments", paymentsRoutes);
+
+// Quotations — QUO-<year>-<0000> auto-generated; sequence stored in
+// finance.quotationNumberSequences (same pattern as invoice numbering).
+// Status: DRAFT → SENT → ACCEPTED / REJECTED / EXPIRED.
+// startingNumber on POST lets the first quotation start at a chosen number;
+// future ones continue from there automatically.
+app.use("/api/quotations", quotationsRoutes);
+
 app.use("/api/salary-advances", salaryAdvancesRoutes);
 
 // Push notification device-token registration — see push-tokens.routes.ts.

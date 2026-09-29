@@ -37,6 +37,7 @@ import TargetsPage from "./pages/marketing/TargetsPage";
 import MarketingExpensesPage from "./pages/marketing/MarketingExpensesPage";
 import ReportsPage from "./pages/marketing/ReportsPage";
 import ManagementPage from "./pages/marketing/ManagementPage";
+import QuotationsPage from "./pages/quotations/QuotationsPage";
 import PasswordConfirmModal from "./components/PasswordConfirmModal";
 
 // NOTE (2026-09-13, MB.2): this file previously still had the default
@@ -62,6 +63,7 @@ function App() {
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/invoices" element={<InvoicesPage />} />
+            <Route path="/quotations" element={<QuotationsPage />} />
             <Route path="/payroll" element={<PayrollPage />} />
             <Route path="/clients" element={<ClientsPage />} />
             <Route path="/sites" element={<SitesPage />} />

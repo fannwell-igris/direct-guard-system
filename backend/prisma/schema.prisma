@@ -188,6 +188,7 @@ model Client {
   operationsRecords OperationsRecord[]
   marketingActivities MarketingActivity[]
   fieldVisits         FieldVisit[]
+  quotations          Quotation[]
 
   @@map("clients")
 }
@@ -215,6 +216,7 @@ model Site {
   rosterEntries     RosterEntry[]
   operationsRecords OperationsRecord[]
   fieldReceiptEntries FieldReceiptEntry[]
+  quotations          Quotation[]
 
   @@map("sites")
 }
@@ -259,6 +261,15 @@ model Employee {
   // not contract-level — registration status doesn't change per contract.
   napsaRegistered   Boolean  @default(false)
   nhimaRegistered   Boolean  @default(false)
+
+  // Personal contact details — added 2026-09-28
+  email             String?
+  address           String?
+
+  // Next of kin — emergency contact details
+  nextOfKinName         String?
+  nextOfKinRelationship String?
+  nextOfKinPhone        String?
 
   notes             String?
   dateAdded         DateTime @default(now())
@@ -1754,4 +1765,46 @@ model MarketingTarget {
   @@index([marketerId])
   @@index([periodYear, periodMonth])
   @@map("marketing_targets")
+}
+enum QuotationStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  REJECTED
+  EXPIRED
+}
+
+// Quotations — formal price proposals sent to prospective or existing
+// clients before an invoice is raised. quotationNumber is always
+// auto-generated server-side (QUO-<year>-<0000>); the counter is stored
+// in the "finance" settings section under quotationNumberSequences so an
+// Admin can view or override it (e.g. to continue a manual sequence).
+// Status workflow: DRAFT → SENT → ACCEPTED / REJECTED / EXPIRED.
+// Only DRAFT quotations may be edited or deleted.
+model Quotation {
+  id               String          @id @default(uuid())
+  quotationNumber  String          @unique
+
+  clientId  String
+  client    Client  @relation(fields: [clientId], references: [id], onDelete: Restrict)
+
+  siteId  String?
+  site    Site?   @relation(fields: [siteId], references: [id], onDelete: SetNull)
+
+  quotationDate  DateTime
+  validUntil     DateTime?
+  billingPeriod  String?
+
+  amount  Decimal  @db.Decimal(12, 2)
+
+  status  QuotationStatus  @default(DRAFT)
+  notes   String?
+
+  dateCreated  DateTime  @default(now())
+  lastUpdated  DateTime  @updatedAt
+
+  @@index([clientId])
+  @@index([siteId])
+  @@index([status])
+  @@map("quotations")
 }

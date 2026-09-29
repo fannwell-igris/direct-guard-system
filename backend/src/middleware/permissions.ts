@@ -182,6 +182,10 @@ const REGISTRY: RouteRule[] = [
   // through requireDeleteConfirmation's password re-check on top of this.
   { prefix: "/api/invoices", methods: { GET: ADMIN_MANAGER_PAYROLL, POST: ADMIN_PAYROLL, PUT: ADMIN_PAYROLL, PATCH: ADMIN_PAYROLL, DELETE: ADMIN } },
   { prefix: "/api/payments", methods: { GET: ADMIN_MANAGER_PAYROLL, POST: ADMIN_PAYROLL, PUT: ADMIN_PAYROLL, PATCH: ADMIN_PAYROLL, DELETE: ADMIN } },
+  // Quotations — same Finance cluster rules as Invoices: Admin+Payroll can
+  // create/edit; Manager gets read access for visibility; delete is ADMIN
+  // only (DRAFT quotations only) + requireDeleteConfirmation password check.
+  { prefix: "/api/quotations", methods: { GET: ADMIN_MANAGER_PAYROLL, POST: ADMIN_PAYROLL, PUT: ADMIN_PAYROLL, PATCH: ADMIN_PAYROLL, DELETE: ADMIN } },
   { prefix: "/api/operational-costs", methods: { GET: ADMIN_MANAGER_PAYROLL, POST: ADMIN_PAYROLL, PUT: ADMIN_PAYROLL, PATCH: ADMIN_PAYROLL, DELETE: ADMIN } },
   // MARKETING added to GET only (2026-09-24, Marketing module Phase 6
   // "Marketing Expenses") — per the brief this reuses General Expenses
