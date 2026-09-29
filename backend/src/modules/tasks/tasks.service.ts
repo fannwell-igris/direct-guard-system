@@ -6,7 +6,7 @@ import { TaskCreateInput, TaskUpdateInput, TaskListQuery } from "./tasks.validat
 const NON_TERMINAL_STATUSES: TaskStatus[] = ["OPEN", "IN_PROGRESS", "ON_HOLD"];
 
 /** Roles that can see all tasks across every department. */
-const ADMIN_ROLES = ["ADMIN", "SUPERADMIN"];
+const ADMIN_ROLES = ["ADMIN", "SUPERADMIN", "MANAGER", "FINANCE"];
 
 /**
  * OVERDUE is never stored - it's a calculated DISPLAY status, same
