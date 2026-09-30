@@ -1638,7 +1638,8 @@ export default function EmployeesPage() {
                     </div>
                   )}
 
-                  {/* Contracts */}
+                  {/* Contracts — hidden from Operations and other non-finance roles */}
+                  {canSeePayrollProfile && (
                   <div className="border-t border-gray-100 pt-3">
                     <div className="flex items-center gap-2 mb-2">
                       <ClipboardList size={14} className="text-gray-400" />
@@ -1674,13 +1675,11 @@ export default function EmployeesPage() {
                               {formatDate(contract.startDate)}
                               {contract.endDate ? ` → ${formatDate(contract.endDate)}` : " · Ongoing"}
                             </p>
-                            {canSeePayrollProfile && (
                             <p className="text-xs text-gray-600 mt-0.5">
                               {contract.payType === "SHIFT"
                                 ? `Shift rate: ${formatCurrency(contract.shiftRate)}`
                                 : `Salary: ${formatCurrency(contract.salary)}`}
                             </p>
-                            )}
                             {contract.contractType && (
                               <span className={
                                 "inline-block mt-1 text-xs font-medium px-2 py-0.5 rounded-full " +
@@ -1702,6 +1701,7 @@ export default function EmployeesPage() {
                       )}
                     </div>
                   </div>
+                  )} {/* end canSeePayrollProfile contracts */}
 
                   {/* Leave Balance */}
                   <div className="border-t border-gray-100 pt-3">

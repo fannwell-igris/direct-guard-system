@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from "react";
 import type { FormEvent } from "react";
 import { Pencil, FileText, X } from "lucide-react";
 import api from "../../api/client";
+import { useAuth } from "../../context/AuthContext";
 
 type ContractStatus = "ACTIVE" | "EXPIRING_SOON" | "EXPIRED" | "INACTIVE";
 type BillingFrequency = "MONTHLY" | "QUARTERLY" | "ANNUALLY" | "ONE_OFF";
@@ -72,6 +73,8 @@ function formatDate(iso: string): string {
 }
 
 export default function ContractsPage() {
+  const { user } = useAuth();
+  const canSeeFinancials = user?.role === "ADMIN" || user?.role === "HR" || user?.role === "PAYROLL";
   const [tab, setTab] = useState<"client" | "employee">("client");
 
   return (
@@ -452,7 +455,9 @@ function ClientContractsTab() {
                   </p>
                 </div>
 
-                <p className="text-sm text-gray-900 flex-shrink-0">K{Number(c.amount).toLocaleString()}</p>
+                {canSeeFinancials && (
+                  <p className="text-sm text-gray-900 flex-shrink-0">K{Number(c.amount).toLocaleString()}</p>
+                )}
 
                 <StatusBadge status={c.status} />
 

@@ -15,6 +15,7 @@ import {
   Building2,
 } from "lucide-react";
 import api from "../../api/client";
+import { useAuth } from "../../context/AuthContext";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -268,6 +269,8 @@ function SiteModal({
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function SitesPage() {
+  const { user } = useAuth();
+  const canSeeFinancials = user?.role === "ADMIN" || user?.role === "HR" || user?.role === "PAYROLL";
   const [sites, setSites] = useState<Site[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [pagination, setPagination] = useState<Pagination>({
@@ -791,7 +794,7 @@ export default function SitesPage() {
                             {formatDate(contract.startDate)}
                             {contract.endDate ? ` → ${formatDate(contract.endDate)}` : " · Ongoing"}
                           </p>
-                          {contract.monthlyValue != null && (
+                          {contract.monthlyValue != null && canSeeFinancials && (
                             <p className="text-xs text-gray-600 mt-0.5">
                               {formatCurrency(contract.monthlyValue)} / month
                             </p>
