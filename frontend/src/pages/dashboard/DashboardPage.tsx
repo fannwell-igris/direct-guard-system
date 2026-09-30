@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Users, Building2, MapPin, TrendingUp, TrendingDown,
-  AlertTriangle, CheckCircle, Clock, DollarSign,
+  AlertTriangle, CheckCircle, Clock,
   ArrowRight, Briefcase, Shield,
 } from "lucide-react";
 import api from "../../api/client";
