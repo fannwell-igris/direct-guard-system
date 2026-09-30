@@ -73,8 +73,6 @@ function formatDate(iso: string): string {
 }
 
 export default function ContractsPage() {
-  const { user } = useAuth();
-  const canSeeFinancials = user?.role === "ADMIN" || user?.role === "HR" || user?.role === "PAYROLL";
   const [tab, setTab] = useState<"client" | "employee">("client");
 
   return (
@@ -307,6 +305,8 @@ function ClientContractModal({
 }
 
 function ClientContractsTab() {
+  const { user } = useAuth();
+  const canSeeFinancials = user?.role === "ADMIN" || user?.role === "HR" || user?.role === "PAYROLL";
   const [contracts, setContracts] = useState<ClientContract[]>([]);
   const [clients, setClients] = useState<ClientLite[]>([]);
   const [sites, setSites] = useState<SiteLite[]>([]);
