@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import api from "../../api/client";
 import Modal from "../../components/ui/Modal";
+import { useAuth } from "../../contexts/AuthContext";
 
 interface Lookup {
   id: string;
@@ -50,7 +51,13 @@ const EMPTY_FORM: FormState = {
 const PRIORITY_OPTIONS: Task["priority"][] = ["NORMAL", "HIGH", "URGENT", "CRITICAL"];
 const STATUS_OPTIONS: Task["status"][] = ["OPEN", "IN_PROGRESS", "ON_HOLD", "COMPLETED", "CANCELLED"];
 
+// Roles that can create and fully edit tasks.
+const CAN_MANAGE_ROLES = new Set(["ADMIN", "MANAGER", "FINANCE"]);
+
 export default function TasksPage() {
+  const { user } = useAuth();
+  const canManage = !!user && CAN_MANAGE_ROLES.has(user.role);
+
   const [tasks, setTasks] = useState<Task[]>([]);
   const [departments, setDepartments] = useState<Lookup[]>([]);
   const [employees, setEmployees] = useState<Lookup[]>([]);
@@ -71,7 +78,7 @@ export default function TasksPage() {
       setDepartments(depRes.data.data);
       setEmployees(empRes.data.data);
     } catch {
-      // Non-fatal -- dropdowns just show no options if this fails.
+      // Non-fatal — dropdowns just show no options if this fails.
     }
   }
 
@@ -151,6 +158,8 @@ export default function TasksPage() {
     }
   }
 
+  // Status dropdown is available to everyone — assignees can mark their own
+  // task In Progress or Completed without needing full edit access.
   async function handleStatusChange(task: Task, status: Task["status"]) {
     try {
       await api.put(`/tasks/${task.id}`, { status });
@@ -167,12 +176,14 @@ export default function TasksPage() {
           <h1 className="text-2xl font-semibold text-gray-900">Tasks</h1>
           <p className="text-sm text-gray-500 mt-1">{tasks.length} total</p>
         </div>
-        <button
-          onClick={openCreateForm}
-          className="bg-green-600 text-white text-sm font-medium rounded px-4 py-2 hover:bg-green-700"
-        >
-          + Add Task
-        </button>
+        {canManage && (
+          <button
+            onClick={openCreateForm}
+            className="bg-green-600 text-white text-sm font-medium rounded px-4 py-2 hover:bg-green-700"
+          >
+            + Add Task
+          </button>
+        )}
       </div>
 
       {error && (
@@ -181,116 +192,114 @@ export default function TasksPage() {
         </div>
       )}
 
-      {editingId && (
+      {/* Edit / create modal — only reachable by canManage roles */}
+      {canManage && editingId && (
         <Modal
           title={editingId === "new" ? "New Task" : "Edit Task"}
           onClose={closeForm}
           widthClass="max-w-lg"
         >
-        <form
-          onSubmit={handleSubmit}
-          className="space-y-4"
-        >
-          {formError && (
-            <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded px-3 py-2">
-              {formError}
-            </div>
-          )}
-
-          <div className="space-y-1">
-            <label className="text-sm font-medium text-gray-700">Title *</label>
-            <input
-              required
-              value={form.title}
-              onChange={(e) => setForm({ ...form, title: e.target.value })}
-              className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <label className="text-sm font-medium text-gray-700">Department</label>
-              <select
-                value={form.departmentId}
-                onChange={(e) => setForm({ ...form, departmentId: e.target.value })}
-                className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
-              >
-                <option value="">None</option>
-                {departments.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-1">
-              <label className="text-sm font-medium text-gray-700">Assigned To</label>
-              <select
-                value={form.assignedToEmployeeId}
-                onChange={(e) => setForm({ ...form, assignedToEmployeeId: e.target.value })}
-                className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
-              >
-                <option value="">Unassigned</option>
-                {employees.map((e) => (
-                  <option key={e.id} value={e.id}>
-                    {e.fullName}
-                  </option>
-                ))}
-              </select>
-            </div>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {formError && (
+              <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded px-3 py-2">
+                {formError}
+              </div>
+            )}
 
             <div className="space-y-1">
-              <label className="text-sm font-medium text-gray-700">Priority</label>
-              <select
-                value={form.priority}
-                onChange={(e) => setForm({ ...form, priority: e.target.value as Task["priority"] })}
-                className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
-              >
-                {PRIORITY_OPTIONS.map((p) => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-1">
-              <label className="text-sm font-medium text-gray-700">Due Date</label>
+              <label className="text-sm font-medium text-gray-700">Title *</label>
               <input
-                type="date"
-                value={form.dueDate}
-                onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
+                required
+                value={form.title}
+                onChange={(e) => setForm({ ...form, title: e.target.value })}
                 className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
               />
             </div>
-          </div>
 
-          <div className="space-y-1">
-            <label className="text-sm font-medium text-gray-700">Description</label>
-            <textarea
-              value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-              className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
-              rows={2}
-            />
-          </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-gray-700">Department</label>
+                <select
+                  value={form.departmentId}
+                  onChange={(e) => setForm({ ...form, departmentId: e.target.value })}
+                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                >
+                  <option value="">None</option>
+                  {departments.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-gray-700">Assigned To</label>
+                <select
+                  value={form.assignedToEmployeeId}
+                  onChange={(e) => setForm({ ...form, assignedToEmployeeId: e.target.value })}
+                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                >
+                  <option value="">Unassigned</option>
+                  {employees.map((e) => (
+                    <option key={e.id} value={e.id}>
+                      {e.fullName}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-          <div className="flex gap-2">
-            <button
-              type="submit"
-              disabled={isSaving}
-              className="bg-green-600 text-white text-sm font-medium rounded px-4 py-2 hover:bg-green-700 disabled:opacity-60"
-            >
-              {isSaving ? "Saving..." : "Save"}
-            </button>
-            <button
-              type="button"
-              onClick={closeForm}
-              className="text-sm border border-gray-300 rounded px-4 py-2 hover:bg-gray-100"
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-gray-700">Priority</label>
+                <select
+                  value={form.priority}
+                  onChange={(e) => setForm({ ...form, priority: e.target.value as Task["priority"] })}
+                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                >
+                  {PRIORITY_OPTIONS.map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-gray-700">Due Date</label>
+                <input
+                  type="date"
+                  value={form.dueDate}
+                  onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
+                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-gray-700">Description</label>
+              <textarea
+                value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                rows={2}
+              />
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                type="submit"
+                disabled={isSaving}
+                className="bg-green-600 text-white text-sm font-medium rounded px-4 py-2 hover:bg-green-700 disabled:opacity-60"
+              >
+                {isSaving ? "Saving..." : "Save"}
+              </button>
+              <button
+                type="button"
+                onClick={closeForm}
+                className="text-sm border border-gray-300 rounded px-4 py-2 hover:bg-gray-100"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
         </Modal>
       )}
 
@@ -308,7 +317,7 @@ export default function TasksPage() {
                 <th className="text-left px-4 py-3">Assigned To</th>
                 <th className="text-left px-4 py-3">Priority</th>
                 <th className="text-left px-4 py-3">Status</th>
-                <th className="text-right px-4 py-3">Actions</th>
+                {canManage && <th className="text-right px-4 py-3">Actions</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -338,11 +347,16 @@ export default function TasksPage() {
                       ))}
                     </select>
                   </td>
-                  <td className="px-4 py-3 text-right">
-                    <button onClick={() => openEditForm(task)} className="text-green-600 hover:underline">
-                      Edit
-                    </button>
-                  </td>
+                  {canManage && (
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        onClick={() => openEditForm(task)}
+                        className="text-green-600 hover:underline"
+                      >
+                        Edit
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -352,4 +366,3 @@ export default function TasksPage() {
     </div>
   );
 }
-
