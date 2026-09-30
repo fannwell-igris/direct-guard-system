@@ -19,6 +19,35 @@ export interface RosterEntryUpdateInput {
   notes?: string | null;
 }
 
+// ─── New: bulk create ────────────────────────────────────────────────────────
+
+export interface BulkCreateInput {
+  employeeId: string;
+  siteId: string;
+  shiftTypeId: string;
+  /** First day of the range (inclusive). */
+  startDate: Date;
+  /** Last day of the range (inclusive). */
+  endDate: Date;
+  notes?: string | null;
+}
+
+// ─── New: bulk cancel ────────────────────────────────────────────────────────
+
+export interface BulkCancelInput {
+  ids: string[];
+}
+
+// ─── New: record relief ──────────────────────────────────────────────────────
+
+export interface RecordReliefInput {
+  /** The employee who actually showed up as a replacement. */
+  reliefEmployeeId: string;
+  notes?: string | null;
+}
+
+// ─── Shared helpers ──────────────────────────────────────────────────────────
+
 const VALID_STATUSES: RosterEntryStatus[] = ["SCHEDULED", "CANCELLED"];
 
 function trimOrNull(v: unknown): string | null | undefined {
@@ -53,10 +82,12 @@ function parseStatus(v: unknown): RosterEntryStatus {
   return v as RosterEntryStatus;
 }
 
+// ─── Parse functions ─────────────────────────────────────────────────────────
+
 /**
  * Validates and normalizes the body for POST /roster.
- * Note: `clientId` is deliberately not accepted here — it's always
- * snapshotted server-side from the site's current client (see service).
+ * `clientId` is deliberately not accepted — it's always snapshotted
+ * server-side from the site's current client.
  */
 export function parseRosterEntryCreate(body: unknown): RosterEntryCreateInput {
   if (typeof body !== "object" || body === null) {
@@ -105,6 +136,80 @@ export function parseRosterEntryUpdate(body: unknown): RosterEntryUpdateInput {
 
   return out;
 }
+
+/**
+ * Validates POST /roster/bulk.
+ * Creates one RosterEntry per calendar day from startDate to endDate.
+ */
+export function parseBulkCreate(body: unknown): BulkCreateInput {
+  if (typeof body !== "object" || body === null) {
+    throw ApiError.badRequest("Request body must be a JSON object.");
+  }
+  const b = body as Record<string, unknown>;
+
+  const employeeId = parseRequiredId(b.employeeId, "employeeId");
+  const siteId = parseRequiredId(b.siteId, "siteId");
+  const shiftTypeId = parseRequiredId(b.shiftTypeId, "shiftTypeId");
+  const startDate = parseRequiredDate(b.startDate, "startDate");
+  const endDate = parseRequiredDate(b.endDate, "endDate");
+
+  if (endDate.getTime() < startDate.getTime()) {
+    throw ApiError.badRequest("`endDate` cannot be before `startDate`.");
+  }
+
+  // Sanity cap: no more than 365 days at once.
+  const diffDays =
+    Math.floor((endDate.getTime() - startDate.getTime()) / 86_400_000) + 1;
+  if (diffDays > 365) {
+    throw ApiError.badRequest("Cannot bulk-schedule more than 365 days at once.");
+  }
+
+  return {
+    employeeId,
+    siteId,
+    shiftTypeId,
+    startDate,
+    endDate,
+    notes: trimOrNull(b.notes) ?? null,
+  };
+}
+
+/** Validates POST /roster/bulk-cancel. */
+export function parseBulkCancel(body: unknown): BulkCancelInput {
+  if (typeof body !== "object" || body === null) {
+    throw ApiError.badRequest("Request body must be a JSON object.");
+  }
+  const b = body as Record<string, unknown>;
+
+  if (!Array.isArray(b.ids) || b.ids.length === 0) {
+    throw ApiError.badRequest("`ids` must be a non-empty array of roster entry IDs.");
+  }
+  const ids = b.ids.map((v, i) => {
+    if (typeof v !== "string" || !v.trim()) {
+      throw ApiError.badRequest(`\`ids[${i}]\` must be a non-empty string.`);
+    }
+    return v.trim();
+  });
+
+  return { ids };
+}
+
+/** Validates POST /roster/:id/relief. */
+export function parseRecordRelief(body: unknown): RecordReliefInput {
+  if (typeof body !== "object" || body === null) {
+    throw ApiError.badRequest("Request body must be a JSON object.");
+  }
+  const b = body as Record<string, unknown>;
+
+  const reliefEmployeeId = parseRequiredId(b.reliefEmployeeId, "reliefEmployeeId");
+
+  return {
+    reliefEmployeeId,
+    notes: trimOrNull(b.notes) ?? null,
+  };
+}
+
+// ─── List query (unchanged) ──────────────────────────────────────────────────
 
 export interface RosterEntryListQuery {
   employeeId?: string;
