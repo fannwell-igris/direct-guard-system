@@ -133,9 +133,7 @@ export default function InventoryPage() {
   // canIssue: can log stock movements (OPERATIONS limited to ISSUE only — enforced server-side too)
   const canIssue  = ["ADMIN", "MANAGER", "OPERATIONS"].includes(userRole);
   // availableMovementTypes: OPERATIONS can only ISSUE; ADMIN/MANAGER get all types
-  const availableMovementTypes = canManage
-    ? ["PURCHASE", "ISSUE", "WRITE_OFF", "ADJUSTMENT"]
-    : ["ISSUE"];
+  const availableMovementTypes = canManage ? MOVEMENT_TYPES : ["ISSUE"];
 
   const [activeTab, setActiveTab] = useState<TabKey>("company");
   const [allItems, setAllItems] = useState<InventoryItem[]>([]);
