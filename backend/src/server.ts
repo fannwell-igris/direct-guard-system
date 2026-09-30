@@ -1,3 +1,4 @@
+import messagesRouter from "./modules/messages/messages.routes";
 import employeeLoansRouter from "./modules/employee-loans/employee-loans.routes";
 import demoResetRouter from "./modules/demo-reset/demo-reset.routes";
 import settingsRouter from "./modules/settings/settings.routes";
@@ -47,7 +48,6 @@ import salaryAdvancesRoutes from "./modules/salary-advances/salary-advances.rout
 import { requireAuth } from "./middleware/requireAuth";
 import { checkPermissions } from "./middleware/permissions";
 import { requireDeleteConfirmation } from "./middleware/requireDeleteConfirmation";
-import messagesRoutes from "./modules/messages/messages.routes";
 
 dotenv.config();
 
@@ -195,9 +195,6 @@ app.use("/api/quotations", quotationsRoutes);
 
 app.use("/api/salary-advances", salaryAdvancesRoutes);
 
-// Messages — internal messaging between staff users.
-app.use("/api/messages", messagesRoutes);
-
 // Push notification device-token registration — see push-tokens.routes.ts.
 app.use("/api/push-tokens", pushTokensRoutes);
 
@@ -228,6 +225,10 @@ app.use("/api/field-visits", fieldVisitsRoutes);
 // new Targets piece — monthly goals per marketer, compared against live
 // actuals computed at read time.
 app.use("/api/marketing-targets", marketingTargetsRoutes);
+
+// Messages — internal messaging between system users (threads + participants +
+// messages). Every authenticated role can send and receive messages.
+app.use("/api/messages", messagesRouter);
 
 // Demo reset — wipes all transactional data in one shot so staff can start
 // fresh after a training session. ADMIN only + password re-confirmation.

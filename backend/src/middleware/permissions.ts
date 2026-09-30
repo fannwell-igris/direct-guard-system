@@ -258,6 +258,11 @@ const REGISTRY: RouteRule[] = [
   { prefix: "/api/dashboard", methods: { GET: ALL_ROLES } },
   { prefix: "/api/alerts", methods: { GET: ALL_ROLES } },
 
+  // Messages — internal messaging between system users. Every authenticated
+  // role can read and send messages (threads and their own messages only;
+  // participant-level row security is enforced inside the controller).
+  { prefix: "/api/messages", methods: { GET: ALL_ROLES, POST: ALL_ROLES } },
+
   // Push token registration — every authenticated role may register or
   // unregister their OWN device's token (self-service, not a data-access
   // endpoint, so no role gating beyond "logged in" makes sense here).

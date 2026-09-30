@@ -2,23 +2,16 @@
  * MessagesPage.tsx
  *
  * Internal messaging / communication between staff users.
- *
- * NOTE (2026-09-19): The messages backend API has not yet been built.
- *   This page runs in a local-state demo mode (no HTTP calls are made).
- *   When GET/POST /api/messages is implemented, replace the demo state
- *   initializer and the `sendMessage` handler with real fetch calls and
- *   remove the DEMO_* constants.
- *
  * Layout: two-pane — left rail = conversations list, right = thread view.
  * On narrow screens the rail is shown until a thread is opened, then the
  * thread fills the viewport (back button returns to the rail).
  */
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import type { FormEvent } from "react";
 import {
   MessageSquare, Send, Search, Plus, X, ChevronLeft,
-  Circle, CheckCheck,
+  Circle, CheckCheck, Loader2,
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { cn } from "../../lib/utils";
@@ -26,114 +19,38 @@ import api from "../../api/client";
 
 // ─── types ───────────────────────────────────────────────────────────────────
 
-interface Message {
-  id: string;
+interface Participant {
+  id:       string;
+  fullName: string;
+  email:    string;
+  role:     string;
+}
+
+interface ApiMessage {
+  id:       string;
   threadId: string;
   senderId: string;
-  senderName: string;
-  body: string;
-  sentAt: string; // ISO
-  readBy: string[]; // list of userIds who have read it
+  body:     string;
+  sentAt:   string;
+  readBy:   string[];
+  sender:   { id: string; fullName: string; role: string };
 }
 
 interface Thread {
-  id: string;
-  participantIds: string[];
-  participantNames: string[];
-  subject: string;
-  lastMessage: string;
+  id:            string;
+  subject:       string;
+  participants:  Participant[];        // other participants (not me)
+  lastMessage:   string;
   lastMessageAt: string;
-  unread: number;
+  unread:        number;
 }
 
-// ─── demo seed data ──────────────────────────────────────────────────────────
-
-const ME_ID = "current-user";
-const ME_NAME = "You";
-
-const DEMO_THREADS: Thread[] = [
-  {
-    id: "t1",
-    participantIds: [ME_ID, "u2"],
-    participantNames: ["Benjamin Mwila"],
-    subject: "Site coverage — Levy Mall",
-    lastMessage: "Guard #3 is confirmed for tomorrow's morning shift.",
-    lastMessageAt: new Date(Date.now() - 1000 * 60 * 8).toISOString(),
-    unread: 2,
-  },
-  {
-    id: "t2",
-    participantIds: [ME_ID, "u3"],
-    participantNames: ["Grace Phiri"],
-    subject: "Invoice INV-0042 payment",
-    lastMessage: "The client confirmed payment was sent via EFT.",
-    lastMessageAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
-    unread: 0,
-  },
-  {
-    id: "t3",
-    participantIds: [ME_ID, "u4", "u5"],
-    participantNames: ["James Banda", "Sandra Tembo"],
-    subject: "Roster — weekend shift cover",
-    lastMessage: "Can someone cover the Sunday night shift at Arcades?",
-    lastMessageAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-    unread: 0,
-  },
-];
-
-const DEMO_MESSAGES: Record<string, Message[]> = {
-  t1: [
-    {
-      id: "m1", threadId: "t1", senderId: "u2", senderName: "Benjamin Mwila",
-      body: "Hi, just checking in on the Levy Mall roster for tomorrow.",
-      sentAt: new Date(Date.now() - 1000 * 60 * 30).toISOString(), readBy: [ME_ID],
-    },
-    {
-      id: "m2", threadId: "t1", senderId: ME_ID, senderName: ME_NAME,
-      body: "We have 3 guards confirmed. Checking on the 4th now.",
-      sentAt: new Date(Date.now() - 1000 * 60 * 20).toISOString(), readBy: [ME_ID, "u2"],
-    },
-    {
-      id: "m3", threadId: "t1", senderId: "u2", senderName: "Benjamin Mwila",
-      body: "Thanks. Let me know if you need a replacement.",
-      sentAt: new Date(Date.now() - 1000 * 60 * 15).toISOString(), readBy: [],
-    },
-    {
-      id: "m4", threadId: "t1", senderId: "u2", senderName: "Benjamin Mwila",
-      body: "Guard #3 is confirmed for tomorrow's morning shift.",
-      sentAt: new Date(Date.now() - 1000 * 60 * 8).toISOString(), readBy: [],
-    },
-  ],
-  t2: [
-    {
-      id: "m5", threadId: "t2", senderId: "u3", senderName: "Grace Phiri",
-      body: "Following up on invoice INV-0042 for Shoprite Longacres.",
-      sentAt: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(), readBy: [ME_ID],
-    },
-    {
-      id: "m6", threadId: "t2", senderId: ME_ID, senderName: ME_NAME,
-      body: "It was sent to the client on Monday. Awaiting confirmation.",
-      sentAt: new Date(Date.now() - 1000 * 60 * 60 * 4).toISOString(), readBy: [ME_ID, "u3"],
-    },
-    {
-      id: "m7", threadId: "t2", senderId: "u3", senderName: "Grace Phiri",
-      body: "The client confirmed payment was sent via EFT.",
-      sentAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(), readBy: [ME_ID],
-    },
-  ],
-  t3: [
-    {
-      id: "m8", threadId: "t3", senderId: "u4", senderName: "James Banda",
-      body: "Good morning team. We have a gap on the Sunday night shift at Arcades.",
-      sentAt: new Date(Date.now() - 1000 * 60 * 60 * 26).toISOString(), readBy: [ME_ID],
-    },
-    {
-      id: "m9", threadId: "t3", senderId: "u5", senderName: "Sandra Tembo",
-      body: "Can someone cover the Sunday night shift at Arcades?",
-      sentAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(), readBy: [ME_ID],
-    },
-  ],
-};
+interface SystemUser {
+  id:       string;
+  fullName: string;
+  email:    string;
+  role:     string;
+}
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -147,17 +64,8 @@ function timeAgo(isoStr: string): string {
   return new Date(isoStr).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 }
 
-function threadParticipants(thread: Thread): string {
-  return thread.participantNames.join(", ");
-}
-
 function initials(name: string): string {
-  return name
-    .split(" ")
-    .map((w) => w[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
+  return name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();
 }
 
 const AVATAR_COLORS = [
@@ -171,6 +79,14 @@ function avatarColor(name: string): string {
   return AVATAR_COLORS[h];
 }
 
+function unwrapList<T>(raw: unknown): T[] {
+  if (Array.isArray(raw)) return raw as T[];
+  const r = raw as Record<string, unknown>;
+  if (Array.isArray(r?.data))  return r.data  as T[];
+  if (Array.isArray(r?.users)) return r.users as T[];
+  return [];
+}
+
 // ─── sub-components ───────────────────────────────────────────────────────────
 
 function Avatar({ name, size = "md" }: { name: string; size?: "sm" | "md" | "lg" }) {
@@ -182,46 +98,31 @@ function Avatar({ name, size = "md" }: { name: string; size?: "sm" | "md" | "lg"
   );
 }
 
-// ─── user type returned by GET /api/messages/users ──────────────────────────
-
-interface SystemUser {
-  id: string;
-  fullName: string;
-  email: string;
-  role: string;
-}
+// ─── New Thread Modal ─────────────────────────────────────────────────────────
 
 interface NewThreadModalProps {
-  onClose: () => void;
-  onCreate: (subject: string, participantName: string, participantId: string, body: string) => void;
+  onClose:  () => void;
+  onCreate: (subject: string, recipientId: string, recipientName: string, body: string) => Promise<void>;
 }
 
 function NewThreadModal({ onClose, onCreate }: NewThreadModalProps) {
   const [subject, setSubject]           = useState("");
-  const [query, setQuery]               = useState("");           // what user types
+  const [query, setQuery]               = useState("");
   const [selectedUser, setSelectedUser] = useState<SystemUser | null>(null);
   const [suggestions, setSuggestions]   = useState<SystemUser[]>([]);
   const [allUsers, setAllUsers]         = useState<SystemUser[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [showDropdown, setShowDropdown] = useState(false);
   const [body, setBody]                 = useState("");
+  const [submitting, setSubmitting]     = useState(false);
+  const [error, setError]               = useState<string | null>(null);
   const toRef = useRef<HTMLDivElement>(null);
 
   // Fetch all users once on mount
   useEffect(() => {
     api.get("/messages/users")
       .then((res) => {
-        // Handle all common response shapes:
-        // { status, data: [...] }  or  { data: [...] }  or  [...]
-        const raw = res.data;
-        const list: SystemUser[] = Array.isArray(raw)
-          ? raw
-          : Array.isArray(raw?.data)
-          ? raw.data
-          : Array.isArray(raw?.users)
-          ? raw.users
-          : [];
-        setAllUsers(list);
+        setAllUsers(unwrapList<SystemUser>(res.data));
       })
       .catch(() => setAllUsers([]))
       .finally(() => setLoadingUsers(false));
@@ -274,13 +175,20 @@ function NewThreadModal({ onClose, onCreate }: NewThreadModalProps) {
     setSuggestions([]);
   }
 
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!subject.trim() || (!selectedUser && !query.trim()) || !body.trim()) return;
-    const name = selectedUser ? selectedUser.fullName : query.trim();
-    const id   = selectedUser ? selectedUser.id : `manual-${Date.now()}`;
-    onCreate(subject.trim(), name, id, body.trim());
+    if (!selectedUser || !subject.trim() || !body.trim()) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      await onCreate(subject.trim(), selectedUser.id, selectedUser.fullName, body.trim());
+    } catch {
+      setError("Failed to send. Please try again.");
+      setSubmitting(false);
+    }
   }
+
+  const canSend = !!selectedUser && subject.trim().length > 0 && body.trim().length > 0 && !submitting;
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -297,20 +205,12 @@ function NewThreadModal({ onClose, onCreate }: NewThreadModalProps) {
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">To</label>
             <div ref={toRef} className="relative">
-              <div className={cn(
-                "input flex items-center gap-2 p-0 overflow-hidden",
-                selectedUser ? "pr-2" : ""
-              )}>
+              <div className={cn("input flex items-center gap-2 p-0 overflow-hidden", selectedUser ? "pr-2" : "")}>
                 {selectedUser ? (
-                  /* Selected chip */
                   <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-md px-2.5 py-1 m-1.5 text-sm">
                     <span className="font-medium text-emerald-800">{selectedUser.fullName}</span>
                     <span className="text-emerald-500 text-xs">{selectedUser.role}</span>
-                    <button
-                      type="button"
-                      onClick={clearUser}
-                      className="text-emerald-400 hover:text-emerald-700 ml-1"
-                    >
+                    <button type="button" onClick={clearUser} className="text-emerald-400 hover:text-emerald-700 ml-1">
                       <X size={12} />
                     </button>
                   </div>
@@ -353,6 +253,9 @@ function NewThreadModal({ onClose, onCreate }: NewThreadModalProps) {
             {!selectedUser && query.trim() && suggestions.length === 0 && !loadingUsers && (
               <p className="text-xs text-gray-400 mt-1">No users found matching "{query}"</p>
             )}
+            {!selectedUser && query.trim() === "" && !loadingUsers && allUsers.length === 0 && (
+              <p className="text-xs text-red-400 mt-1">Could not load users — please try again.</p>
+            )}
           </div>
 
           <div>
@@ -377,14 +280,18 @@ function NewThreadModal({ onClose, onCreate }: NewThreadModalProps) {
               required
             />
           </div>
+
+          {error && <p className="text-xs text-red-500">{error}</p>}
+
           <div className="flex justify-end gap-2 pt-1">
             <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
             <button
               type="submit"
-              disabled={(!selectedUser && !query.trim()) || !subject.trim() || !body.trim()}
+              disabled={!canSend}
               className="btn-primary disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              <Send size={14} /> Send Message
+              {submitting ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+              {submitting ? "Sending…" : "Send Message"}
             </button>
           </div>
         </form>
@@ -397,14 +304,17 @@ function NewThreadModal({ onClose, onCreate }: NewThreadModalProps) {
 
 export default function MessagesPage() {
   const { user } = useAuth();
+  const myId = user?.id ?? "";
 
-  const [threads, setThreads] = useState<Thread[]>(DEMO_THREADS);
-  const [messages, setMessages] = useState<Record<string, Message[]>>(DEMO_MESSAGES);
+  const [threads, setThreads]               = useState<Thread[]>([]);
+  const [threadMessages, setThreadMessages] = useState<ApiMessage[]>([]);
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
-  const [draftBody, setDraftBody] = useState("");
-  const [showNewThread, setShowNewThread] = useState(false);
-  const [sending, setSending] = useState(false);
+  const [search, setSearch]                 = useState("");
+  const [draftBody, setDraftBody]           = useState("");
+  const [showNewThread, setShowNewThread]   = useState(false);
+  const [sending, setSending]               = useState(false);
+  const [loadingThreads, setLoadingThreads] = useState(true);
+  const [loadingMsgs, setLoadingMsgs]       = useState(false);
 
   // Mobile: show thread list or thread view
   const [mobileView, setMobileView] = useState<"list" | "thread">("list");
@@ -412,86 +322,95 @@ export default function MessagesPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const selectedThread = threads.find((t) => t.id === selectedThreadId) ?? null;
-  const threadMessages = selectedThreadId ? (messages[selectedThreadId] ?? []) : [];
+
+  // ── fetch thread list ──────────────────────────────────────────────────────
+  const fetchThreads = useCallback(async () => {
+    try {
+      const res = await api.get("/messages/threads");
+      setThreads(unwrapList<Thread>(res.data));
+    } catch {
+      setThreads([]);
+    } finally {
+      setLoadingThreads(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchThreads(); }, [fetchThreads]);
+
+  // ── fetch messages when thread selected ───────────────────────────────────
+  useEffect(() => {
+    if (!selectedThreadId) { setThreadMessages([]); return; }
+    setLoadingMsgs(true);
+    api.get(`/messages/threads/${selectedThreadId}/messages`)
+      .then((res) => {
+        setThreadMessages(unwrapList<ApiMessage>(res.data));
+        // mark as read locally
+        setThreads((prev) =>
+          prev.map((t) => t.id === selectedThreadId ? { ...t, unread: 0 } : t)
+        );
+      })
+      .catch(() => setThreadMessages([]))
+      .finally(() => setLoadingMsgs(false));
+  }, [selectedThreadId]);
 
   // Scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [threadMessages.length]);
 
-  // Mark thread as read when opened
   function openThread(threadId: string) {
     setSelectedThreadId(threadId);
     setMobileView("thread");
     setDraftBody("");
-    setThreads((prev) =>
-      prev.map((t) => (t.id === threadId ? { ...t, unread: 0 } : t))
-    );
   }
 
-  function sendMessage(e: FormEvent) {
+  async function sendMessage(e: FormEvent) {
     e.preventDefault();
-    if (!draftBody.trim() || !selectedThreadId) return;
+    if (!draftBody.trim() || !selectedThreadId || sending) return;
     setSending(true);
-
-    const newMsg: Message = {
-      id: `m-${Date.now()}`,
-      threadId: selectedThreadId,
-      senderId: ME_ID,
-      senderName: user?.email ?? ME_NAME,
-      body: draftBody.trim(),
-      sentAt: new Date().toISOString(),
-      readBy: [ME_ID],
-    };
-
-    setMessages((prev) => ({
-      ...prev,
-      [selectedThreadId]: [...(prev[selectedThreadId] ?? []), newMsg],
-    }));
-
-    setThreads((prev) =>
-      prev.map((t) =>
-        t.id === selectedThreadId
-          ? { ...t, lastMessage: newMsg.body, lastMessageAt: newMsg.sentAt }
-          : t
-      )
-    );
-
-    setDraftBody("");
-    setSending(false);
+    try {
+      const res = await api.post(`/messages/threads/${selectedThreadId}/messages`, { body: draftBody.trim() });
+      const newMsg: ApiMessage = res.data?.data ?? res.data;
+      setThreadMessages((prev) => [...prev, newMsg]);
+      setThreads((prev) =>
+        prev.map((t) =>
+          t.id === selectedThreadId
+            ? { ...t, lastMessage: draftBody.trim(), lastMessageAt: new Date().toISOString() }
+            : t
+        )
+      );
+      setDraftBody("");
+    } catch {
+      // keep the draft so the user can retry
+    } finally {
+      setSending(false);
+    }
   }
 
-  function createThread(subject: string, participantName: string, participantId: string, body: string) {
-    const newThreadId = `t-${Date.now()}`;
+  async function createThread(subject: string, recipientId: string, recipientName: string, body: string) {
+    const res = await api.post("/messages/threads", { recipientId, subject, body });
+    const created = res.data?.data ?? res.data;
+    // Add the new thread to the top of the list
     const newThread: Thread = {
-      id: newThreadId,
-      participantIds: [ME_ID, participantId],
-      participantNames: [participantName],
-      subject,
-      lastMessage: body,
+      id:            created.id,
+      subject:       created.subject,
+      participants:  created.participants
+        ?.filter((p: { user: Participant }) => p.user?.id !== myId)
+        .map((p: { user: Participant }) => p.user) ?? [{ id: recipientId, fullName: recipientName, email: "", role: "" }],
+      lastMessage:   body,
       lastMessageAt: new Date().toISOString(),
-      unread: 0,
-    };
-    const newMsg: Message = {
-      id: `m-${Date.now()}`,
-      threadId: newThreadId,
-      senderId: ME_ID,
-      senderName: user?.email ?? ME_NAME,
-      body,
-      sentAt: new Date().toISOString(),
-      readBy: [ME_ID],
+      unread:        0,
     };
     setThreads((prev) => [newThread, ...prev]);
-    setMessages((prev) => ({ ...prev, [newThreadId]: [newMsg] }));
     setShowNewThread(false);
-    openThread(newThreadId);
+    openThread(created.id);
   }
 
   const filteredThreads = search.trim()
     ? threads.filter(
         (t) =>
           t.subject.toLowerCase().includes(search.toLowerCase()) ||
-          t.participantNames.some((n) => n.toLowerCase().includes(search.toLowerCase()))
+          t.participants.some((p) => p.fullName.toLowerCase().includes(search.toLowerCase()))
       )
     : threads;
 
@@ -500,7 +419,7 @@ export default function MessagesPage() {
   return (
     <>
       {showNewThread && (
-        <NewThreadModal onClose={() => setShowNewThread(false)} onCreate={createThread as any} />
+        <NewThreadModal onClose={() => setShowNewThread(false)} onCreate={createThread} />
       )}
 
       <div className="flex h-full gap-0 overflow-hidden rounded-xl border border-gray-200 shadow-sm bg-white">
@@ -508,7 +427,6 @@ export default function MessagesPage() {
         <div
           className={cn(
             "flex flex-col w-72 flex-shrink-0 border-r border-gray-100",
-            // Mobile: hide rail when viewing a thread
             mobileView === "thread" ? "hidden md:flex" : "flex"
           )}
         >
@@ -547,15 +465,26 @@ export default function MessagesPage() {
 
           {/* Thread list */}
           <div className="flex-1 overflow-y-auto">
-            {filteredThreads.length === 0 ? (
+            {loadingThreads ? (
+              <div className="flex items-center justify-center py-16 text-gray-400">
+                <Loader2 size={22} className="animate-spin" />
+              </div>
+            ) : filteredThreads.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 px-4 text-center text-gray-400">
                 <MessageSquare size={28} className="mb-2 opacity-30" />
-                <p className="text-sm">No conversations found</p>
+                <p className="text-sm">
+                  {search.trim() ? "No conversations found" : "No messages yet"}
+                </p>
+                {!search.trim() && (
+                  <button onClick={() => setShowNewThread(true)} className="btn-primary mt-3 text-xs">
+                    <Plus size={12} /> Start a conversation
+                  </button>
+                )}
               </div>
             ) : (
               filteredThreads.map((thread) => {
                 const isSelected = thread.id === selectedThreadId;
-                const others = thread.participantNames[0] ?? "Unknown";
+                const otherName = thread.participants[0]?.fullName ?? "Unknown";
                 return (
                   <button
                     key={thread.id}
@@ -565,11 +494,11 @@ export default function MessagesPage() {
                       isSelected ? "bg-magen-green-light" : "hover:bg-gray-50"
                     )}
                   >
-                    <Avatar name={others} size="md" />
+                    <Avatar name={otherName} size="md" />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-baseline justify-between gap-1 mb-0.5">
                         <span className={cn("text-sm truncate", thread.unread > 0 ? "font-semibold text-gray-900" : "font-medium text-gray-700")}>
-                          {threadParticipants(thread)}
+                          {thread.participants.map((p) => p.fullName).join(", ") || "Unknown"}
                         </span>
                         <span className="text-xs text-gray-400 whitespace-nowrap flex-shrink-0">
                           {timeAgo(thread.lastMessageAt)}
@@ -605,17 +534,16 @@ export default function MessagesPage() {
             <>
               {/* Thread header */}
               <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100">
-                {/* Mobile back button */}
                 <button
                   onClick={() => { setMobileView("list"); setSelectedThreadId(null); }}
                   className="md:hidden p-1 rounded text-gray-500 hover:bg-gray-100"
                 >
                   <ChevronLeft size={18} />
                 </button>
-                <Avatar name={selectedThread.participantNames[0] ?? "?"} size="lg" />
+                <Avatar name={selectedThread.participants[0]?.fullName ?? "?"} size="lg" />
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-gray-900 text-sm truncate">
-                    {threadParticipants(selectedThread)}
+                    {selectedThread.participants.map((p) => p.fullName).join(", ") || "Unknown"}
                   </p>
                   <p className="text-xs text-gray-500 truncate">{selectedThread.subject}</p>
                 </div>
@@ -627,38 +555,49 @@ export default function MessagesPage() {
 
               {/* Messages list */}
               <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-                {threadMessages.map((msg) => {
-                  const isMe = msg.senderId === ME_ID;
-                  return (
-                    <div key={msg.id} className={cn("flex items-end gap-2", isMe ? "flex-row-reverse" : "flex-row")}>
-                      {!isMe && <Avatar name={msg.senderName} size="sm" />}
-                      <div className={cn("max-w-[70%]")}>
-                        {!isMe && (
-                          <p className="text-xs text-gray-500 mb-1 ml-1">{msg.senderName}</p>
-                        )}
-                        <div
-                          className={cn(
-                            "px-3 py-2 rounded-2xl text-sm leading-relaxed",
-                            isMe
-                              ? "bg-magen-navy text-white rounded-br-sm"
-                              : "bg-gray-100 text-gray-800 rounded-bl-sm"
+                {loadingMsgs ? (
+                  <div className="flex items-center justify-center py-12 text-gray-400">
+                    <Loader2 size={22} className="animate-spin" />
+                  </div>
+                ) : threadMessages.length === 0 ? (
+                  <div className="flex items-center justify-center py-12 text-gray-400 text-sm">
+                    No messages yet — send the first one!
+                  </div>
+                ) : (
+                  threadMessages.map((msg) => {
+                    const isMe = msg.senderId === myId;
+                    const senderName = isMe ? user?.fullName ?? "You" : msg.sender?.fullName ?? "Unknown";
+                    return (
+                      <div key={msg.id} className={cn("flex items-end gap-2", isMe ? "flex-row-reverse" : "flex-row")}>
+                        {!isMe && <Avatar name={senderName} size="sm" />}
+                        <div className="max-w-[70%]">
+                          {!isMe && (
+                            <p className="text-xs text-gray-500 mb-1 ml-1">{senderName}</p>
                           )}
-                        >
-                          {msg.body}
-                        </div>
-                        <div className={cn("flex items-center gap-1 mt-1", isMe ? "justify-end" : "justify-start")}>
-                          <span className="text-xs text-gray-400">{timeAgo(msg.sentAt)}</span>
-                          {isMe && (
-                            <CheckCheck
-                              size={12}
-                              className={msg.readBy.length > 1 ? "text-magen-green" : "text-gray-300"}
-                            />
-                          )}
+                          <div
+                            className={cn(
+                              "px-3 py-2 rounded-2xl text-sm leading-relaxed",
+                              isMe
+                                ? "bg-magen-navy text-white rounded-br-sm"
+                                : "bg-gray-100 text-gray-800 rounded-bl-sm"
+                            )}
+                          >
+                            {msg.body}
+                          </div>
+                          <div className={cn("flex items-center gap-1 mt-1", isMe ? "justify-end" : "justify-start")}>
+                            <span className="text-xs text-gray-400">{timeAgo(msg.sentAt)}</span>
+                            {isMe && (
+                              <CheckCheck
+                                size={12}
+                                className={msg.readBy.length > 1 ? "text-magen-green" : "text-gray-300"}
+                              />
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })
+                )}
                 <div ref={messagesEndRef} />
               </div>
 
@@ -672,7 +611,7 @@ export default function MessagesPage() {
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && !e.shiftKey) {
                         e.preventDefault();
-                        sendMessage(e as any);
+                        sendMessage(e as unknown as FormEvent);
                       }
                     }}
                     rows={1}
@@ -682,9 +621,9 @@ export default function MessagesPage() {
                   <button
                     type="submit"
                     disabled={!draftBody.trim() || sending}
-                    className="btn-primary py-2.5 px-3"
+                    className="btn-primary py-2.5 px-3 disabled:opacity-40"
                   >
-                    <Send size={15} />
+                    {sending ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
                   </button>
                 </form>
                 <p className="text-xs text-gray-400 mt-1">Press Enter to send, Shift+Enter for new line</p>
@@ -707,9 +646,6 @@ export default function MessagesPage() {
                 <Plus size={15} />
                 New Conversation
               </button>
-              <p className="text-xs text-gray-300 mt-6">
-                Messages API coming soon — currently showing demo data.
-              </p>
             </div>
           )}
         </div>
