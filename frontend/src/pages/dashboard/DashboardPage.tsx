@@ -1,27 +1,26 @@
 import { useEffect, useState } from "react";
-import { Users, Building2, MapPin, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Clock, DollarSign } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import {
+  Users, Building2, MapPin, TrendingUp, TrendingDown,
+  AlertTriangle, CheckCircle, Clock, DollarSign,
+  ArrowRight, Briefcase, Shield,
+} from "lucide-react";
 import api from "../../api/client";
 import { useAuth } from "../../contexts/AuthContext";
 
-// ---- Role constants ----
-
+// ── Role constants ──────────────────────────────────────────────────────────
 const FINANCE_ROLES = new Set(["ADMIN", "MANAGER", "PAYROLL"]);
-const OPS_ROLES = new Set(["ADMIN", "MANAGER", "OPERATIONS", "HR", "PAYROLL"]);
-const HR_ROLES = new Set(["ADMIN", "MANAGER", "HR", "PAYROLL"]);
+const OPS_ROLES     = new Set(["ADMIN", "MANAGER", "OPERATIONS", "HR", "PAYROLL"]);
+const HR_ROLES      = new Set(["ADMIN", "MANAGER", "HR", "PAYROLL"]);
 
-// ---- Types ----
-
+// ── Types ───────────────────────────────────────────────────────────────────
 interface MainDashboard {
-  counts: { activeClients: number; activeSites: number; activeEmployees: number; activeGuards: number };
+  counts: { activeClients: number; activeSites: number; activeEmployees: number };
   revenue: { thisMonth: number; lastMonth: number; changePercent: number | null } | null;
   outstandingBalance: number | null;
   expenses: { thisMonth: number } | null;
   payroll: { paidThisMonth: number } | null;
-  alerts: {
-    overdueInvoices: number | null;
-    expiringContracts: number;
-    overdueTasks: number;
-  };
+  alerts: { overdueInvoices: number | null; expiringContracts: number; overdueTasks: number };
   recentInvoices: {
     id: string; invoiceNumber: string; amount: string; status: string;
     dueDate: string | null; dateCreated: string; client?: { name: string };
@@ -66,123 +65,207 @@ interface HRDashboard {
 
 type Tab = "overview" | "operations" | "hr";
 
-// ---- Helpers ----
-
+// ── Helpers ─────────────────────────────────────────────────────────────────
 function fmt(n: number | null | undefined) {
   const val = Number(n ?? 0);
   return `K ${(isNaN(val) ? 0 : val).toLocaleString("en-ZM", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
-
 function fmtDate(s: string) {
   return new Date(s).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
-
 function invoiceStatusClass(status: string) {
   switch (status) {
-    case "PAID": return "bg-green-100 text-green-700";
-    case "OVERDUE": return "bg-red-100 text-red-700";
-    case "SENT": return "bg-blue-100 text-blue-700";
+    case "PAID":      return "bg-green-100 text-green-700";
+    case "OVERDUE":   return "bg-red-100 text-red-700";
+    case "SENT":      return "bg-blue-100 text-blue-700";
     case "CANCELLED": return "bg-gray-100 text-gray-500";
-    default: return "bg-yellow-100 text-yellow-700";
+    default:          return "bg-yellow-100 text-yellow-700";
   }
 }
-
 function priorityClass(p: string) {
   switch (p) {
     case "CRITICAL": return "bg-red-100 text-red-700";
-    case "HIGH": return "bg-orange-100 text-orange-700";
-    case "MEDIUM": return "bg-yellow-100 text-yellow-700";
-    default: return "bg-gray-100 text-gray-600";
+    case "HIGH":     return "bg-orange-100 text-orange-700";
+    case "MEDIUM":   return "bg-yellow-100 text-yellow-700";
+    default:         return "bg-gray-100 text-gray-600";
   }
 }
+function greeting() {
+  const h = new Date().getHours();
+  if (h < 12) return "Good morning";
+  if (h < 17) return "Good afternoon";
+  return "Good evening";
+}
 
-// ---- Mini revenue vs expenses bar chart (pure CSS) — last 3 months ----
+// ── Revenue bar chart ────────────────────────────────────────────────────────
 function RevenueChart({ data }: { data: { month: string; revenue: number; expenses?: number }[] }) {
   const safeData = data.map((d) => ({ ...d, revenue: Number(d.revenue ?? 0), expenses: Number(d.expenses ?? 0) }));
   const max = Math.max(...safeData.flatMap((d) => [d.revenue, d.expenses]), 1);
   return (
     <div className="min-w-0">
-      {/* overflow-x-auto + justify-start (not justify-center) is deliberate:
-          if this ever gets handed more months than fit the card (e.g. a
-          data-shape mismatch like the one that caused this to spill into
-          the neighboring "Recent Invoices" card), it scrolls inside its own
-          box instead of overflowing equally past both edges of the card. */}
       <div className="flex items-end justify-start gap-8 h-24 overflow-x-auto">
         {safeData.map((d) => (
           <div key={d.month} className="flex flex-col items-center gap-1.5">
             <div className="flex items-end gap-1.5 h-20 group">
               <div
-                className="w-5 bg-magen-green rounded-sm opacity-85 group-hover:opacity-100 transition-opacity"
-                style={{ height: `${Math.max((d.revenue / max) * 80, 2)}px` }}
+                className="w-5 rounded-sm opacity-85 group-hover:opacity-100 transition-opacity"
+                style={{ height: `${Math.max((d.revenue / max) * 80, 2)}px`, background: "linear-gradient(to top, #15803d, #4ade80)" }}
                 title={`Revenue — ${d.month}: ${fmt(d.revenue)}`}
               />
               <div
-                className="w-5 bg-blue-500 rounded-sm opacity-85 group-hover:opacity-100 transition-opacity"
-                style={{ height: `${Math.max((d.expenses / max) * 80, 2)}px` }}
+                className="w-5 rounded-sm opacity-85 group-hover:opacity-100 transition-opacity"
+                style={{ height: `${Math.max((d.expenses / max) * 80, 2)}px`, background: "linear-gradient(to top, #1d4ed8, #60a5fa)" }}
                 title={`Expenses — ${d.month}: ${fmt(d.expenses)}`}
               />
             </div>
-            <span className="text-[10px] font-medium text-gray-500 whitespace-nowrap">
-              {d.month}
-            </span>
+            <span className="text-[10px] font-medium text-gray-500 whitespace-nowrap">{d.month}</span>
           </div>
         ))}
       </div>
       <div className="flex items-center justify-center gap-4 mt-3 text-[11px] text-gray-500">
         <span className="flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-sm bg-magen-green inline-block" /> Revenue
+          <span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: "linear-gradient(to top, #15803d, #4ade80)" }} /> Revenue
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-sm bg-blue-500 inline-block" /> Expenses
+          <span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: "linear-gradient(to top, #1d4ed8, #60a5fa)" }} /> Expenses
         </span>
       </div>
     </div>
   );
 }
 
-// ---- Stat card ----
-function StatCard({ label, value, sub, icon: Icon, bg, iconBg }: {
-  label: string; value: string | number; sub?: string;
-  icon: React.ElementType; bg: string; iconBg: string;
+// ── Gradient stat card ───────────────────────────────────────────────────────
+function StatCard({ label, value, sub, trend, icon: Icon, gradient, to }: {
+  label: string;
+  value: string | number;
+  sub?: string;
+  trend?: { value: number; label?: string } | null;
+  icon: React.ElementType;
+  gradient: string;   // e.g. "from-emerald-500 to-emerald-700"
+  to?: string;
 }) {
+  const navigate = useNavigate();
+  const clickable = !!to;
+  const isUp = trend && trend.value >= 0;
+
   return (
-    <div className={`${bg} rounded-2xl p-4 flex items-center gap-3`}>
-      <div className={`${iconBg} text-white rounded-full p-2.5 shrink-0`}>
-        <Icon size={18} />
+    <div
+      className={`bg-gradient-to-br ${gradient} rounded-2xl p-5 text-white shadow-md
+        ${clickable ? "cursor-pointer hover:shadow-lg hover:scale-[1.02] active:scale-[0.99] transition-all duration-200" : ""}`}
+      onClick={clickable ? () => navigate(to!) : undefined}
+      role={clickable ? "button" : undefined}
+    >
+      <div className="flex items-start justify-between">
+        <div className="bg-white/20 rounded-xl p-2.5">
+          <Icon size={20} className="text-white" />
+        </div>
+        {trend !== undefined && trend !== null && (
+          <div className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full
+            ${isUp ? "bg-white/20 text-white" : "bg-white/20 text-white"}`}>
+            {isUp ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
+            {isUp ? "+" : ""}{trend.value}%
+          </div>
+        )}
+        {clickable && !trend && (
+          <ArrowRight size={15} className="text-white/60 mt-1" />
+        )}
       </div>
-      <div>
-        <div className="text-xl font-semibold text-gray-900 leading-tight">{value}</div>
-        <div className="text-xs text-gray-500 leading-tight">{label}</div>
-        {sub && <div className="text-xs text-gray-400 leading-tight mt-0.5">{sub}</div>}
+      <div className="mt-4">
+        <div className="text-3xl font-bold tracking-tight leading-none">{value}</div>
+        <div className="text-sm text-white/80 mt-1 font-medium">{label}</div>
+        {sub && <div className="text-xs text-white/60 mt-0.5">{sub}</div>}
+        {trend?.label && (
+          <div className="text-xs text-white/60 mt-0.5">{trend.label}</div>
+        )}
       </div>
     </div>
   );
 }
 
-// ---- Main Component ----
+// ── Finance metric card (white) ──────────────────────────────────────────────
+function MetricCard({ label, value, sub, accent, trend, to }: {
+  label: string; value: string; sub?: string;
+  accent: string; trend?: { value: number } | null; to?: string;
+}) {
+  const navigate = useNavigate();
+  return (
+    <div
+      className={`bg-white border border-gray-100 rounded-2xl p-5 shadow-sm
+        ${to ? "cursor-pointer hover:shadow-md hover:border-gray-200 transition-all duration-200" : ""}`}
+      onClick={to ? () => navigate(to) : undefined}
+    >
+      <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">{label}</p>
+      <p className={`text-xl font-bold ${accent}`}>{value}</p>
+      {trend !== undefined && trend !== null && (
+        <div className={`flex items-center gap-1 mt-1.5 text-xs font-medium
+          ${trend.value >= 0 ? "text-emerald-600" : "text-red-500"}`}>
+          {trend.value >= 0 ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
+          {trend.value >= 0 ? "+" : ""}{trend.value}% vs last month
+        </div>
+      )}
+      {sub && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
+    </div>
+  );
+}
 
+// ── Alert pill ───────────────────────────────────────────────────────────────
+function AlertPill({ text, color, to, navigate }: {
+  text: string; color: string; to: string; navigate: (p: string) => void;
+}) {
+  return (
+    <div
+      className={`flex items-center gap-2 ${color} text-xs font-medium rounded-xl px-3.5 py-2
+        cursor-pointer hover:brightness-95 transition-all`}
+      onClick={() => navigate(to)}
+    >
+      <AlertTriangle size={13} />
+      {text}
+      <ArrowRight size={11} className="ml-0.5 opacity-60" />
+    </div>
+  );
+}
+
+// ── Section card wrapper ─────────────────────────────────────────────────────
+function SectionCard({ title, action, onAction, children }: {
+  title: string; action?: string; onAction?: () => void; children: React.ReactNode;
+}) {
+  return (
+    <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
+        <p className="text-sm font-semibold text-gray-800">{title}</p>
+        {action && onAction && (
+          <button onClick={onAction}
+            className="text-xs text-emerald-600 font-medium flex items-center gap-1 hover:text-emerald-700">
+            {action} <ArrowRight size={11} />
+          </button>
+        )}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// ── Main Component ────────────────────────────────────────────────────────────
 export default function DashboardPage() {
   const { user } = useAuth();
-  const role = user?.role ?? "STAFF";
+  const navigate  = useNavigate();
+  const role      = user?.role ?? "STAFF";
 
   const canSeeFinance = FINANCE_ROLES.has(role);
-  const canSeeOps = OPS_ROLES.has(role);
-  const canSeeHR = HR_ROLES.has(role);
+  const canSeeOps     = OPS_ROLES.has(role);
+  const canSeeHR      = HR_ROLES.has(role);
 
-  // Default tab: OPERATIONS/STAFF who can only see ops land on Operations tab
-  const defaultTab: Tab =
-    !canSeeFinance && !canSeeHR && canSeeOps ? "operations" : "overview";
-
-  const [tab, setTab] = useState<Tab>(defaultTab);
+  const defaultTab: Tab = !canSeeFinance && !canSeeHR && canSeeOps ? "operations" : "overview";
+  const [tab, setTab]   = useState<Tab>(defaultTab);
 
   const [main, setMain] = useState<MainDashboard | null>(null);
-  const [ops, setOps] = useState<OperationsDashboard | null>(null);
-  const [hr, setHr] = useState<HRDashboard | null>(null);
+  const [ops,  setOps]  = useState<OperationsDashboard | null>(null);
+  const [hr,   setHr]   = useState<HRDashboard | null>(null);
 
   const [mainLoading, setMainLoading] = useState(true);
-  const [opsLoading, setOpsLoading] = useState(false);
-  const [hrLoading, setHrLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [opsLoading,  setOpsLoading]  = useState(false);
+  const [hrLoading,   setHrLoading]   = useState(false);
+  const [error, setError]             = useState<string | null>(null);
 
   useEffect(() => {
     setMainLoading(true);
@@ -191,7 +274,6 @@ export default function DashboardPage() {
       .catch((err) => setError(err.response?.data?.message ?? "Failed to load dashboard."))
       .finally(() => setMainLoading(false));
 
-    // If the default tab is operations, pre-fetch it immediately
     if (defaultTab === "operations") {
       setOpsLoading(true);
       api.get("/dashboard/operations")
@@ -220,382 +302,403 @@ export default function DashboardPage() {
     }
   }
 
-  // Build visible tabs based on role
   const tabs: { key: Tab; label: string }[] = [
-    { key: "overview", label: "Overview" },
+    { key: "overview",   label: "Overview"   },
     ...(canSeeOps ? [{ key: "operations" as Tab, label: "Operations" }] : []),
-    ...(canSeeHR ? [{ key: "hr" as Tab, label: "HR" }] : []),
+    ...(canSeeHR  ? [{ key: "hr"         as Tab, label: "HR"         }] : []),
   ];
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-semibold text-gray-900">Dashboard</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          Welcome back, {user?.fullName} ({user?.role})
-        </p>
+
+      {/* ── Welcome header ── */}
+      <div className="bg-gradient-to-r from-[#0f2d52] to-[#1a4a7a] rounded-2xl px-6 py-5 text-white shadow-md">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm text-white/60 font-medium">{greeting()},</p>
+            <h1 className="text-2xl font-bold mt-0.5">{user?.fullName}</h1>
+            <p className="text-sm text-white/50 mt-0.5">
+              {role} · Magen Security System
+            </p>
+          </div>
+          <div className="hidden sm:flex items-center gap-2 bg-white/10 rounded-xl px-4 py-2.5">
+            <Shield size={18} className="text-emerald-400" />
+            <span className="text-sm font-semibold text-white/90">
+              {new Date().toLocaleDateString("en-GB", { weekday: "short", day: "2-digit", month: "short", year: "numeric" })}
+            </span>
+          </div>
+        </div>
       </div>
 
       {error && (
-        <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded px-3 py-2">{error}</div>
+        <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-xl px-4 py-3">{error}</div>
       )}
 
-      {/* Tabs */}
-      <div className="flex gap-4 border-b border-gray-200">
+      {/* ── Tabs ── */}
+      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit">
         {tabs.map((t) => (
           <button key={t.key} onClick={() => handleTabChange(t.key)}
-            className={`pb-2 text-sm font-medium ${tab === t.key ? "border-b-2 border-green-600 text-green-600" : "text-gray-500 hover:text-gray-700"}`}>
+            className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-150
+              ${tab === t.key
+                ? "bg-white text-gray-900 shadow-sm"
+                : "text-gray-500 hover:text-gray-700"}`}>
             {t.label}
           </button>
         ))}
       </div>
 
-      {/* ── OVERVIEW TAB ── */}
+      {/* ══ OVERVIEW TAB ══ */}
       {tab === "overview" && (
         <>
           {mainLoading ? (
-            <div className="text-sm text-gray-500">Loading...</div>
+            <div className="flex items-center gap-2 text-sm text-gray-400 py-8 justify-center">
+              <div className="w-4 h-4 border-2 border-gray-300 border-t-emerald-500 rounded-full animate-spin" />
+              Loading dashboard…
+            </div>
           ) : main ? (
-            <div className="space-y-6">
-              {/* Stat cards — visible to all roles */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <StatCard label="Active Clients" value={main.counts.activeClients} icon={Building2} bg="bg-emerald-50" iconBg="bg-emerald-600" />
-                <StatCard label="Active Sites" value={main.counts.activeSites} icon={MapPin} bg="bg-blue-50" iconBg="bg-blue-500" />
-                <StatCard label="Active Employees" value={main.counts.activeEmployees} icon={Users} bg="bg-amber-50" iconBg="bg-amber-500" />
-                <StatCard label="Active Guards" value={main.counts.activeGuards} icon={Users} bg="bg-indigo-50" iconBg="bg-indigo-500" />
+            <div className="space-y-5">
+
+              {/* Core stat cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <StatCard
+                  label="Active Clients" value={main.counts.activeClients}
+                  sub="Click to view all clients"
+                  icon={Building2} gradient="from-emerald-500 to-emerald-700" to="/clients"
+                />
+                <StatCard
+                  label="Active Sites" value={main.counts.activeSites}
+                  sub="Click to manage sites"
+                  icon={MapPin} gradient="from-blue-500 to-blue-700" to="/sites"
+                />
+                <StatCard
+                  label="Active Employees" value={main.counts.activeEmployees}
+                  sub="Click to view workforce"
+                  icon={Users} gradient="from-violet-500 to-violet-700" to="/employees"
+                />
               </div>
 
-              {/* Finance cards — finance roles only */}
+              {/* Finance metric cards */}
               {canSeeFinance && main.revenue && main.expenses && main.payroll && (
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="bg-white border border-gray-200 rounded-xl p-4">
-                    <p className="text-xs text-gray-400 mb-1">Revenue this month</p>
-                    <p className="text-lg font-semibold text-gray-900">{fmt(main.revenue.thisMonth)}</p>
-                    {main.revenue.changePercent !== null && (
-                      <div className={`flex items-center gap-1 mt-1 text-xs ${main.revenue.changePercent >= 0 ? "text-green-600" : "text-red-600"}`}>
-                        {main.revenue.changePercent >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-                        {main.revenue.changePercent >= 0 ? "+" : ""}{main.revenue.changePercent}% vs last month
-                      </div>
-                    )}
-                  </div>
-                  <div className="bg-white border border-gray-200 rounded-xl p-4">
-                    <p className="text-xs text-gray-400 mb-1">Outstanding balance</p>
-                    <p className="text-lg font-semibold text-red-600">{fmt(main.outstandingBalance ?? 0)}</p>
-                    {main.alerts.overdueInvoices !== null && (
-                      <p className="text-xs text-gray-400 mt-1">{main.alerts.overdueInvoices} overdue invoice{main.alerts.overdueInvoices !== 1 ? "s" : ""}</p>
-                    )}
-                  </div>
-                  <div className="bg-white border border-gray-200 rounded-xl p-4">
-                    <p className="text-xs text-gray-400 mb-1">Expenses this month</p>
-                    <p className="text-lg font-semibold text-orange-600">{fmt(main.expenses.thisMonth)}</p>
-                    <p className="text-xs text-gray-400 mt-1">General + operational</p>
-                  </div>
-                  <div className="bg-white border border-gray-200 rounded-xl p-4">
-                    <p className="text-xs text-gray-400 mb-1">Payroll paid this month</p>
-                    <p className="text-lg font-semibold text-gray-900">{fmt(main.payroll.paidThisMonth)}</p>
-                    <p className="text-xs text-gray-400 mt-1">Net pay disbursed</p>
-                  </div>
+                  <MetricCard
+                    label="Revenue this month" value={fmt(main.revenue.thisMonth)}
+                    accent="text-gray-900"
+                    trend={main.revenue.changePercent !== null ? { value: main.revenue.changePercent } : null}
+                    to="/invoices"
+                  />
+                  <MetricCard
+                    label="Outstanding balance" value={fmt(main.outstandingBalance ?? 0)}
+                    accent="text-red-600"
+                    sub={main.alerts.overdueInvoices !== null
+                      ? `${main.alerts.overdueInvoices} overdue invoice${main.alerts.overdueInvoices !== 1 ? "s" : ""}`
+                      : undefined}
+                    to="/invoices"
+                  />
+                  <MetricCard
+                    label="Expenses this month" value={fmt(main.expenses.thisMonth)}
+                    accent="text-orange-600"
+                    sub="General + operational"
+                    to="/expenses"
+                  />
+                  <MetricCard
+                    label="Payroll paid" value={fmt(main.payroll.paidThisMonth)}
+                    accent="text-gray-900"
+                    sub="Net pay disbursed this month"
+                    to="/payroll"
+                  />
                 </div>
               )}
 
               {/* Non-finance notice */}
               {!canSeeFinance && (
-                <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm text-gray-500">
-                  Financial data (revenue, expenses, payroll, invoices) is not available for your role.
+                <div className="flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
+                  <Briefcase size={15} className="text-gray-400 shrink-0" />
+                  <p className="text-sm text-gray-500">Financial data is not available for your role.</p>
                 </div>
               )}
 
-              {/* Alerts row — visible to all roles (finance-only alerts gated) */}
-              {(
-                (canSeeFinance && (main.alerts.overdueInvoices ?? 0) > 0) ||
+              {/* Alert pills */}
+              {((canSeeFinance && (main.alerts.overdueInvoices ?? 0) > 0) ||
                 main.alerts.expiringContracts > 0 ||
-                main.alerts.overdueTasks > 0
-              ) && (
-                <div className="flex flex-wrap gap-3">
+                main.alerts.overdueTasks > 0) && (
+                <div className="flex flex-wrap gap-2">
                   {canSeeFinance && (main.alerts.overdueInvoices ?? 0) > 0 && (
-                    <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg px-3 py-2">
-                      <AlertTriangle size={13} />
-                      {main.alerts.overdueInvoices} overdue invoice{main.alerts.overdueInvoices !== 1 ? "s" : ""}
-                    </div>
+                    <AlertPill
+                      text={`${main.alerts.overdueInvoices} overdue invoice${main.alerts.overdueInvoices !== 1 ? "s" : ""}`}
+                      color="bg-red-50 border border-red-200 text-red-700"
+                      to="/invoices" navigate={navigate}
+                    />
                   )}
                   {main.alerts.expiringContracts > 0 && (
-                    <div className="flex items-center gap-2 bg-yellow-50 border border-yellow-200 text-yellow-700 text-xs rounded-lg px-3 py-2">
-                      <Clock size={13} />
-                      {main.alerts.expiringContracts} contract{main.alerts.expiringContracts !== 1 ? "s" : ""} expiring within 30 days
-                    </div>
+                    <AlertPill
+                      text={`${main.alerts.expiringContracts} contract${main.alerts.expiringContracts !== 1 ? "s" : ""} expiring within 30 days`}
+                      color="bg-amber-50 border border-amber-200 text-amber-700"
+                      to="/contracts" navigate={navigate}
+                    />
                   )}
                   {main.alerts.overdueTasks > 0 && (
-                    <div className="flex items-center gap-2 bg-orange-50 border border-orange-200 text-orange-700 text-xs rounded-lg px-3 py-2">
-                      <AlertTriangle size={13} />
-                      {main.alerts.overdueTasks} overdue task{main.alerts.overdueTasks !== 1 ? "s" : ""}
-                    </div>
+                    <AlertPill
+                      text={`${main.alerts.overdueTasks} overdue task${main.alerts.overdueTasks !== 1 ? "s" : ""}`}
+                      color="bg-orange-50 border border-orange-200 text-orange-700"
+                      to="/tasks" navigate={navigate}
+                    />
                   )}
                 </div>
               )}
 
-              {/* Revenue chart + Recent invoices — finance roles only */}
+              {/* Revenue chart + Recent invoices */}
               {canSeeFinance && main.monthlyRevenue && main.recentInvoices && (
                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-                  <div className="lg:col-span-2 bg-white border border-gray-200 rounded-xl p-4 overflow-hidden min-w-0">
-                    <p className="text-sm font-medium text-gray-700 mb-3">Revenue vs Expenses — last 3 months</p>
-                    <RevenueChart data={main.monthlyRevenue} />
-                  </div>
+                  <SectionCard title="Revenue vs Expenses — last 3 months">
+                    <div className="p-4 lg:col-span-2">
+                      <RevenueChart data={main.monthlyRevenue} />
+                    </div>
+                  </SectionCard>
 
-                  <div className="lg:col-span-3 bg-white border border-gray-200 rounded-xl overflow-x-auto">
-                    <p className="text-sm font-medium text-gray-700 px-4 py-3 border-b border-gray-100">Recent Invoices</p>
-                    {main.recentInvoices.length === 0 ? (
-                      <p className="text-xs text-gray-400 p-4">No invoices yet.</p>
-                    ) : (
-                      <table className="w-full text-xs">
-                        <thead className="bg-gray-50 text-gray-400 uppercase">
-                          <tr>
-                            <th className="text-left px-4 py-2">Invoice</th>
-                            <th className="text-left px-4 py-2">Client</th>
-                            <th className="text-right px-4 py-2">Amount</th>
-                            <th className="text-left px-4 py-2">Status</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100">
-                          {main.recentInvoices.map((inv) => (
-                            <tr key={inv.id}>
-                              <td className="px-4 py-2 font-medium text-gray-800">{inv.invoiceNumber}</td>
-                              <td className="px-4 py-2 text-gray-600">{inv.client?.name ?? "—"}</td>
-                              <td className="px-4 py-2 text-right">{fmt(Number(inv.amount))}</td>
-                              <td className="px-4 py-2">
-                                <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium ${invoiceStatusClass(inv.status)}`}>
-                                  {inv.status}
-                                </span>
-                              </td>
+                  <div className="lg:col-span-3">
+                    <SectionCard title="Recent Invoices" action="View all" onAction={() => navigate("/invoices")}>
+                      {main.recentInvoices.length === 0 ? (
+                        <p className="text-xs text-gray-400 p-4">No invoices yet.</p>
+                      ) : (
+                        <table className="w-full text-xs">
+                          <thead className="bg-gray-50 text-gray-400 uppercase text-[10px] tracking-wide">
+                            <tr>
+                              <th className="text-left px-5 py-2.5">Invoice</th>
+                              <th className="text-left px-5 py-2.5">Client</th>
+                              <th className="text-right px-5 py-2.5">Amount</th>
+                              <th className="text-left px-5 py-2.5">Status</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    )}
+                          </thead>
+                          <tbody className="divide-y divide-gray-50">
+                            {main.recentInvoices.map((inv) => (
+                              <tr key={inv.id} className="hover:bg-gray-50/50 transition-colors">
+                                <td className="px-5 py-2.5 font-semibold text-gray-800">{inv.invoiceNumber}</td>
+                                <td className="px-5 py-2.5 text-gray-500">{inv.client?.name ?? "—"}</td>
+                                <td className="px-5 py-2.5 text-right font-medium text-gray-800">{fmt(Number(inv.amount))}</td>
+                                <td className="px-5 py-2.5">
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${invoiceStatusClass(inv.status)}`}>
+                                    {inv.status}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+                    </SectionCard>
                   </div>
                 </div>
               )}
 
-              {/* Recent payments — finance roles only */}
+              {/* Recent payments */}
               {canSeeFinance && main.recentPayments && main.recentPayments.length > 0 && (
-                <div className="bg-white border border-gray-200 rounded-xl overflow-x-auto">
-                  <p className="text-sm font-medium text-gray-700 px-4 py-3 border-b border-gray-100">Recent Payments</p>
+                <SectionCard title="Recent Payments" action="View invoices" onAction={() => navigate("/invoices")}>
                   <table className="w-full text-xs">
-                    <thead className="bg-gray-50 text-gray-400 uppercase">
+                    <thead className="bg-gray-50 text-gray-400 uppercase text-[10px] tracking-wide">
                       <tr>
-                        <th className="text-left px-4 py-2">Date</th>
-                        <th className="text-left px-4 py-2">Client</th>
-                        <th className="text-left px-4 py-2">Invoice</th>
-                        <th className="text-left px-4 py-2">Method</th>
-                        <th className="text-right px-4 py-2">Amount</th>
+                        <th className="text-left px-5 py-2.5">Date</th>
+                        <th className="text-left px-5 py-2.5">Client</th>
+                        <th className="text-left px-5 py-2.5">Invoice</th>
+                        <th className="text-left px-5 py-2.5">Method</th>
+                        <th className="text-right px-5 py-2.5">Amount</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody className="divide-y divide-gray-50">
                       {main.recentPayments.map((p) => (
-                        <tr key={p.id}>
-                          <td className="px-4 py-2 text-gray-600">{fmtDate(p.paymentDate)}</td>
-                          <td className="px-4 py-2 text-gray-800">{p.invoice?.client?.name ?? "—"}</td>
-                          <td className="px-4 py-2 text-gray-600">{p.invoice?.invoiceNumber ?? "—"}</td>
-                          <td className="px-4 py-2 text-gray-600">{p.paymentMethod}</td>
-                          <td className="px-4 py-2 text-right font-medium text-green-700">{fmt(Number(p.amount))}</td>
+                        <tr key={p.id} className="hover:bg-gray-50/50 transition-colors">
+                          <td className="px-5 py-2.5 text-gray-500">{fmtDate(p.paymentDate)}</td>
+                          <td className="px-5 py-2.5 text-gray-800">{p.invoice?.client?.name ?? "—"}</td>
+                          <td className="px-5 py-2.5 text-gray-500">{p.invoice?.invoiceNumber ?? "—"}</td>
+                          <td className="px-5 py-2.5 text-gray-500">{p.paymentMethod}</td>
+                          <td className="px-5 py-2.5 text-right font-semibold text-emerald-700">{fmt(Number(p.amount))}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
-                </div>
+                </SectionCard>
               )}
             </div>
           ) : null}
         </>
       )}
 
-      {/* ── OPERATIONS TAB ── */}
+      {/* ══ OPERATIONS TAB ══ */}
       {tab === "operations" && canSeeOps && (
         <>
           {opsLoading ? (
-            <div className="text-sm text-gray-500">Loading...</div>
+            <div className="flex items-center gap-2 text-sm text-gray-400 py-8 justify-center">
+              <div className="w-4 h-4 border-2 border-gray-300 border-t-emerald-500 rounded-full animate-spin" />
+              Loading…
+            </div>
           ) : ops ? (
-            <div className="space-y-6">
-              {/* Roster cards */}
+            <div className="space-y-5">
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <StatCard label="Active Sites" value={ops.roster.activeSitesTotal} icon={MapPin} bg="bg-blue-50" iconBg="bg-blue-500" />
-                <StatCard label="Sites Rostered Today" value={ops.roster.sitesRosteredToday} icon={CheckCircle} bg="bg-emerald-50" iconBg="bg-emerald-600" />
-                <StatCard label="Officers on Duty" value={ops.roster.officersOnDutyToday} icon={Users} bg="bg-amber-50" iconBg="bg-amber-500" />
-                <StatCard label="Pending Review" value={ops.operations.pendingReview} icon={Clock} bg="bg-orange-50" iconBg="bg-orange-500" />
+                <StatCard label="Active Sites"         value={ops.roster.activeSitesTotal}    icon={MapPin}       gradient="from-blue-500 to-blue-700"     to="/sites"      />
+                <StatCard label="Rostered Today"       value={ops.roster.sitesRosteredToday}  icon={CheckCircle}  gradient="from-emerald-500 to-emerald-700" to="/roster"    />
+                <StatCard label="Officers on Duty"     value={ops.roster.officersOnDutyToday} icon={Users}        gradient="from-violet-500 to-violet-700"  to="/operations" />
+                <StatCard label="Pending Review"       value={ops.operations.pendingReview}   icon={Clock}        gradient="from-orange-500 to-orange-700"  to="/operations" />
               </div>
 
-              {/* Sites with roster gap */}
               {ops.roster.sitesWithGapToday.length > 0 && (
-                <div className="bg-red-50 border border-red-200 rounded-xl p-4">
-                  <p className="text-sm font-medium text-red-700 mb-2">
+                <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+                  <p className="text-sm font-semibold text-red-700 mb-2">
                     Sites with no roster today ({ops.roster.sitesWithGapToday.length})
                   </p>
                   <div className="flex flex-wrap gap-2">
                     {ops.roster.sitesWithGapToday.map((name) => (
-                      <span key={name} className="bg-red-100 text-red-700 text-xs px-2 py-1 rounded-full">{name}</span>
+                      <span key={name} className="bg-red-100 text-red-700 text-xs px-2.5 py-1 rounded-full font-medium">{name}</span>
                     ))}
                   </div>
                 </div>
               )}
 
               <div className="grid grid-cols-2 gap-4">
-                {/* Attendance this month */}
-                <div className="bg-white border border-gray-200 rounded-xl p-4">
-                  <p className="text-sm font-medium text-gray-700 mb-3">Attendance this month</p>
-                  {Object.keys(ops.attendanceThisMonth).length === 0 ? (
-                    <p className="text-xs text-gray-400">No attendance records this month.</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {Object.entries(ops.attendanceThisMonth).map(([status, count]) => (
-                        <div key={status} className="flex items-center justify-between text-xs">
-                          <span className="text-gray-600">{status.replace(/_/g, " ")}</span>
-                          <span className="font-semibold text-gray-900">{count}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                <SectionCard title="Attendance this month">
+                  <div className="p-4">
+                    {Object.keys(ops.attendanceThisMonth).length === 0 ? (
+                      <p className="text-xs text-gray-400">No records this month.</p>
+                    ) : (
+                      <div className="space-y-2.5">
+                        {Object.entries(ops.attendanceThisMonth).map(([status, count]) => (
+                          <div key={status} className="flex items-center justify-between text-xs">
+                            <span className="text-gray-600 font-medium">{status.replace(/_/g, " ")}</span>
+                            <span className="font-bold text-gray-900">{count}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </SectionCard>
 
-                {/* Recent operations records */}
-                <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-                  <p className="text-sm font-medium text-gray-700 px-4 py-3 border-b border-gray-100">Recent Operations Records</p>
+                <SectionCard title="Recent Operations Records" action="View all" onAction={() => navigate("/operations")}>
                   {ops.recentOperations.length === 0 ? (
                     <p className="text-xs text-gray-400 p-4">No records yet.</p>
                   ) : (
-                    <div className="divide-y divide-gray-100">
+                    <div className="divide-y divide-gray-50">
                       {ops.recentOperations.map((r) => (
-                        <div key={r.id} className="px-4 py-2.5 flex items-center justify-between text-xs">
+                        <div key={r.id} className="px-5 py-3 flex items-center justify-between text-xs hover:bg-gray-50/50">
                           <div>
-                            <p className="font-medium text-gray-800">{r.site?.siteName ?? "—"}</p>
-                            <p className="text-gray-400">{fmtDate(r.date)} · {r.shiftType?.name ?? "—"}</p>
+                            <p className="font-semibold text-gray-800">{r.site?.siteName ?? "—"}</p>
+                            <p className="text-gray-400 mt-0.5">{fmtDate(r.date)} · {r.shiftType?.name ?? "—"}</p>
                           </div>
-                          <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium ${
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
                             r.reviewStatus === "APPROVED" ? "bg-green-100 text-green-700" :
                             r.reviewStatus === "REJECTED" ? "bg-red-100 text-red-700" :
-                            "bg-yellow-100 text-yellow-700"
-                          }`}>
+                            "bg-yellow-100 text-yellow-700"}`}>
                             {r.reviewStatus}
                           </span>
                         </div>
                       ))}
                     </div>
                   )}
-                </div>
+                </SectionCard>
               </div>
             </div>
           ) : null}
         </>
       )}
 
-      {/* ── HR TAB ── */}
+      {/* ══ HR TAB ══ */}
       {tab === "hr" && canSeeHR && (
         <>
           {hrLoading ? (
-            <div className="text-sm text-gray-500">Loading...</div>
+            <div className="flex items-center gap-2 text-sm text-gray-400 py-8 justify-center">
+              <div className="w-4 h-4 border-2 border-gray-300 border-t-emerald-500 rounded-full animate-spin" />
+              Loading…
+            </div>
           ) : hr ? (
-            <div className="space-y-6">
-              {/* Employee counts */}
+            <div className="space-y-5">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <StatCard label="Active Employees" value={hr.employees.active} icon={Users} bg="bg-emerald-50" iconBg="bg-emerald-600" />
-                <StatCard label="Inactive" value={hr.employees.inactive} icon={Users} bg="bg-gray-50" iconBg="bg-gray-400" />
-                <StatCard label="Terminated" value={hr.employees.terminated} icon={Users} bg="bg-red-50" iconBg="bg-red-400" />
+                <StatCard label="Active Employees"  value={hr.employees.active}     icon={Users} gradient="from-emerald-500 to-emerald-700" to="/employees" />
+                <StatCard label="Inactive"           value={hr.employees.inactive}   icon={Users} gradient="from-gray-400 to-gray-600"       to="/employees" />
+                <StatCard label="Terminated"         value={hr.employees.terminated} icon={Users} gradient="from-red-500 to-red-700"          to="/employees" />
               </div>
 
-              {/* Alerts */}
               {(hr.tasks.overdueCount > 0 || hr.openDepartmentRequests > 0) && (
-                <div className="flex flex-wrap gap-3">
+                <div className="flex flex-wrap gap-2">
                   {hr.tasks.overdueCount > 0 && (
-                    <div className="flex items-center gap-2 bg-orange-50 border border-orange-200 text-orange-700 text-xs rounded-lg px-3 py-2">
-                      <AlertTriangle size={13} />
-                      {hr.tasks.overdueCount} overdue task{hr.tasks.overdueCount !== 1 ? "s" : ""}
-                    </div>
+                    <AlertPill
+                      text={`${hr.tasks.overdueCount} overdue task${hr.tasks.overdueCount !== 1 ? "s" : ""}`}
+                      color="bg-orange-50 border border-orange-200 text-orange-700"
+                      to="/tasks" navigate={navigate}
+                    />
                   )}
                   {hr.openDepartmentRequests > 0 && (
-                    <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 text-blue-700 text-xs rounded-lg px-3 py-2">
-                      <DollarSign size={13} />
-                      {hr.openDepartmentRequests} open department request{hr.openDepartmentRequests !== 1 ? "s" : ""}
-                    </div>
+                    <AlertPill
+                      text={`${hr.openDepartmentRequests} open department request${hr.openDepartmentRequests !== 1 ? "s" : ""}`}
+                      color="bg-blue-50 border border-blue-200 text-blue-700"
+                      to="/department-requests" navigate={navigate}
+                    />
                   )}
                 </div>
               )}
 
               <div className="grid grid-cols-2 gap-4">
-                {/* Employees by department */}
-                <div className="bg-white border border-gray-200 rounded-xl p-4">
-                  <p className="text-sm font-medium text-gray-700 mb-3">Employees by department</p>
-                  {hr.byDepartment.length === 0 ? (
-                    <p className="text-xs text-gray-400">No departments.</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {hr.byDepartment.map((d) => (
-                        <div key={d.department} className="flex items-center justify-between text-xs">
-                          <span className="text-gray-600">{d.department}</span>
-                          <span className="font-semibold text-gray-900">{d.count}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                <SectionCard title="Employees by department">
+                  <div className="p-4">
+                    {hr.byDepartment.length === 0 ? (
+                      <p className="text-xs text-gray-400">No departments.</p>
+                    ) : (
+                      <div className="space-y-2.5">
+                        {hr.byDepartment.map((d) => (
+                          <div key={d.department} className="flex items-center justify-between text-xs">
+                            <span className="text-gray-600 font-medium">{d.department}</span>
+                            <span className="font-bold text-gray-900">{d.count}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </SectionCard>
 
-                {/* Contracts expiring */}
-                <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-                  <p className="text-sm font-medium text-gray-700 px-4 py-3 border-b border-gray-100">
-                    Contracts expiring within 30 days ({hr.expiringContracts.length})
-                  </p>
+                <SectionCard title={`Contracts expiring within 30 days (${hr.expiringContracts.length})`}>
                   {hr.expiringContracts.length === 0 ? (
                     <p className="text-xs text-gray-400 p-4">None — all good.</p>
                   ) : (
-                    <div className="divide-y divide-gray-100 max-h-52 overflow-y-auto">
+                    <div className="divide-y divide-gray-50 max-h-52 overflow-y-auto">
                       {hr.expiringContracts.map((c) => (
-                        <div key={c.id} className="px-4 py-2.5 flex items-center justify-between text-xs">
+                        <div key={c.id} className="px-5 py-3 flex items-center justify-between text-xs hover:bg-gray-50/50">
                           <div>
-                            <p className="font-medium text-gray-800">{c.employee?.fullName}</p>
-                            <p className="text-gray-400">{c.employee?.position ?? c.payType}</p>
+                            <p className="font-semibold text-gray-800">{c.employee?.fullName}</p>
+                            <p className="text-gray-400 mt-0.5">{c.employee?.position ?? c.payType}</p>
                           </div>
-                          <span className="text-yellow-700 font-medium">{fmtDate(c.endDate)}</span>
+                          <span className="text-amber-700 font-semibold">{fmtDate(c.endDate)}</span>
                         </div>
                       ))}
                     </div>
                   )}
-                </div>
+                </SectionCard>
               </div>
 
-              {/* Recent hires + overdue tasks */}
               <div className="grid grid-cols-2 gap-4">
-                <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-                  <p className="text-sm font-medium text-gray-700 px-4 py-3 border-b border-gray-100">
-                    Recent hires — last 30 days ({hr.recentHires.length})
-                  </p>
+                <SectionCard title={`Recent hires — last 30 days (${hr.recentHires.length})`} action="View all" onAction={() => navigate("/employees")}>
                   {hr.recentHires.length === 0 ? (
                     <p className="text-xs text-gray-400 p-4">No new hires in the last 30 days.</p>
                   ) : (
-                    <div className="divide-y divide-gray-100">
+                    <div className="divide-y divide-gray-50">
                       {hr.recentHires.map((e) => (
-                        <div key={e.id} className="px-4 py-2.5 flex items-center justify-between text-xs">
+                        <div key={e.id} className="px-5 py-3 flex items-center justify-between text-xs hover:bg-gray-50/50">
                           <div>
-                            <p className="font-medium text-gray-800">{e.fullName}</p>
-                            <p className="text-gray-400">{e.position ?? "—"}</p>
+                            <p className="font-semibold text-gray-800">{e.fullName}</p>
+                            <p className="text-gray-400 mt-0.5">{e.position ?? "—"}</p>
                           </div>
                           <span className="text-gray-400">{fmtDate(e.dateAdded)}</span>
                         </div>
                       ))}
                     </div>
                   )}
-                </div>
+                </SectionCard>
 
-                <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-                  <p className="text-sm font-medium text-gray-700 px-4 py-3 border-b border-gray-100">
-                    Top overdue tasks ({hr.tasks.overdueCount})
-                  </p>
+                <SectionCard title={`Top overdue tasks (${hr.tasks.overdueCount})`} action="View tasks" onAction={() => navigate("/tasks")}>
                   {hr.tasks.topOverdue.length === 0 ? (
                     <p className="text-xs text-gray-400 p-4">No overdue tasks.</p>
                   ) : (
-                    <div className="divide-y divide-gray-100">
+                    <div className="divide-y divide-gray-50">
                       {hr.tasks.topOverdue.map((t) => (
-                        <div key={t.id} className="px-4 py-2.5 text-xs">
+                        <div key={t.id} className="px-5 py-3 text-xs hover:bg-gray-50/50">
                           <div className="flex items-center justify-between">
-                            <p className="font-medium text-gray-800">{t.title}</p>
-                            <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium ${priorityClass(t.priority)}`}>
+                            <p className="font-semibold text-gray-800">{t.title}</p>
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${priorityClass(t.priority)}`}>
                               {t.priority}
                             </span>
                           </div>
@@ -606,7 +709,7 @@ export default function DashboardPage() {
                       ))}
                     </div>
                   )}
-                </div>
+                </SectionCard>
               </div>
             </div>
           ) : null}
