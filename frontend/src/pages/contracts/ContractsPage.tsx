@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from "react";
 import type { FormEvent } from "react";
 import { Pencil, FileText, X } from "lucide-react";
 import api from "../../api/client";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../../contexts/AuthContext";
 
 type ContractStatus = "ACTIVE" | "EXPIRING_SOON" | "EXPIRED" | "INACTIVE";
 type BillingFrequency = "MONTHLY" | "QUARTERLY" | "ANNUALLY" | "ONE_OFF";

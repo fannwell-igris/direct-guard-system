@@ -15,7 +15,7 @@ import {
   Building2,
 } from "lucide-react";
 import api from "../../api/client";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../../contexts/AuthContext";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
