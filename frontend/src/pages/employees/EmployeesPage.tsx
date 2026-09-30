@@ -1133,7 +1133,7 @@ export default function EmployeesPage() {
               className="select w-40"
               title="Sort by"
             >
-              {SORT_OPTIONS.map((opt) => (
+              {SORT_OPTIONS.filter((opt) => opt.value !== "salary" || canSeePayrollProfile).map((opt) => (
                 <option key={opt.value} value={opt.value}>Sort: {opt.label}</option>
               ))}
             </select>
@@ -1357,7 +1357,7 @@ export default function EmployeesPage() {
                         <span className="text-gray-500">{detailEmployee.assignedSite.siteName}</span>
                       </div>
                     )}
-                    {detailEmployee.salary && (
+                    {detailEmployee.salary && canSeePayrollProfile && (
                       <div className="flex items-center gap-2">
                         <FileText size={13} className="text-gray-400 flex-shrink-0" />
                         <span>Salary: {formatCurrency(detailEmployee.salary)}</span>
@@ -1674,11 +1674,13 @@ export default function EmployeesPage() {
                               {formatDate(contract.startDate)}
                               {contract.endDate ? ` → ${formatDate(contract.endDate)}` : " · Ongoing"}
                             </p>
+                            {canSeePayrollProfile && (
                             <p className="text-xs text-gray-600 mt-0.5">
                               {contract.payType === "SHIFT"
                                 ? `Shift rate: ${formatCurrency(contract.shiftRate)}`
                                 : `Salary: ${formatCurrency(contract.salary)}`}
                             </p>
+                            )}
                             {contract.contractType && (
                               <span className={
                                 "inline-block mt-1 text-xs font-medium px-2 py-0.5 rounded-full " +
