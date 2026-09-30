@@ -7,6 +7,11 @@ import {
   RosterEntryListQuery,
 } from "./roster.validation";
 
+export interface ReliefInput {
+  reliefEmployeeId: string;
+  notes?: string | null;
+}
+
 /**
  * Creates a new roster entry. Validates employeeId, siteId, and shiftTypeId
  * all reference real records first, so a bad id comes back as a clean 400
@@ -153,6 +158,107 @@ export async function updateRosterEntry(id: string, input: RosterEntryUpdateInpu
       ...(clientId !== undefined ? { clientId } : {}),
     },
   });
+}
+
+/**
+ * Relief officer flow — single atomic action:
+ *  1. Loads the original SCHEDULED roster entry (404 if not found, 409 if
+ *     already cancelled).
+ *  2. Validates the relief officer is a Guard and not the same person.
+ *  3. Finds or creates the OperationsRecord for this site/date/shift
+ *     (creates it with no report fields if it doesn't exist yet — this
+ *     matches the pattern used everywhere else: the ops record is the
+ *     container, the attendance record is the content).
+ *  4. Inside a transaction:
+ *     a. Sets the original roster entry to CANCELLED.
+ *     b. Creates an AttendanceRecord for the relief officer with
+ *        status=REPLACEMENT, linked to the original officer via
+ *        replacementForEmployeeId.
+ *
+ * Returns the created AttendanceRecord so the caller can confirm what was
+ * recorded.
+ */
+export async function recordRelief(rosterEntryId: string, input: ReliefInput) {
+  // 1. Load original entry
+  const entry = await prisma.rosterEntry.findUnique({
+    where: { id: rosterEntryId },
+    include: {
+      employee:  { select: { id: true, fullName: true } },
+      site:      { select: { id: true, siteName: true, clientId: true } },
+      shiftType: { select: { id: true, name: true } },
+    },
+  });
+  if (!entry) {
+    throw ApiError.notFound(`Roster entry ${rosterEntryId} not found.`);
+  }
+  if (entry.status === "CANCELLED") {
+    throw ApiError.conflict(
+      `This roster entry is already cancelled — it cannot receive a relief officer.`
+    );
+  }
+
+  // 2. Validate relief officer
+  if (input.reliefEmployeeId === entry.employeeId) {
+    throw ApiError.badRequest("The relief officer cannot be the same as the original officer.");
+  }
+  await ensureEmployeeIsGuard(input.reliefEmployeeId);
+
+  // 3. Find or create the OperationsRecord for this site/date/shift
+  const dateOnly = new Date(entry.date);
+  let opsRecord = await prisma.operationsRecord.findFirst({
+    where: {
+      siteId:      entry.siteId,
+      shiftTypeId: entry.shiftTypeId,
+      date:        dateOnly,
+    },
+    select: { id: true },
+  });
+
+  if (!opsRecord) {
+    opsRecord = await prisma.operationsRecord.create({
+      data: {
+        siteId:      entry.siteId,
+        clientId:    entry.site.clientId,
+        shiftTypeId: entry.shiftTypeId,
+        date:        dateOnly,
+        // Report fields left blank — relief is recorded before a full
+        // ops report is submitted; the ops team fills those in separately.
+      },
+      select: { id: true },
+    });
+  }
+
+  // 4. Transaction: cancel original entry + create REPLACEMENT attendance
+  const [, attendanceRecord] = await prisma.$transaction([
+    prisma.rosterEntry.update({
+      where: { id: rosterEntryId },
+      data: {
+        status: "CANCELLED",
+        notes: input.notes
+          ? `Relief: ${input.notes}`
+          : (entry.notes ?? undefined),
+      },
+    }),
+    prisma.attendanceRecord.create({
+      data: {
+        operationsRecordId:       opsRecord.id,
+        employeeId:               input.reliefEmployeeId,
+        status:                   "REPLACEMENT",
+        rosterEntryId:            rosterEntryId,
+        replacementForEmployeeId: entry.employeeId,
+        notes:                    input.notes ?? null,
+      },
+      include: {
+        employee:               { select: { id: true, fullName: true } },
+        replacementForEmployee: { select: { id: true, fullName: true } },
+      },
+    }),
+  ]);
+
+  return {
+    cancelledEntry: { id: rosterEntryId, originalOfficer: entry.employee.fullName },
+    attendanceRecord,
+  };
 }
 
 // Free-text on the Employee record (see schema comment on `position`), so
