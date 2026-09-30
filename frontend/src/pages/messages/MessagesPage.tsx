@@ -210,7 +210,19 @@ function NewThreadModal({ onClose, onCreate }: NewThreadModalProps) {
   // Fetch all users once on mount
   useEffect(() => {
     api.get("/messages/users")
-      .then((res) => setAllUsers(res.data.data ?? res.data ?? []))
+      .then((res) => {
+        // Handle all common response shapes:
+        // { status, data: [...] }  or  { data: [...] }  or  [...]
+        const raw = res.data;
+        const list: SystemUser[] = Array.isArray(raw)
+          ? raw
+          : Array.isArray(raw?.data)
+          ? raw.data
+          : Array.isArray(raw?.users)
+          ? raw.users
+          : [];
+        setAllUsers(list);
+      })
       .catch(() => setAllUsers([]))
       .finally(() => setLoadingUsers(false));
   }, []);
@@ -264,8 +276,10 @@ function NewThreadModal({ onClose, onCreate }: NewThreadModalProps) {
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!subject.trim() || !selectedUser || !body.trim()) return;
-    onCreate(subject.trim(), selectedUser.fullName, selectedUser.id, body.trim());
+    if (!subject.trim() || (!selectedUser && !query.trim()) || !body.trim()) return;
+    const name = selectedUser ? selectedUser.fullName : query.trim();
+    const id   = selectedUser ? selectedUser.id : `manual-${Date.now()}`;
+    onCreate(subject.trim(), name, id, body.trim());
   }
 
   return (
@@ -367,7 +381,7 @@ function NewThreadModal({ onClose, onCreate }: NewThreadModalProps) {
             <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
             <button
               type="submit"
-              disabled={!selectedUser || !subject.trim() || !body.trim()}
+              disabled={(!selectedUser && !query.trim()) || !subject.trim() || !body.trim()}
               className="btn-primary disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Send size={14} /> Send Message
