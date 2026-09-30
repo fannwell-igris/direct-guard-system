@@ -52,6 +52,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: "Attendance Calendar", to: "/operations/calendar", icon: CalendarDays },
       { label: "Field Receipts", to: "/operations/field-receipts", icon: Receipt },
       { label: "Deployment", to: "/deployment", icon: UserCheck },
+      { label: "Inventory & Assets", to: "/inventory", icon: Package },
       { label: "Tasks", to: "/tasks", icon: CheckSquare },
       { label: "Department Requests", to: "/department-requests", icon: Inbox },
       { label: "Department Budgets", to: "/department-budgets", icon: PiggyBank },

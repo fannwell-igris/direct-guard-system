@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import api from "../../api/client";
 import Modal from "../../components/ui/Modal";
+import { useAuth } from "../../contexts/AuthContext";
 
 interface Employee { id: string; fullName: string; }
 interface Department { id: string; name: string; }
@@ -20,6 +21,11 @@ interface InventoryItem {
   assignedToSiteId: string | null;
   assignedToSite?: { siteName: string } | null;
   purchaseDate: string | null; purchasePrice: string | null; notes: string | null;
+  // Asset-return workflow fields
+  returnStatus?: "PENDING_COLLECTION" | "COLLECTED" | null;
+  returnTriggeredAt?: string | null;
+  returnConfirmedAt?: string | null;
+  returnConfirmedBy?: string | null;
 }
 
 interface StockMovement {
@@ -120,6 +126,17 @@ function ReconciliationBar({ items }: { items: InventoryItem[] }) {
 }
 
 export default function InventoryPage() {
+  const { user } = useAuth();
+  const userRole = user?.role ?? "STAFF";
+  // canManage: can create items, edit item details, archive
+  const canManage = ["ADMIN", "MANAGER"].includes(userRole);
+  // canIssue: can log stock movements (OPERATIONS limited to ISSUE only — enforced server-side too)
+  const canIssue  = ["ADMIN", "MANAGER", "OPERATIONS"].includes(userRole);
+  // availableMovementTypes: OPERATIONS can only ISSUE; ADMIN/MANAGER get all types
+  const availableMovementTypes = canManage
+    ? ["PURCHASE", "ISSUE", "WRITE_OFF", "ADJUSTMENT"]
+    : ["ISSUE"];
+
   const [activeTab, setActiveTab] = useState<TabKey>("company");
   const [allItems, setAllItems] = useState<InventoryItem[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -153,6 +170,11 @@ export default function InventoryPage() {
   const [thNotes, setThNotes] = useState("");
   const [thErr, setThErr] = useState<string | null>(null);
   const [savingTh, setSavingTh] = useState(false);
+  // Confirm collection (pending-return assets)
+  const [showCollectForm, setShowCollectForm] = useState(false);
+  const [collectBy, setCollectBy] = useState("");
+  const [collectErr, setCollectErr] = useState<string | null>(null);
+  const [savingCollect, setSavingCollect] = useState(false);
 
   async function loadItems() {
     setIsLoading(true);
@@ -172,8 +194,22 @@ export default function InventoryPage() {
     ]).then(([e, d, s]) => { setEmployees(e.data.data); setDepartments(d.data.data); setSites(s.data.data); }).catch(() => {});
   }, []);
 
+  async function submitCollectConfirm() {
+    if (!selectedItem || !collectBy.trim()) { setCollectErr("Please enter who collected the item."); return; }
+    setSavingCollect(true); setCollectErr(null);
+    try {
+      await api.post(`/inventory/${selectedItem.id}/confirm-collection`, { confirmedBy: collectBy.trim() });
+      setShowCollectForm(false); setCollectBy("");
+      await loadItems();
+      // Re-open detail with fresh data
+      const res = await api.get(`/inventory/${selectedItem.id}`);
+      setSelectedItem(res.data.data);
+    } catch (err: any) { setCollectErr(err.response?.data?.message ?? "Failed to confirm collection."); }
+    finally { setSavingCollect(false); }
+  }
+
   async function openDetail(item: InventoryItem) {
-    setSelectedItem(item); setDetailTab("movements"); setShowMovForm(false); setShowThForm(false);
+    setSelectedItem(item); setDetailTab("movements"); setShowMovForm(false); setShowThForm(false); setShowCollectForm(false);
     try {
       const [mr, lr] = await Promise.all([api.get(`/inventory/${item.id}/movements`), api.get(`/inventory/${item.id}/take-home-log`)]);
       setMovements(mr.data.data); setTakeLogs(lr.data.data);
@@ -240,12 +276,14 @@ export default function InventoryPage() {
           <h1 className="text-2xl font-semibold text-gray-900">Inventory & Assets</h1>
           <p className="text-sm text-gray-500 mt-0.5">{allItems.length} total items across all categories</p>
         </div>
-        <button onClick={() => {
-          setForm({ ...EMPTY_FORM, itemType: activeTab === "consumable" ? "CONSUMABLE" : "ASSET" });
-          setFormError(null); setEditingId("new"); setSelectedItem(null);
-        }} className="bg-green-600 text-white text-sm font-medium rounded px-4 py-2 hover:bg-green-700">
-          + Add Item
-        </button>
+        {canManage && (
+          <button onClick={() => {
+            setForm({ ...EMPTY_FORM, itemType: activeTab === "consumable" ? "CONSUMABLE" : "ASSET" });
+            setFormError(null); setEditingId("new"); setSelectedItem(null);
+          }} className="bg-green-600 text-white text-sm font-medium rounded px-4 py-2 hover:bg-green-700">
+            + Add Item
+          </button>
+        )}
       </div>
 
       {error && <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded px-3 py-2">{error}</div>}
@@ -370,6 +408,9 @@ export default function InventoryPage() {
                       <td className="px-4 py-3">
                         <button onClick={() => openDetail(item)} className="font-medium text-green-600 hover:underline text-left">
                           {item.name}{item.takenHome && <span className="ml-1 text-xs text-orange-500">📤</span>}
+                          {item.returnStatus === "PENDING_COLLECTION" && (
+                            <span className="ml-1.5 inline-block bg-red-100 text-red-700 text-xs font-semibold px-1.5 py-0.5 rounded-full">⚠ Pending Collection</span>
+                          )}
                         </button>
                         {item.serialNumber && <p className="text-xs text-gray-400">S/N: {item.serialNumber}</p>}
                       </td>
@@ -382,10 +423,12 @@ export default function InventoryPage() {
                           : (item.assignedToEmployee?.fullName ?? item.assignedToDepartment?.name ?? item.assignedToSite?.siteName ?? "—")}
                       </td>
                       <td className="px-4 py-3 text-right space-x-2">
-                        <button onClick={() => {
-                          setForm({ name: item.name, category: item.category, itemType: item.itemType, quantity: String(item.quantity), unitOfMeasure: item.unitOfMeasure ?? "", condition: item.condition, serialNumber: item.serialNumber ?? "", canTakeHome: item.canTakeHome, assignedToEmployeeId: item.assignedToEmployeeId ?? "", assignedToDepartmentId: item.assignedToDepartmentId ?? "", assignedToSiteId: item.assignedToSiteId ?? "", purchaseDate: item.purchaseDate?.slice(0, 10) ?? "", purchasePrice: item.purchasePrice ?? "", notes: item.notes ?? "" });
-                          setFormError(null); setEditingId(item.id); setSelectedItem(null);
-                        }} className="text-green-600 hover:underline text-xs">Edit</button>
+                        {canManage && (
+                          <button onClick={() => {
+                            setForm({ name: item.name, category: item.category, itemType: item.itemType, quantity: String(item.quantity), unitOfMeasure: item.unitOfMeasure ?? "", condition: item.condition, serialNumber: item.serialNumber ?? "", canTakeHome: item.canTakeHome, assignedToEmployeeId: item.assignedToEmployeeId ?? "", assignedToDepartmentId: item.assignedToDepartmentId ?? "", assignedToSiteId: item.assignedToSiteId ?? "", purchaseDate: item.purchaseDate?.slice(0, 10) ?? "", purchasePrice: item.purchasePrice ?? "", notes: item.notes ?? "" });
+                            setFormError(null); setEditingId(item.id); setSelectedItem(null);
+                          }} className="text-green-600 hover:underline text-xs">Edit</button>
+                        )}
                         <button onClick={() => openDetail(item)} className="text-gray-500 hover:underline text-xs">Detail</button>
                       </td>
                     </tr>
@@ -413,6 +456,53 @@ export default function InventoryPage() {
               {selectedItem.canTakeHome && <div className="flex justify-between"><span>Take-home</span><span className={selectedItem.takenHome ? "text-orange-600 font-medium" : "text-green-600"}>{selectedItem.takenHome ? "Currently away" : "In office"}</span></div>}
             </div>
 
+            {/* Pending-collection banner + confirm action */}
+            {selectedItem.returnStatus === "PENDING_COLLECTION" && (
+              <div className="rounded-lg bg-red-50 border border-red-200 p-3 space-y-2">
+                <p className="text-xs font-semibold text-red-700">⚠ Awaiting Physical Collection</p>
+                <p className="text-xs text-red-600">
+                  This item was flagged when the assigned officer was terminated or marked absconded.
+                  Confirm below once it has been physically retrieved.
+                </p>
+                {selectedItem.returnTriggeredAt && (
+                  <p className="text-xs text-red-500">Flagged: {new Date(selectedItem.returnTriggeredAt).toLocaleDateString("en-GB")}</p>
+                )}
+                {canManage && (
+                  !showCollectForm ? (
+                    <button onClick={() => setShowCollectForm(true)} className="w-full text-xs bg-red-600 text-white rounded px-3 py-1.5 hover:bg-red-700">
+                      Confirm Collected
+                    </button>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {collectErr && <p className="text-xs text-red-700">{collectErr}</p>}
+                      <input
+                        placeholder="Collected by (your name)"
+                        value={collectBy}
+                        onChange={(e) => setCollectBy(e.target.value)}
+                        className="w-full border border-red-300 rounded px-2 py-1.5 text-xs"
+                      />
+                      <div className="flex gap-2">
+                        <button onClick={submitCollectConfirm} disabled={savingCollect}
+                          className="flex-1 text-xs bg-red-600 text-white rounded px-2 py-1.5 hover:bg-red-700 disabled:opacity-60">
+                          {savingCollect ? "Saving…" : "Confirm"}
+                        </button>
+                        <button onClick={() => { setShowCollectForm(false); setCollectBy(""); setCollectErr(null); }}
+                          className="text-xs border border-gray-300 rounded px-2 py-1.5 hover:bg-gray-50">
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )
+                )}
+              </div>
+            )}
+            {selectedItem.returnStatus === "COLLECTED" && selectedItem.returnConfirmedAt && (
+              <div className="rounded-lg bg-green-50 border border-green-200 p-3 text-xs text-green-700">
+                ✓ Collected on {new Date(selectedItem.returnConfirmedAt).toLocaleDateString("en-GB")}
+                {selectedItem.returnConfirmedBy && ` by ${selectedItem.returnConfirmedBy}`}
+              </div>
+            )}
+
             {/* Stock movements — show for all tabs */}
             <div className="border-t pt-3">
               {isAssignableTab && (
@@ -433,8 +523,15 @@ export default function InventoryPage() {
                     {movements.length === 0 ? <p className="text-xs text-gray-400">No movements yet.</p> : movements.map((m) => (
                       <div key={m.id} className="text-xs border-b border-gray-100 pb-1.5">
                         <div className="flex justify-between">
-                          <span className={`font-medium ${["PURCHASE", "ADJUSTMENT"].includes(m.movementType) ? "text-green-600" : "text-red-600"}`}>
-                            {["PURCHASE", "ADJUSTMENT"].includes(m.movementType) ? "+" : "-"}{m.quantity} {m.movementType}
+                          <span className={`font-medium ${
+                            ["PURCHASE", "ADJUSTMENT", "RETURN_CONFIRMED"].includes(m.movementType)
+                              ? "text-green-600"
+                              : m.movementType === "RETURN_PENDING"
+                                ? "text-orange-600"
+                                : "text-red-600"
+                          }`}>
+                            {m.movementType === "RETURN_PENDING" ? "⚠ " : m.movementType === "RETURN_CONFIRMED" ? "✓ " : ["PURCHASE", "ADJUSTMENT"].includes(m.movementType) ? "+" : "-"}
+                            {m.quantity} {m.movementType.replace(/_/g, " ")}
                           </span>
                           <span className="text-gray-400">{new Date(m.movementDate).toLocaleDateString("en-GB")}</span>
                         </div>
@@ -443,13 +540,13 @@ export default function InventoryPage() {
                       </div>
                     ))}
                   </div>
-                  {!showMovForm ? (
+                  {canIssue && (!showMovForm ? (
                     <button onClick={() => setShowMovForm(true)} className="w-full text-xs border border-gray-300 rounded px-3 py-1.5 hover:bg-gray-50">+ Record Movement</button>
                   ) : (
                     <form onSubmit={submitMovement} className="space-y-2 border-t pt-2">
                       {movErr && <p className="text-xs text-red-600">{movErr}</p>}
                       <select value={movType} onChange={(e) => setMovType(e.target.value)} className="w-full border border-gray-300 rounded px-2 py-1.5 text-xs">
-                        {MOVEMENT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                        {availableMovementTypes.map((t) => <option key={t} value={t}>{t}</option>)}
                       </select>
                       <div className="grid grid-cols-2 gap-2">
                         <input type="number" required min="1" placeholder="Qty" value={movQty} onChange={(e) => setMovQty(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-xs" />
@@ -467,7 +564,7 @@ export default function InventoryPage() {
                         <button type="button" onClick={() => setShowMovForm(false)} className="text-xs border border-gray-300 rounded px-2 py-1.5 hover:bg-gray-50">Cancel</button>
                       </div>
                     </form>
-                  )}
+                  ))}
                 </div>
               )}
 
@@ -488,7 +585,7 @@ export default function InventoryPage() {
                     ))}
                   </div>
                   {thErr && <p className="text-xs text-red-600">{thErr}</p>}
-                  {selectedItem.canTakeHome && selectedItem.assignedToEmployeeId && (
+                  {canManage && selectedItem.canTakeHome && selectedItem.assignedToEmployeeId && (
                     !showThForm ? (
                       <button onClick={() => setShowThForm(true)} className="w-full text-xs border border-gray-300 rounded px-3 py-1.5 hover:bg-gray-50">
                         {selectedItem.takenHome ? "Record Return" : "Record Take-Home"}
