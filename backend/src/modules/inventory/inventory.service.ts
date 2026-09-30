@@ -4,233 +4,243 @@ import { ApiError } from "../../middleware/errorHandler";
 import {
   InventoryItemCreateInput,
   InventoryItemUpdateInput,
-  InventoryItemListQuery,
-  StockMovementCreateInput,
-  TakeHomeInput,
+  StockMovementInput,
+  InventoryListQuery,
 } from "./inventory.validation";
 
-// ---- InventoryItem CRUD ----
+// ── Items ────────────────────────────────────────────────────────────────────
 
-export async function createInventoryItem(input: InventoryItemCreateInput) {
-  await validateAssignmentFKs(input.assignedToEmployeeId, input.assignedToDepartmentId, input.assignedToSiteId);
+const ITEM_INCLUDE = {
+  assignedToEmployee:   { select: { id: true, fullName: true } },
+  assignedToDepartment: { select: { id: true, name: true } },
+  assignedToSite:       { select: { id: true, siteName: true } },
+} satisfies Prisma.InventoryItemInclude;
 
-  // Auto-set assignedAt if assignment provided and not explicitly set
-  const data = {
-    ...input,
-    assignedAt:
-      input.assignedAt !== undefined
-        ? input.assignedAt
-        : input.assignedToEmployeeId || input.assignedToDepartmentId || input.assignedToSiteId
-        ? new Date()
-        : null,
-  };
-
-  return prisma.inventoryItem.create({ data });
+export async function createItem(input: InventoryItemCreateInput) {
+  await validateAssignmentTargets(input);
+  return prisma.inventoryItem.create({
+    data: {
+      name:                   input.name,
+      category:               input.category,
+      itemType:               input.itemType,
+      quantity:               input.quantity ?? 0,
+      unitOfMeasure:          input.unitOfMeasure ?? null,
+      condition:              input.condition ?? "GOOD",
+      serialNumber:           input.serialNumber ?? null,
+      purchaseDate:           input.purchaseDate ?? null,
+      purchasePrice:          input.purchasePrice != null
+        ? new Prisma.Decimal(input.purchasePrice) : null,
+      assignedToEmployeeId:   input.assignedToEmployeeId   ?? null,
+      assignedToDepartmentId: input.assignedToDepartmentId ?? null,
+      assignedToSiteId:       input.assignedToSiteId       ?? null,
+      assignedAt:             input.assignedAt ?? null,
+      canTakeHome:            input.canTakeHome ?? false,
+      notes:                  input.notes ?? null,
+    },
+    include: ITEM_INCLUDE,
+  });
 }
 
-export async function listInventoryItems(query: InventoryItemListQuery) {
+export async function listItems(query: InventoryListQuery) {
   const where: Prisma.InventoryItemWhereInput = {};
   if (query.itemType) where.itemType = query.itemType;
-  if (query.status) where.status = query.status;
   if (query.category) where.category = { contains: query.category, mode: "insensitive" };
-  if (query.assignedToEmployeeId) where.assignedToEmployeeId = query.assignedToEmployeeId;
-  if (query.assignedToDepartmentId) where.assignedToDepartmentId = query.assignedToDepartmentId;
-  if (query.assignedToSiteId) where.assignedToSiteId = query.assignedToSiteId;
+  if (query.status)   where.status   = query.status;
 
   const [total, rows] = await Promise.all([
     prisma.inventoryItem.count({ where }),
     prisma.inventoryItem.findMany({
       where,
-      orderBy: [{ category: "asc" }, { name: "asc" }],
+      orderBy: { dateCreated: "desc" },
       skip: (query.page - 1) * query.pageSize,
       take: query.pageSize,
-      include: {
-        assignedToEmployee: { select: { id: true, fullName: true, position: true } },
-        assignedToDepartment: { select: { id: true, name: true } },
-        assignedToSite: { select: { id: true, siteName: true } },
-      },
+      include: ITEM_INCLUDE,
     }),
   ]);
 
   return {
     data: rows,
-    pagination: { page: query.page, pageSize: query.pageSize, total, totalPages: Math.max(1, Math.ceil(total / query.pageSize)) },
+    pagination: {
+      page: query.page,
+      pageSize: query.pageSize,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / query.pageSize)),
+    },
   };
 }
 
-export async function getInventoryItemById(id: string) {
+export async function getItemById(id: string) {
   const item = await prisma.inventoryItem.findUnique({
     where: { id },
     include: {
-      assignedToEmployee: { select: { id: true, fullName: true, position: true } },
-      assignedToDepartment: { select: { id: true, name: true } },
-      assignedToSite: { select: { id: true, siteName: true } },
-      _count: { select: { stockMovements: true, takeHomeLogs: true } },
+      ...ITEM_INCLUDE,
+      stockMovements: {
+        orderBy: { movementDate: "desc" },
+        include: {
+          issuedToEmployee:   { select: { id: true, fullName: true } },
+          issuedToDepartment: { select: { id: true, name: true } },
+        },
+      },
     },
   });
   if (!item) throw ApiError.notFound(`Inventory item ${id} not found.`);
   return item;
 }
 
-export async function updateInventoryItem(id: string, input: InventoryItemUpdateInput) {
-  const existing = await prisma.inventoryItem.findUnique({ where: { id }, select: { id: true, takenHome: true } });
-  if (!existing) throw ApiError.notFound(`Inventory item ${id} not found.`);
+export async function updateItem(id: string, input: InventoryItemUpdateInput) {
+  await ensureItemExists(id);
+  await validateAssignmentTargets(input);
 
-  await validateAssignmentFKs(input.assignedToEmployeeId, input.assignedToDepartmentId, input.assignedToSiteId);
-
-  // Auto-set assignedAt when assignment changes and not explicitly supplied
-  const data: typeof input & { assignedAt?: Date | null } = { ...input };
-  if (
-    (input.assignedToEmployeeId !== undefined || input.assignedToDepartmentId !== undefined || input.assignedToSiteId !== undefined) &&
-    input.assignedAt === undefined
-  ) {
-    const hasAssignment = input.assignedToEmployeeId || input.assignedToDepartmentId || input.assignedToSiteId;
-    data.assignedAt = hasAssignment ? new Date() : null;
+  const data: Prisma.InventoryItemUpdateInput = { ...input };
+  if (input.purchasePrice !== undefined) {
+    data.purchasePrice = input.purchasePrice != null
+      ? new Prisma.Decimal(input.purchasePrice) : null;
   }
 
-  return prisma.inventoryItem.update({ where: { id }, data });
-}
-
-// ---- Stock Movements ----
-
-export async function addStockMovement(itemId: string, input: StockMovementCreateInput) {
-  const item = await prisma.inventoryItem.findUnique({
-    where: { id: itemId },
-    select: { id: true, quantity: true, itemType: true },
-  });
-  if (!item) throw ApiError.notFound(`Inventory item ${itemId} not found.`);
-
-  // Calculate new quantity
-  const isIncrease = input.movementType === "PURCHASE" || input.movementType === "ADJUSTMENT";
-  const newQty = isIncrease ? item.quantity + input.quantity : item.quantity - input.quantity;
-
-  if (newQty < 0) {
-    throw ApiError.badRequest(
-      `Insufficient quantity. Current stock: ${item.quantity}, requested: ${input.quantity}.`
-    );
-  }
-
-  // Validate issue FKs
-  if (input.issuedToEmployeeId) {
-    const emp = await prisma.employee.findUnique({ where: { id: input.issuedToEmployeeId }, select: { id: true } });
-    if (!emp) throw ApiError.badRequest(`Employee ${input.issuedToEmployeeId} does not exist.`);
-  }
-  if (input.issuedToDepartmentId) {
-    const dept = await prisma.department.findUnique({ where: { id: input.issuedToDepartmentId }, select: { id: true } });
-    if (!dept) throw ApiError.badRequest(`Department ${input.issuedToDepartmentId} does not exist.`);
-  }
-
-  return prisma.$transaction(async (tx) => {
-    const movement = await tx.stockMovement.create({
-      data: { inventoryItemId: itemId, ...input },
-    });
-    await tx.inventoryItem.update({ where: { id: itemId }, data: { quantity: newQty } });
-    return movement;
+  return prisma.inventoryItem.update({
+    where: { id },
+    data,
+    include: ITEM_INCLUDE,
   });
 }
 
-export async function listStockMovements(itemId: string) {
-  const item = await prisma.inventoryItem.findUnique({ where: { id: itemId }, select: { id: true } });
-  if (!item) throw ApiError.notFound(`Inventory item ${itemId} not found.`);
+export async function setItemStatus(id: string, status: "ACTIVE" | "INACTIVE" | "ARCHIVED") {
+  await ensureItemExists(id);
+  return prisma.inventoryItem.update({
+    where: { id },
+    data: { status },
+    include: ITEM_INCLUDE,
+  });
+}
 
+// ── Stock Movements ──────────────────────────────────────────────────────────
+
+export async function listMovements(inventoryItemId: string) {
+  await ensureItemExists(inventoryItemId);
   return prisma.stockMovement.findMany({
-    where: { inventoryItemId: itemId },
+    where: { inventoryItemId },
     orderBy: { movementDate: "desc" },
     include: {
-      issuedToEmployee: { select: { id: true, fullName: true } },
+      issuedToEmployee:   { select: { id: true, fullName: true } },
       issuedToDepartment: { select: { id: true, name: true } },
     },
   });
 }
 
-// ---- Take-home ----
-
-export async function markTakenHome(itemId: string, input: TakeHomeInput) {
-  const item = await prisma.inventoryItem.findUnique({
-    where: { id: itemId },
-    select: { id: true, canTakeHome: true, takenHome: true, assignedToEmployeeId: true },
-  });
-  if (!item) throw ApiError.notFound(`Inventory item ${itemId} not found.`);
-  if (!item.canTakeHome) throw ApiError.badRequest(`Item ${itemId} is not permitted to be taken home.`);
-  if (item.takenHome) throw ApiError.badRequest(`Item ${itemId} is already marked as taken home.`);
-  if (!item.assignedToEmployeeId) throw ApiError.badRequest(`Item ${itemId} must be assigned to an employee before it can be taken home.`);
-
-  const now = new Date();
-
-  return prisma.$transaction(async (tx) => {
-    await tx.inventoryItem.update({
-      where: { id: itemId },
-      data: { takenHome: true, takenHomeAt: now },
-    });
-    return tx.itemTakeHomeLog.create({
-      data: {
-        inventoryItemId: itemId,
-        employeeId: item.assignedToEmployeeId,
-        action: "TAKEN_HOME",
-        actionDate: now,
-        authorisedBy: input.authorisedBy,
-        notes: input.notes,
-      },
-    });
-  });
-}
-
-export async function markReturned(itemId: string, input: TakeHomeInput) {
-  const item = await prisma.inventoryItem.findUnique({
-    where: { id: itemId },
-    select: { id: true, takenHome: true, assignedToEmployeeId: true },
-  });
-  if (!item) throw ApiError.notFound(`Inventory item ${itemId} not found.`);
-  if (!item.takenHome) throw ApiError.badRequest(`Item ${itemId} is not currently marked as taken home.`);
-
-  const now = new Date();
-
-  return prisma.$transaction(async (tx) => {
-    await tx.inventoryItem.update({
-      where: { id: itemId },
-      data: { takenHome: false, takenHomeAt: null },
-    });
-    return tx.itemTakeHomeLog.create({
-      data: {
-        inventoryItemId: itemId,
-        employeeId: item.assignedToEmployeeId,
-        action: "RETURNED",
-        actionDate: now,
-        authorisedBy: input.authorisedBy,
-        notes: input.notes,
-      },
-    });
-  });
-}
-
-export async function getTakeHomeLog(itemId: string) {
-  const item = await prisma.inventoryItem.findUnique({ where: { id: itemId }, select: { id: true } });
-  if (!item) throw ApiError.notFound(`Inventory item ${itemId} not found.`);
-
-  return prisma.itemTakeHomeLog.findMany({
-    where: { inventoryItemId: itemId },
-    orderBy: { actionDate: "desc" },
-    include: { employee: { select: { id: true, fullName: true } } },
-  });
-}
-
-// ---- helpers ----
-
-async function validateAssignmentFKs(
-  employeeId?: string | null,
-  departmentId?: string | null,
-  siteId?: string | null
+/**
+ * Log a stock movement and adjust the item's `quantity` accordingly.
+ *   PURCHASE  → +quantity (stock received)
+ *   ISSUE     → −quantity (stock given out to someone)
+ *   WRITE_OFF → −quantity (damaged / lost)
+ *   ADJUSTMENT → signed delta (supply correctionKey; use positive or
+ *                negative `quantity` in the notes/reference; here we
+ *                always add, caller passes a negative number to subtract)
+ *
+ * For ISSUE movements the quantity is subtracted. If the resulting stock
+ * would go below 0, we reject the request — can't issue more than you have.
+ */
+export async function logMovement(
+  inventoryItemId: string,
+  input: StockMovementInput,
+  callerRole: string,
 ) {
-  if (employeeId) {
-    const exists = await prisma.employee.findUnique({ where: { id: employeeId }, select: { id: true } });
-    if (!exists) throw ApiError.badRequest(`Employee ${employeeId} does not exist.`);
+  const item = await prisma.inventoryItem.findUnique({
+    where: { id: inventoryItemId },
+    select: { id: true, quantity: true, itemType: true },
+  });
+  if (!item) throw ApiError.notFound(`Inventory item ${inventoryItemId} not found.`);
+
+  // Operations role: ISSUE only
+  if (callerRole === "OPERATIONS" && input.movementType !== "ISSUE") {
+    throw ApiError.forbidden(
+      "Operations staff may only log ISSUE movements. " +
+      "Contact Admin or Management to record purchases, write-offs, or adjustments.",
+    );
   }
-  if (departmentId) {
-    const exists = await prisma.department.findUnique({ where: { id: departmentId }, select: { id: true } });
-    if (!exists) throw ApiError.badRequest(`Department ${departmentId} does not exist.`);
+
+  let quantityDelta = input.quantity;
+  if (input.movementType === "ISSUE" || input.movementType === "WRITE_OFF") {
+    quantityDelta = -input.quantity;
   }
-  if (siteId) {
-    const exists = await prisma.site.findUnique({ where: { id: siteId }, select: { id: true } });
-    if (!exists) throw ApiError.badRequest(`Site ${siteId} does not exist.`);
+
+  const newQty = item.quantity + quantityDelta;
+  if (newQty < 0) {
+    throw ApiError.badRequest(
+      `Cannot issue ${input.quantity} unit(s) — only ${item.quantity} in stock.`,
+    );
+  }
+
+  // Validate issuance targets exist
+  if (input.issuedToEmployeeId) {
+    const emp = await prisma.employee.findUnique({
+      where: { id: input.issuedToEmployeeId },
+      select: { id: true },
+    });
+    if (!emp) throw ApiError.badRequest(`Employee ${input.issuedToEmployeeId} does not exist.`);
+  }
+  if (input.issuedToDepartmentId) {
+    const dept = await prisma.department.findUnique({
+      where: { id: input.issuedToDepartmentId },
+      select: { id: true },
+    });
+    if (!dept) throw ApiError.badRequest(`Department ${input.issuedToDepartmentId} does not exist.`);
+  }
+
+  const [movement] = await prisma.$transaction([
+    prisma.stockMovement.create({
+      data: {
+        inventoryItemId,
+        movementType:         input.movementType,
+        quantity:             input.quantity,
+        movementDate:         input.movementDate,
+        issuedToEmployeeId:   input.issuedToEmployeeId   ?? null,
+        issuedToDepartmentId: input.issuedToDepartmentId ?? null,
+        reference:            input.reference   ?? null,
+        notes:                input.notes       ?? null,
+        recordedBy:           input.recordedBy  ?? null,
+      },
+      include: {
+        issuedToEmployee:   { select: { id: true, fullName: true } },
+        issuedToDepartment: { select: { id: true, name: true } },
+      },
+    }),
+    prisma.inventoryItem.update({
+      where: { id: inventoryItemId },
+      data:  { quantity: newQty },
+    }),
+  ]);
+
+  return movement;
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+async function ensureItemExists(id: string) {
+  const exists = await prisma.inventoryItem.findUnique({ where: { id }, select: { id: true } });
+  if (!exists) throw ApiError.notFound(`Inventory item ${id} not found.`);
+}
+
+async function validateAssignmentTargets(input: {
+  assignedToEmployeeId?:   string | null;
+  assignedToDepartmentId?: string | null;
+  assignedToSiteId?:       string | null;
+}) {
+  if (input.assignedToEmployeeId) {
+    const emp = await prisma.employee.findUnique({
+      where: { id: input.assignedToEmployeeId }, select: { id: true },
+    });
+    if (!emp) throw ApiError.badRequest(`Employee ${input.assignedToEmployeeId} does not exist.`);
+  }
+  if (input.assignedToDepartmentId) {
+    const dept = await prisma.department.findUnique({
+      where: { id: input.assignedToDepartmentId }, select: { id: true },
+    });
+    if (!dept) throw ApiError.badRequest(`Department ${input.assignedToDepartmentId} does not exist.`);
+  }
+  if (input.assignedToSiteId) {
+    const site = await prisma.site.findUnique({
+      where: { id: input.assignedToSiteId }, select: { id: true },
+    });
+    if (!site) throw ApiError.badRequest(`Site ${input.assignedToSiteId} does not exist.`);
   }
 }

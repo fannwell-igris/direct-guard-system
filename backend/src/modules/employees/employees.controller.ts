@@ -33,7 +33,15 @@ export const updateEmployee = asyncHandler(async (req: Request, res: Response) =
 
 export const updateEmploymentStatus = asyncHandler(async (req: Request, res: Response) => {
   const employmentStatus = parseEmploymentStatusUpdate(req.body);
-  const employee = await employeesService.setEmploymentStatus(req.params.id, employmentStatus);
+  // Pass the acting user's name so it is recorded on the RETURN_PENDING
+  // stock-movement entries and the item's returnTriggeredBy field.
+  const triggeredBy = (req.user as { fullName?: string; email?: string } | undefined)
+    ?.fullName ?? (req.user as { email?: string } | undefined)?.email ?? undefined;
+  const employee = await employeesService.setEmploymentStatus(
+    req.params.id,
+    employmentStatus,
+    triggeredBy,
+  );
   res.status(200).json({ status: "ok", data: employee });
 });
 

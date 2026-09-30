@@ -1201,6 +1201,19 @@ enum MovementType {
   ISSUE
   WRITE_OFF
   ADJUSTMENT
+  // Auto-logged when an employee is terminated/absconded and their assigned
+  // assets are flagged for collection. Not a stock quantity change — purely
+  // a paper trail that the item was flagged on this date.
+  RETURN_PENDING
+  // Logged when operations confirms the item was physically collected.
+  RETURN_CONFIRMED
+}
+
+// Tracks whether a previously-issued asset is awaiting physical collection
+// after an employee's exit, or has been confirmed recovered.
+enum AssetReturnStatus {
+  PENDING_COLLECTION   // flagged on termination/absconding — awaiting physical handover
+  COLLECTED            // operations confirmed the item was physically retrieved
 }
 
 enum TakeHomeAction {
@@ -1231,6 +1244,14 @@ model InventoryItem {
   canTakeHome  Boolean   @default(false)
   takenHome    Boolean   @default(false)
   takenHomeAt  DateTime?
+
+  // Asset-return workflow: populated automatically when the assigned employee
+  // is terminated or marked absconded. Null = no pending return.
+  returnStatus       AssetReturnStatus?
+  returnTriggeredAt  DateTime?   // when the flag was set (termination date)
+  returnTriggeredBy  String?     // name/id of the user who actioned the termination
+  returnConfirmedAt  DateTime?   // when ops confirmed physical collection
+  returnConfirmedBy  String?     // name of staff who confirmed collection
 
   notes       String?
   status      RecordStatus @default(ACTIVE)

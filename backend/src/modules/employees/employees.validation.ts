@@ -6,6 +6,8 @@ export interface EmployeeCreateInput {
   employeeNumber?: string | null;
   position?: string | null;
   phone?: string | null;
+  email?: string | null;
+  address?: string | null;
   salary?: number | null;
   contractStartDate?: Date | null;
   contractEndDate?: Date | null;
@@ -13,6 +15,9 @@ export interface EmployeeCreateInput {
   assignedSiteId?: string | null;
   napsaRegistered?: boolean;
   nhimaRegistered?: boolean;
+  nextOfKinName?: string | null;
+  nextOfKinRelationship?: string | null;
+  nextOfKinPhone?: string | null;
   notes?: string | null;
 }
 
@@ -21,6 +26,8 @@ export interface EmployeeUpdateInput {
   employeeNumber?: string | null;
   position?: string | null;
   phone?: string | null;
+  email?: string | null;
+  address?: string | null;
   salary?: number | null;
   contractStartDate?: Date | null;
   contractEndDate?: Date | null;
@@ -29,6 +36,9 @@ export interface EmployeeUpdateInput {
   employmentStatus?: EmploymentStatus;
   napsaRegistered?: boolean;
   nhimaRegistered?: boolean;
+  nextOfKinName?: string | null;
+  nextOfKinRelationship?: string | null;
+  nextOfKinPhone?: string | null;
   notes?: string | null;
 }
 
@@ -96,6 +106,8 @@ export function parseEmployeeCreate(body: unknown): EmployeeCreateInput {
     employeeNumber: trimOrNull(b.employeeNumber) ?? null,
     position: trimOrNull(b.position) ?? null,
     phone: trimOrNull(b.phone) ?? null,
+    email: trimOrNull(b.email) ?? null,
+    address: trimOrNull(b.address) ?? null,
     salary: parseSalary(b.salary) ?? null,
     contractStartDate,
     contractEndDate,
@@ -103,6 +115,9 @@ export function parseEmployeeCreate(body: unknown): EmployeeCreateInput {
     assignedSiteId: trimOrNull(b.assignedSiteId) ?? null,
     napsaRegistered: parseOptionalBoolean(b.napsaRegistered, "napsaRegistered"),
     nhimaRegistered: parseOptionalBoolean(b.nhimaRegistered, "nhimaRegistered"),
+    nextOfKinName: trimOrNull(b.nextOfKinName) ?? null,
+    nextOfKinRelationship: trimOrNull(b.nextOfKinRelationship) ?? null,
+    nextOfKinPhone: trimOrNull(b.nextOfKinPhone) ?? null,
     notes: trimOrNull(b.notes) ?? null,
   };
 }
@@ -127,11 +142,16 @@ export function parseEmployeeUpdate(body: unknown): EmployeeUpdateInput {
   if (b.employeeNumber !== undefined) out.employeeNumber = trimOrNull(b.employeeNumber);
   if (b.position !== undefined) out.position = trimOrNull(b.position);
   if (b.phone !== undefined) out.phone = trimOrNull(b.phone);
+  if (b.email !== undefined) out.email = trimOrNull(b.email);
+  if (b.address !== undefined) out.address = trimOrNull(b.address);
   if (b.salary !== undefined) out.salary = parseSalary(b.salary);
   if (b.assignedClientId !== undefined) out.assignedClientId = trimOrNull(b.assignedClientId);
   if (b.assignedSiteId !== undefined) out.assignedSiteId = trimOrNull(b.assignedSiteId);
   if (b.napsaRegistered !== undefined) out.napsaRegistered = parseOptionalBoolean(b.napsaRegistered, "napsaRegistered");
   if (b.nhimaRegistered !== undefined) out.nhimaRegistered = parseOptionalBoolean(b.nhimaRegistered, "nhimaRegistered");
+  if (b.nextOfKinName !== undefined) out.nextOfKinName = trimOrNull(b.nextOfKinName);
+  if (b.nextOfKinRelationship !== undefined) out.nextOfKinRelationship = trimOrNull(b.nextOfKinRelationship);
+  if (b.nextOfKinPhone !== undefined) out.nextOfKinPhone = trimOrNull(b.nextOfKinPhone);
   if (b.notes !== undefined) out.notes = trimOrNull(b.notes);
 
   if (b.contractStartDate !== undefined) out.contractStartDate = parseDate(b.contractStartDate, "contractStartDate");
@@ -178,11 +198,33 @@ export interface EmployeeListQuery {
   assignedSiteId?: string;
   page: number;
   pageSize: number;
+  sortBy: EmployeeSortField;
+  sortOrder: "asc" | "desc";
 }
+
+// Added 2026-09-25 for the Employees list "Sort by" control — fullName
+// stays the default (matches prior behavior) since spotting duplicate
+// names is easiest with same/similar names sitting next to each other.
+export type EmployeeSortField =
+  | "fullName"
+  | "employeeNumber"
+  | "position"
+  | "salary"
+  | "contractStartDate"
+  | "dateAdded";
+
+const VALID_SORT_FIELDS: EmployeeSortField[] = [
+  "fullName",
+  "employeeNumber",
+  "position",
+  "salary",
+  "contractStartDate",
+  "dateAdded",
+];
 
 /** Validates and normalizes query params for GET /employees. */
 export function parseListQuery(query: Record<string, unknown>): EmployeeListQuery {
-  const result: EmployeeListQuery = { page: 1, pageSize: 20 };
+  const result: EmployeeListQuery = { page: 1, pageSize: 20, sortBy: "fullName", sortOrder: "asc" };
 
   if (typeof query.search === "string" && query.search.trim() !== "") {
     result.search = query.search.trim();
@@ -228,6 +270,20 @@ export function parseListQuery(query: Record<string, unknown>): EmployeeListQuer
       throw ApiError.badRequest("`pageSize` must be an integer between 1 and 500.");
     }
     result.pageSize = pageSize;
+  }
+
+  if (query.sortBy !== undefined) {
+    if (typeof query.sortBy !== "string" || !VALID_SORT_FIELDS.includes(query.sortBy as EmployeeSortField)) {
+      throw ApiError.badRequest(`\`sortBy\` must be one of: ${VALID_SORT_FIELDS.join(", ")}.`);
+    }
+    result.sortBy = query.sortBy as EmployeeSortField;
+  }
+
+  if (query.sortOrder !== undefined) {
+    if (query.sortOrder !== "asc" && query.sortOrder !== "desc") {
+      throw ApiError.badRequest('`sortOrder` must be "asc" or "desc".');
+    }
+    result.sortOrder = query.sortOrder;
   }
 
   return result;

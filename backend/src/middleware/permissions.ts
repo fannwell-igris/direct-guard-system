@@ -224,7 +224,20 @@ const REGISTRY: RouteRule[] = [
 
   // Inventory — no broad STAFF access. A future "My Assigned Assets"
   // endpoint with row-level filtering is explicitly out of scope here.
-  { prefix: "/api/inventory", methods: { GET: ADMIN_MANAGER_OPS, POST: ADMIN_MANAGER_OPS, PUT: ADMIN_MANAGER_OPS, PATCH: ADMIN_MANAGER_OPS, DELETE: ADMIN_MANAGER } },
+  // UPDATED (2026-09-30, explicit instruction): OPERATIONS can view stock
+  // levels and log ISSUE movements (enforced in inventory.service.ts —
+  // only ISSUE type allowed for OPERATIONS callers, all other movement
+  // types blocked at the service layer). MANAGER added for full visibility
+  // and issue logging. PAYROLL (Finance) added to GET only — Finance can
+  // view asset/inventory records for cost reconciliation but cannot
+  // create/edit items or log movements.
+  { prefix: "/api/inventory", methods: {
+    GET:    ["ADMIN", "MANAGER", "OPERATIONS", "PAYROLL"],
+    POST:   ["ADMIN", "MANAGER", "OPERATIONS"],
+    PUT:    ["ADMIN", "MANAGER"],
+    PATCH:  ["ADMIN", "MANAGER"],
+    DELETE: ["ADMIN"],
+  } },
 
   // Tasks — STAFF gets nothing at this layer until "my tasks" row-level
   // endpoints exist, per the spec's explicit instruction not to expose

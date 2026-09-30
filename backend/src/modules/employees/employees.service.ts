@@ -1,4 +1,4 @@
-import { Prisma, EmploymentStatus } from "@prisma/client";
+import { Prisma, EmploymentStatus, AssetReturnStatus } from "@prisma/client";
 import path from "path";
 import fs from "fs";
 import { prisma } from "../../lib/prisma";
@@ -29,6 +29,8 @@ export async function createEmployee(input: EmployeeCreateInput) {
       employeeNumber: input.employeeNumber,
       position: input.position,
       phone: input.phone,
+      email: input.email,
+      address: input.address,
       salary: input.salary,
       contractStartDate: input.contractStartDate,
       contractEndDate: input.contractEndDate,
@@ -36,6 +38,9 @@ export async function createEmployee(input: EmployeeCreateInput) {
       assignedSiteId: input.assignedSiteId,
       napsaRegistered: input.napsaRegistered,
       nhimaRegistered: input.nhimaRegistered,
+      nextOfKinName: input.nextOfKinName,
+      nextOfKinRelationship: input.nextOfKinRelationship,
+      nextOfKinPhone: input.nextOfKinPhone,
       notes: input.notes,
       // employmentStatus defaults to ACTIVE per schema
     },
@@ -75,7 +80,7 @@ export async function listEmployees(query: EmployeeListQuery) {
     prisma.employee.count({ where }),
     prisma.employee.findMany({
       where,
-      orderBy: { fullName: "asc" },
+      orderBy: { [query.sortBy]: query.sortOrder },
       skip: (query.page - 1) * query.pageSize,
       take: query.pageSize,
       // Lightweight client/site reference + contract count for the list view.
@@ -144,18 +149,126 @@ export async function updateEmployee(id: string, input: EmployeeUpdateInput) {
 }
 
 /**
- * Changes an employee's employmentStatus (ACTIVE / INACTIVE / TERMINATED).
+ * Changes an employee's employmentStatus (ACTIVE / INACTIVE / TERMINATED / ABSCONDED).
  * This is the only supported "removal" path — employees are never
  * hard-deleted, consistent with Clients/Sites and Section 19's data
  * integrity rule (historical financial/contract data must remain accurate).
+ *
+ * When the new status is TERMINATED or ABSCONDED, any InventoryItems that
+ * are still assigned to this employee are automatically flagged
+ * returnStatus = PENDING_COLLECTION and unassigned from the employee.
+ * A RETURN_PENDING stock-movement record is logged for each item so there
+ * is a permanent paper trail. The caller may optionally pass their name via
+ * `triggeredBy` to record who actioned the termination.
  */
-export async function setEmploymentStatus(id: string, employmentStatus: EmploymentStatus) {
+export async function setEmploymentStatus(
+  id: string,
+  employmentStatus: EmploymentStatus,
+  triggeredBy?: string,
+) {
   await ensureEmployeeExists(id);
 
+  const isExit = employmentStatus === "TERMINATED" || employmentStatus === "ABSCONDED";
+
+  if (isExit) {
+    // Find all inventory items still assigned to this employee
+    const assignedItems = await prisma.inventoryItem.findMany({
+      where: { assignedToEmployeeId: id },
+      select: { id: true, name: true },
+    });
+
+    if (assignedItems.length > 0) {
+      const now = new Date();
+      // Run everything atomically: update employee status + flag all items +
+      // log a RETURN_PENDING movement for each
+      await prisma.$transaction([
+        prisma.employee.update({
+          where: { id },
+          data: { employmentStatus },
+        }),
+        // Flag each assigned item for collection
+        prisma.inventoryItem.updateMany({
+          where: { assignedToEmployeeId: id },
+          data: {
+            returnStatus:      "PENDING_COLLECTION" as AssetReturnStatus,
+            returnTriggeredAt: now,
+            returnTriggeredBy: triggeredBy ?? null,
+            // Deliberately NOT clearing assignedToEmployeeId yet — that
+            // field tells ops *who* the item needs to be collected from.
+            // It is cleared when returnStatus is set to COLLECTED.
+          },
+        }),
+        // Log a RETURN_PENDING movement for audit trail (one per item)
+        ...assignedItems.map((item) =>
+          prisma.stockMovement.create({
+            data: {
+              inventoryItemId: item.id,
+              movementType:    "RETURN_PENDING",
+              quantity:        1,
+              movementDate:    now,
+              notes: `Auto-flagged: employee marked ${employmentStatus}. Awaiting physical collection.`,
+              recordedBy: triggeredBy ?? "System",
+            },
+          })
+        ),
+      ]);
+
+      return prisma.employee.findUnique({ where: { id } });
+    }
+  }
+
+  // No assigned assets, or status is not an exit — simple update
   return prisma.employee.update({
     where: { id },
     data: { employmentStatus },
   });
+}
+
+/**
+ * Confirms that a pending-collection asset has been physically retrieved
+ * from a terminated/absconded employee.  Clears the employee assignment,
+ * sets returnStatus = COLLECTED, and logs a RETURN_CONFIRMED movement.
+ *
+ * Caller must supply confirmedBy (name of the staff member who collected it).
+ */
+export async function confirmAssetCollection(
+  inventoryItemId: string,
+  confirmedBy: string,
+) {
+  const item = await prisma.inventoryItem.findUnique({
+    where: { id: inventoryItemId },
+    select: { id: true, returnStatus: true, assignedToEmployeeId: true },
+  });
+  if (!item) throw ApiError.notFound(`Inventory item ${inventoryItemId} not found.`);
+  if (item.returnStatus !== "PENDING_COLLECTION") {
+    throw ApiError.badRequest("This item is not awaiting collection.");
+  }
+
+  const now = new Date();
+  await prisma.$transaction([
+    prisma.inventoryItem.update({
+      where: { id: inventoryItemId },
+      data: {
+        returnStatus:        "COLLECTED",
+        returnConfirmedAt:   now,
+        returnConfirmedBy:   confirmedBy,
+        assignedToEmployeeId:   null,
+        assignedAt:             null,
+      },
+    }),
+    prisma.stockMovement.create({
+      data: {
+        inventoryItemId,
+        movementType: "RETURN_CONFIRMED",
+        quantity:     1,
+        movementDate: now,
+        notes:        `Asset physically collected and returned to store.`,
+        recordedBy:   confirmedBy,
+      },
+    }),
+  ]);
+
+  return prisma.inventoryItem.findUnique({ where: { id: inventoryItemId } });
 }
 
 /**
