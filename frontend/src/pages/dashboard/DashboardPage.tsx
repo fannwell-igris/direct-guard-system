@@ -102,19 +102,19 @@ function RevenueChart({ data }: { data: { month: string; revenue: number; expens
   const safeData = data.map((d) => ({ ...d, revenue: Number(d.revenue ?? 0), expenses: Number(d.expenses ?? 0) }));
   const max = Math.max(...safeData.flatMap((d) => [d.revenue, d.expenses]), 1);
   return (
-    <div className="min-w-0">
-      <div className="flex items-end justify-start gap-8 h-24 overflow-x-auto">
+    <div className="min-w-0 w-full">
+      <div className="flex items-end justify-around h-40 overflow-x-auto">
         {safeData.map((d) => (
-          <div key={d.month} className="flex flex-col items-center gap-1.5">
-            <div className="flex items-end gap-1.5 h-20 group">
+          <div key={d.month} className="flex flex-col items-center gap-1.5 flex-1">
+            <div className="flex items-end gap-2 h-32 group justify-center">
               <div
-                className="w-5 rounded-sm opacity-85 group-hover:opacity-100 transition-opacity"
-                style={{ height: `${Math.max((d.revenue / max) * 80, 2)}px`, background: "linear-gradient(to top, #15803d, #4ade80)" }}
+                className="w-7 rounded-md opacity-85 group-hover:opacity-100 transition-opacity"
+                style={{ height: `${Math.max((d.revenue / max) * 120, 4)}px`, background: "linear-gradient(to top, #15803d, #4ade80)" }}
                 title={`Revenue — ${d.month}: ${fmt(d.revenue)}`}
               />
               <div
-                className="w-5 rounded-sm opacity-85 group-hover:opacity-100 transition-opacity"
-                style={{ height: `${Math.max((d.expenses / max) * 80, 2)}px`, background: "linear-gradient(to top, #1d4ed8, #60a5fa)" }}
+                className="w-7 rounded-md opacity-85 group-hover:opacity-100 transition-opacity"
+                style={{ height: `${Math.max((d.expenses / max) * 120, 4)}px`, background: "linear-gradient(to top, #1d4ed8, #60a5fa)" }}
                 title={`Expenses — ${d.month}: ${fmt(d.expenses)}`}
               />
             </div>
@@ -448,14 +448,16 @@ export default function DashboardPage() {
 
               {/* Revenue chart + Recent invoices */}
               {canSeeFinance && main.monthlyRevenue && main.recentInvoices && (
-                <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-                  <SectionCard title="Revenue vs Expenses — last 3 months">
-                    <div className="p-4 lg:col-span-2">
-                      <RevenueChart data={main.monthlyRevenue} />
-                    </div>
-                  </SectionCard>
+                <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 items-stretch">
+                  <div className="lg:col-span-2 flex flex-col">
+                    <SectionCard title="Revenue vs Expenses — last 3 months">
+                      <div className="p-5 flex-1 flex items-end">
+                        <RevenueChart data={main.monthlyRevenue} />
+                      </div>
+                    </SectionCard>
+                  </div>
 
-                  <div className="lg:col-span-3">
+                  <div className="lg:col-span-3 flex flex-col">
                     <SectionCard title="Recent Invoices" action="View all" onAction={() => navigate("/invoices")}>
                       {main.recentInvoices.length === 0 ? (
                         <p className="text-xs text-gray-400 p-4">No invoices yet.</p>
