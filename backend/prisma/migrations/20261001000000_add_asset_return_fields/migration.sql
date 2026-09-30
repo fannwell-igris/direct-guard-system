@@ -1,4 +1,4 @@
-﻿-- CreateEnum
+-- CreateEnum
 CREATE TYPE "AssetReturnStatus" AS ENUM ('PENDING_COLLECTION', 'COLLECTED');
 
 -- AlterEnum
