@@ -442,7 +442,9 @@ export default function ClientsPage() {
       closeForm();
       await loadClients();
     } catch (err: any) {
-      setFormError(err.response?.data?.message ?? "Failed to save client.");
+      const status = err.response?.status;
+      const msg = err.response?.data?.message ?? err.message ?? "Failed to save client.";
+      setFormError(status ? `Error ${status}: ${msg}` : msg);
     } finally {
       setIsSaving(false);
     }
