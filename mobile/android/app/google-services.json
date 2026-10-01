@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "417170525653",
-    "project_id": "magen-cms",
-    "storage_bucket": "magen-cms.firebasestorage.app"
+    "project_number": "584654942378",
+    "project_id": "com-magensecurity-cms",
+    "storage_bucket": "com-magensecurity-cms.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:417170525653:android:15b6b6867c0b16a255c15c",
+        "mobilesdk_app_id": "1:584654942378:android:46527fcbc68434d14820d3",
         "android_client_info": {
           "package_name": "com.magensecurity.cms"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyAd60hSjV2OIsSGnrVrl_Ywbiy3RVHGxOY"
+          "current_key": "AIzaSyDEz3Bbj91jpNMld8fQTYJ49ZyJZwXl8HU"
         }
       ],
       "services": {
