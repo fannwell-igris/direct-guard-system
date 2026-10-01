@@ -281,24 +281,28 @@ function OverviewTab({ invoices, payrollRuns, opCosts, genExpenses, accounts }: 
   genExpenses: GeneralExpense[];
   accounts: AccountEntry[];
 }) {
-  const totalInvoiced = invoices.reduce((s, i) => s + Number(i.amount), 0);
-  const totalReceived = invoices.reduce((s, i) => s + Number(i.amountPaid), 0);
-  const totalOutstanding = invoices.reduce((s, i) => s + Number(i.outstandingBalance), 0);
-  const overdueCount = invoices.filter((i) => i.status === "OVERDUE").length;
+  // Current-month filter — dashboard tiles show only the active month
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  const monthInvoices   = invoices.filter((i) => i.invoiceDate?.slice(0, 7) === currentMonth);
+  const monthOpCosts_   = opCosts.filter((c) => c.month?.slice(0, 7) === currentMonth);
+  const monthGenExp_    = genExpenses.filter((e) => e.date?.slice(0, 7) === currentMonth);
+  const monthPayroll_   = payrollRuns.filter((r) => r.periodEnd?.slice(0, 7) === currentMonth);
 
-  const totalOpCosts = opCosts.reduce((s, c) => s + Number(c.amount), 0);
-  const totalGenExp = genExpenses.reduce((s, e) => s + Number(e.amount), 0);
-  const totalPayroll = payrollRuns.reduce((s, r) => s + Number(r.totalNet ?? 0), 0);
+  const totalInvoiced   = monthInvoices.reduce((s, i) => s + Number(i.amount), 0);
+  const totalReceived   = monthInvoices.reduce((s, i) => s + Number(i.amountPaid), 0);
+
+  // Outstanding = all unpaid invoices regardless of month (always relevant)
+  const totalOutstanding = invoices.reduce((s, i) => s + Number(i.outstandingBalance), 0);
+  const overdueCount     = invoices.filter((i) => i.status === "OVERDUE").length;
+
+  const totalOpCosts  = monthOpCosts_.reduce((s, c) => s + Number(c.amount), 0);
+  const totalGenExp   = monthGenExp_.reduce((s, e) => s + Number(e.amount), 0);
+  const totalPayroll  = monthPayroll_.reduce((s, r) => s + Number(r.totalNet ?? 0), 0);
   const totalExpenses = totalOpCosts + totalGenExp + totalPayroll;
 
   const netPosition = totalReceived - totalExpenses;
-  const cashOnHand = accounts.filter((a) => a.type === "cash").reduce((s, a) => s + a.balance, 0);
-  const bankTotal = accounts.filter((a) => a.type === "bank").reduce((s, a) => s + a.balance, 0);
-
-  const currentMonth = new Date().toISOString().slice(0, 7);
-  const monthInvoices = invoices.filter((i) => i.invoiceDate?.slice(0, 7) === currentMonth);
-  const monthIncome = monthInvoices.reduce((s, i) => s + Number(i.amountPaid), 0);
-  const monthOpCosts = opCosts.filter((c) => c.month?.slice(0, 7) === currentMonth).reduce((s, c) => s + Number(c.amount), 0);
+  const cashOnHand  = accounts.filter((a) => a.type === "cash").reduce((s, a) => s + a.balance, 0);
+  const bankTotal   = accounts.filter((a) => a.type === "bank").reduce((s, a) => s + a.balance, 0);
 
   return (
     <div className="space-y-6">
@@ -311,30 +315,30 @@ function OverviewTab({ invoices, payrollRuns, opCosts, genExpenses, accounts }: 
         </button>
       </div>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiTile label="Total Invoiced" value={fmt(totalInvoiced)} sub={`${invoices.length} invoices`} color="blue" icon={FileText} />
-        <KpiTile label="Total Received" value={fmt(totalReceived)} sub={`${overdueCount} overdue`} color="green" icon={TrendingUp} />
-        <KpiTile label="Total Expenses" value={fmt(totalExpenses)} sub="ops + overhead + payroll" color="red" icon={TrendingDown} />
+        <KpiTile label="Invoiced" value={fmt(totalInvoiced)} sub={`${monthInvoices.length} invoices this month`} color="blue" icon={FileText} />
+        <KpiTile label="Received" value={fmt(totalReceived)} sub={`${overdueCount} overdue (all-time)`} color="green" icon={TrendingUp} />
+        <KpiTile label="Expenses" value={fmt(totalExpenses)} sub="ops + overhead + payroll" color="red" icon={TrendingDown} />
         <KpiTile label="Net Position" value={fmt(netPosition)} sub="received − expenses" color={netPosition >= 0 ? "green" : "red"} icon={DollarSign} />
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiTile label="Outstanding" value={fmt(totalOutstanding)} sub="unpaid invoices" color="amber" icon={CreditCard} />
+        <KpiTile label="Outstanding" value={fmt(totalOutstanding)} sub="unpaid invoices (all-time)" color="amber" icon={CreditCard} />
         <KpiTile label="Cash on Hand" value={fmt(cashOnHand)} sub={`${accounts.filter((a) => a.type === "cash").length} account(s)`} color="navy" icon={Banknote} />
         <KpiTile label="Bank Balance" value={fmt(bankTotal)} sub={`${accounts.filter((a) => a.type === "bank").length} account(s)`} color="navy" icon={PiggyBank} />
-        <KpiTile label="This Month Income" value={fmt(monthIncome)} sub={`vs ${fmt(monthOpCosts)} ops costs`} color="blue" icon={Wallet} />
+        <KpiTile label="Gen. Expenses" value={fmt(totalGenExp)} sub={`${monthGenExp_.length} entries this month`} color="red" icon={Wallet} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="card">
-          <h3 className="font-semibold text-sm text-gray-700 mb-3">Income Breakdown</h3>
+          <h3 className="font-semibold text-sm text-gray-700 mb-3">Income — This Month</h3>
           <div className="space-y-2 text-sm">
-            <div className="flex justify-between"><span className="text-gray-500">Total Invoiced</span><span className="font-medium">{fmt(totalInvoiced)}</span></div>
+            <div className="flex justify-between"><span className="text-gray-500">Invoiced</span><span className="font-medium">{fmt(totalInvoiced)}</span></div>
             <div className="flex justify-between"><span className="text-gray-500">Collected</span><span className="font-medium text-emerald-600">{fmt(totalReceived)}</span></div>
-            <div className="flex justify-between border-t pt-2"><span className="text-gray-500">Outstanding</span><span className="font-medium text-amber-600">{fmt(totalOutstanding)}</span></div>
+            <div className="flex justify-between border-t pt-2"><span className="text-gray-500">Outstanding (all-time)</span><span className="font-medium text-amber-600">{fmt(totalOutstanding)}</span></div>
           </div>
         </div>
         <div className="card">
-          <h3 className="font-semibold text-sm text-gray-700 mb-3">Expense Breakdown</h3>
+          <h3 className="font-semibold text-sm text-gray-700 mb-3">Expenses — This Month</h3>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between"><span className="text-gray-500">Operational Costs</span><span className="font-medium">{fmt(totalOpCosts)}</span></div>
             <div className="flex justify-between"><span className="text-gray-500">General Expenses</span><span className="font-medium">{fmt(totalGenExp)}</span></div>
