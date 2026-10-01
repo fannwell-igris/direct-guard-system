@@ -3,18 +3,31 @@ import * as controller from "./operations.controller";
 
 const router = Router();
 
-// GET   /api/operations/coverage-summary   - coverage % per record,
-//                                             filterable + paginated (MUST
-//                                             stay registered before /:id
-//                                             so Express doesn't treat
-//                                             "coverage-summary" as an id)
-// GET   /api/operations/attendance-calendar - per-employee, per-day
-//                                             attendance grid for a date
-//                                             range (dateFrom+dateTo
-//                                             required, max ~2 months;
-//                                             optional siteId/clientId/
-//                                             employeeId). Also MUST stay
-//                                             registered before /:id.
+// GET   /api/operations/coverage-summary     - coverage % per record,
+//                                               filterable + paginated (MUST
+//                                               stay registered before /:id
+//                                               so Express doesn't treat
+//                                               "coverage-summary" as an id)
+// GET   /api/operations/attendance-calendar  - per-employee, per-day
+//                                               attendance grid for a date
+//                                               range (dateFrom+dateTo
+//                                               required, max ~2 months;
+//                                               optional siteId/clientId/
+//                                               employeeId). Also MUST stay
+//                                               registered before /:id.
+// POST  /api/operations/sync-from-roster     - auto-creates OperationsRecords
+//                                               for every (siteId,shiftTypeId)
+//                                               pair that has a SCHEDULED
+//                                               roster entry on `date`.
+//                                               Optional siteId/shiftTypeId
+//                                               narrow scope. Idempotent:
+//                                               existing records are skipped.
+// POST  /api/operations/mark-all-present     - sync-from-roster then bulk-
+//                                               creates AttendanceRecords with
+//                                               status=PRESENT for every
+//                                               SCHEDULED guard on `date` that
+//                                               doesn't already have one.
+//                                               Optional siteId/shiftTypeId.
 // GET   /api/operations                    - list, filterable + paginated
 //                                             (?siteId=&clientId=
 //                                             &shiftTypeId=&reviewStatus=
@@ -54,6 +67,8 @@ const router = Router();
 
 router.get("/coverage-summary", controller.getCoverageSummary);
 router.get("/attendance-calendar", controller.getAttendanceCalendar);
+router.post("/sync-from-roster", controller.syncFromRoster);
+router.post("/mark-all-present", controller.markAllPresent);
 router.get("/", controller.listOperationsRecords);
 router.post("/", controller.createOperationsRecord);
 router.get("/:id", controller.getOperationsRecord);

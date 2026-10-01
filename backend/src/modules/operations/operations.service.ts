@@ -8,6 +8,8 @@ import {
   OperationsListQuery,
   AttendanceRecordCreateInput,
   AttendanceCalendarQuery,
+  SyncFromRosterInput,
+  MarkAllPresentInput,
 } from "./operations.validation";
 
 // Attendance statuses that count as "someone was actually there covering
@@ -462,6 +464,167 @@ export async function createAttendanceRecord(
       replacementForEmployee: { select: { id: true, fullName: true } },
     },
   });
+}
+
+// ------------------------------------------------------------------ //
+// Sync-from-roster + Mark-all-present (attendance workflow shortcuts)
+// ------------------------------------------------------------------ //
+
+/**
+ * Ensures an OperationsRecord exists for every distinct (siteId, shiftTypeId)
+ * pair that has at least one SCHEDULED RosterEntry on the given date.
+ * Existing records are left untouched (the unique constraint prevents
+ * duplicates; `createMany skipDuplicates` swallows the P2002s). Optional
+ * siteId/shiftTypeId narrow the scope to a single site or shift.
+ *
+ * Returns counts of records created vs skipped so the caller can report them.
+ */
+export async function syncOpsFromRoster(input: SyncFromRosterInput): Promise<{
+  created: number;
+  alreadyExisted: number;
+}> {
+  // 1. Find all distinct (siteId, shiftTypeId) pairs from the roster for
+  //    this date. groupBy would be cleaner but Prisma's groupBy doesn't
+  //    support the nested site.clientId select we need — raw distinct is
+  //    simpler and correct.
+  const rosterEntries = await prisma.rosterEntry.findMany({
+    where: {
+      date: input.date,
+      status: "SCHEDULED",
+      ...(input.siteId ? { siteId: input.siteId } : {}),
+      ...(input.shiftTypeId ? { shiftTypeId: input.shiftTypeId } : {}),
+    },
+    select: { siteId: true, shiftTypeId: true },
+    distinct: ["siteId", "shiftTypeId"],
+  });
+
+  if (rosterEntries.length === 0) {
+    return { created: 0, alreadyExisted: 0 };
+  }
+
+  // 2. Look up clientId for every distinct siteId in one batch.
+  const uniqueSiteIds = [...new Set(rosterEntries.map((r) => r.siteId))];
+  const sites = await prisma.site.findMany({
+    where: { id: { in: uniqueSiteIds } },
+    select: { id: true, clientId: true },
+  });
+  const clientIdBySite = new Map(sites.map((s) => [s.id, s.clientId]));
+
+  // 3. Check which (siteId, date, shiftTypeId) combos already exist so we
+  //    can report an accurate "already existed" count.
+  const existing = await prisma.operationsRecord.findMany({
+    where: {
+      date: input.date,
+      OR: rosterEntries.map((r) => ({ siteId: r.siteId, shiftTypeId: r.shiftTypeId })),
+    },
+    select: { siteId: true, shiftTypeId: true },
+  });
+  const existingKeys = new Set(existing.map((r) => `${r.siteId}|${r.shiftTypeId}`));
+
+  // 4. Build the insert list (exclude pairs that already have a record).
+  const toCreate = rosterEntries
+    .filter((r) => !existingKeys.has(`${r.siteId}|${r.shiftTypeId}`))
+    .map((r) => ({
+      siteId: r.siteId,
+      clientId: clientIdBySite.get(r.siteId)!,
+      shiftTypeId: r.shiftTypeId,
+      date: input.date,
+    }));
+
+  if (toCreate.length > 0) {
+    await prisma.operationsRecord.createMany({ data: toCreate, skipDuplicates: true });
+  }
+
+  return {
+    created: toCreate.length,
+    alreadyExisted: existing.length,
+  };
+}
+
+/**
+ * Marks every SCHEDULED guard on the given date as PRESENT in one shot:
+ *
+ *   1. syncOpsFromRoster() — ensures an OperationsRecord exists for every
+ *      (siteId, shiftTypeId) pair that has roster entries for that date.
+ *   2. Find every scheduled roster entry (filtered by siteId/shiftTypeId
+ *      when provided).
+ *   3. Find the matching OperationsRecord for each entry.
+ *   4. For each entry that does NOT yet have an AttendanceRecord, insert one
+ *      with status = PRESENT. Already-recorded entries are left untouched
+ *      (skipDuplicates handles the unique constraint silently).
+ *
+ * Returns counts: scheduled total, newly marked present, already recorded.
+ */
+export async function markAllPresent(input: MarkAllPresentInput): Promise<{
+  scheduled: number;
+  markedPresent: number;
+  alreadyRecorded: number;
+}> {
+  // Step 1: ensure ops records exist.
+  await syncOpsFromRoster(input);
+
+  // Step 2: get all scheduled roster entries for this date (+ optional filters).
+  const rosterEntries = await prisma.rosterEntry.findMany({
+    where: {
+      date: input.date,
+      status: "SCHEDULED",
+      ...(input.siteId ? { siteId: input.siteId } : {}),
+      ...(input.shiftTypeId ? { shiftTypeId: input.shiftTypeId } : {}),
+    },
+    select: { id: true, employeeId: true, siteId: true, shiftTypeId: true },
+  });
+
+  if (rosterEntries.length === 0) {
+    return { scheduled: 0, markedPresent: 0, alreadyRecorded: 0 };
+  }
+
+  // Step 3: fetch the matching OperationsRecords (they now exist from step 1).
+  const pairs = [...new Map(rosterEntries.map((r) => [`${r.siteId}|${r.shiftTypeId}`, r])).values()];
+  const opsRecords = await prisma.operationsRecord.findMany({
+    where: {
+      date: input.date,
+      OR: pairs.map((r) => ({ siteId: r.siteId, shiftTypeId: r.shiftTypeId })),
+    },
+    select: { id: true, siteId: true, shiftTypeId: true },
+  });
+  const opsRecordByKey = new Map(opsRecords.map((o) => [`${o.siteId}|${o.shiftTypeId}`, o.id]));
+
+  // Step 4: find entries that already have an attendance record so we can
+  //         skip them and report an accurate count.
+  const opsRecordIds = opsRecords.map((o) => o.id);
+  const existingAttendance = await prisma.attendanceRecord.findMany({
+    where: {
+      operationsRecordId: { in: opsRecordIds },
+      employeeId: { in: rosterEntries.map((r) => r.employeeId) },
+    },
+    select: { operationsRecordId: true, employeeId: true },
+  });
+  const attendedKeys = new Set(existingAttendance.map((a) => `${a.operationsRecordId}|${a.employeeId}`));
+
+  // Step 5: build insert list.
+  const toInsert = rosterEntries
+    .map((r) => {
+      const opsId = opsRecordByKey.get(`${r.siteId}|${r.shiftTypeId}`);
+      if (!opsId) return null; // shouldn't happen after syncOps, but be safe
+      if (attendedKeys.has(`${opsId}|${r.employeeId}`)) return null;
+      return {
+        operationsRecordId: opsId,
+        employeeId: r.employeeId,
+        status: "PRESENT" as AttendanceStatus,
+        rosterEntryId: r.id,
+      };
+    })
+    .filter((x): x is NonNullable<typeof x> => x !== null);
+
+  if (toInsert.length > 0) {
+    await prisma.attendanceRecord.createMany({ data: toInsert, skipDuplicates: true });
+  }
+
+  return {
+    scheduled: rosterEntries.length,
+    markedPresent: toInsert.length,
+    alreadyRecorded: existingAttendance.length,
+  };
 }
 
 /** Lists AttendanceRecords for one OperationsRecord (nested resource — no separate pagination, mirrors the parent record's own attendanceRecords include). */

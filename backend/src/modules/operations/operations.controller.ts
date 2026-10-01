@@ -9,6 +9,8 @@ import {
   parseCoverageSummaryQuery,
   parseAttendanceRecordCreate,
   parseAttendanceCalendarQuery,
+  parseSyncFromRosterInput,
+  parseMarkAllPresentInput,
 } from "./operations.validation";
 
 export const createOperationsRecord = asyncHandler(async (req: Request, res: Response) => {
@@ -60,5 +62,17 @@ export const listAttendanceRecords = asyncHandler(async (req: Request, res: Resp
 export const getAttendanceCalendar = asyncHandler(async (req: Request, res: Response) => {
   const query = parseAttendanceCalendarQuery(req.query as Record<string, unknown>);
   const result = await service.getAttendanceCalendar(query);
+  res.status(200).json({ status: "ok", data: result });
+});
+
+export const syncFromRoster = asyncHandler(async (req: Request, res: Response) => {
+  const input = parseSyncFromRosterInput(req.body);
+  const result = await service.syncOpsFromRoster(input);
+  res.status(200).json({ status: "ok", data: result });
+});
+
+export const markAllPresent = asyncHandler(async (req: Request, res: Response) => {
+  const input = parseMarkAllPresentInput(req.body);
+  const result = await service.markAllPresent(input);
   res.status(200).json({ status: "ok", data: result });
 });

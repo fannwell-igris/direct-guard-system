@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, CheckSquare } from "lucide-react";
 import api from "../../api/client";
 
 type CellStatus =
@@ -113,11 +113,23 @@ export default function AttendanceCalendarPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Mark All Present state
+  const [isMarkingPresent, setIsMarkingPresent] = useState(false);
+  const [markPresentResult, setMarkPresentResult] = useState<{
+    scheduled: number;
+    markedPresent: number;
+    alreadyRecorded: number;
+  } | null>(null);
+
   const dateFrom = useMemo(() => isoDate(year, month, 1), [year, month]);
   const dateTo = useMemo(() => {
     const lastDay = new Date(year, month + 1, 0).getDate();
     return isoDate(year, month, lastDay);
   }, [year, month]);
+
+  // Today's ISO date — the "Mark All Present" button always targets today,
+  // regardless of which month is displayed.
+  const todayIso = isoDate(today.getFullYear(), today.getMonth(), today.getDate());
 
   async function loadLookups() {
     try {
@@ -152,6 +164,24 @@ export default function AttendanceCalendarPage() {
     }
   }
 
+  async function handleMarkAllPresent() {
+    setIsMarkingPresent(true);
+    setMarkPresentResult(null);
+    try {
+      const body: Record<string, string> = { date: todayIso };
+      if (siteId) body.siteId = siteId;
+      if (shiftTypeId) body.shiftTypeId = shiftTypeId;
+      const res = await api.post("/operations/mark-all-present", body);
+      setMarkPresentResult(res.data.data);
+      // Refresh the calendar so the new PRESENT boxes appear.
+      await loadCalendar();
+    } catch (err: any) {
+      setError(err.response?.data?.message ?? "Failed to mark all present.");
+    } finally {
+      setIsMarkingPresent(false);
+    }
+  }
+
   useEffect(() => {
     loadLookups();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -159,6 +189,9 @@ export default function AttendanceCalendarPage() {
 
   useEffect(() => {
     loadCalendar();
+    // Dismiss the result banner when the user changes the month / filters,
+    // since it referred to whatever they last marked.
+    setMarkPresentResult(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dateFrom, dateTo, siteId, clientId, shiftTypeId]);
 
@@ -184,6 +217,12 @@ export default function AttendanceCalendarPage() {
 
   const dayNumbers = data ? data.days.map((d) => Number(d.slice(-2))) : [];
 
+  // Show the Mark All Present button only when viewing the current month
+  // (it always acts on today, so it would be misleading to show it on a
+  // past or future month view).
+  const isCurrentMonth =
+    year === today.getFullYear() && month === today.getMonth();
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -197,7 +236,20 @@ export default function AttendanceCalendarPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Mark All Present — only visible on current month */}
+          {isCurrentMonth && (
+            <button
+              onClick={handleMarkAllPresent}
+              disabled={isMarkingPresent}
+              className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-white bg-green-600 hover:bg-green-700 disabled:opacity-60 disabled:cursor-not-allowed rounded-lg border border-green-700 transition-colors"
+              title="Auto-create today's operations records from the roster and mark every scheduled guard as Present"
+            >
+              <CheckSquare size={15} />
+              {isMarkingPresent ? "Marking…" : "Mark All Present Today"}
+            </button>
+          )}
+
           <button
             onClick={goToPrevMonth}
             className="w-8 h-8 flex items-center justify-center rounded border border-gray-300 hover:bg-gray-100"
@@ -220,6 +272,27 @@ export default function AttendanceCalendarPage() {
           </button>
         </div>
       </div>
+
+      {/* Mark All Present result banner */}
+      {markPresentResult && (
+        <div className="text-sm text-green-800 bg-green-50 border border-green-200 rounded-lg px-3 py-2 flex items-center justify-between gap-3">
+          <span>
+            ✓ Today's roster processed —{" "}
+            <strong>{markPresentResult.markedPresent}</strong> guard
+            {markPresentResult.markedPresent !== 1 ? "s" : ""} marked present
+            {markPresentResult.alreadyRecorded > 0
+              ? `, ${markPresentResult.alreadyRecorded} already recorded`
+              : ""}
+            {markPresentResult.scheduled === 0 ? " (no guards scheduled today)" : ""}.
+          </span>
+          <button
+            onClick={() => setMarkPresentResult(null)}
+            className="text-green-600 hover:text-green-800 font-semibold text-xs shrink-0"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex items-center gap-3 flex-wrap">

@@ -298,6 +298,56 @@ export interface AttendanceCalendarQuery {
   shiftTypeId?: string;
 }
 
+// ------------------------------------------------------------------ //
+// Sync-from-roster / Mark-all-present
+// ------------------------------------------------------------------ //
+
+export interface SyncFromRosterInput {
+  date: Date;
+  siteId?: string;
+  shiftTypeId?: string;
+}
+
+export interface MarkAllPresentInput {
+  date: Date;
+  siteId?: string;
+  shiftTypeId?: string;
+}
+
+function parseOptionalId(v: unknown, fieldName: string): string | undefined {
+  if (v === undefined || v === null) return undefined;
+  if (typeof v !== "string" || v.trim() === "") {
+    throw ApiError.badRequest(`\`${fieldName}\` must be a non-empty string if provided.`);
+  }
+  return v.trim();
+}
+
+/** Validates POST /operations/sync-from-roster body. */
+export function parseSyncFromRosterInput(body: unknown): SyncFromRosterInput {
+  if (typeof body !== "object" || body === null) {
+    throw ApiError.badRequest("Request body must be a JSON object.");
+  }
+  const b = body as Record<string, unknown>;
+  return {
+    date: parseRequiredDate(b.date, "date"),
+    siteId: parseOptionalId(b.siteId, "siteId"),
+    shiftTypeId: parseOptionalId(b.shiftTypeId, "shiftTypeId"),
+  };
+}
+
+/** Validates POST /operations/mark-all-present body. */
+export function parseMarkAllPresentInput(body: unknown): MarkAllPresentInput {
+  if (typeof body !== "object" || body === null) {
+    throw ApiError.badRequest("Request body must be a JSON object.");
+  }
+  const b = body as Record<string, unknown>;
+  return {
+    date: parseRequiredDate(b.date, "date"),
+    siteId: parseOptionalId(b.siteId, "siteId"),
+    shiftTypeId: parseOptionalId(b.shiftTypeId, "shiftTypeId"),
+  };
+}
+
 // Keeps the grid to roughly two months at a time so one request can't be
 // asked to build (and the browser render) a year-wide table.
 const MAX_CALENDAR_DAYS = 62;
