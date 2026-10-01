@@ -330,28 +330,57 @@ function printInvoice(inv: Invoice, payments: Payment[], preparedByName?: string
 </body>
 </html>`;
 
-  // Use a hidden iframe so printing works in Electron (desktop app) where
-  // window.open() and blob: URLs are blocked by Electron's security policy.
-  const existingFrame = document.getElementById("__invoice_print_frame__") as HTMLIFrameElement | null;
-  if (existingFrame) existingFrame.remove();
+  // Electron blocks window.open() and blob: URLs. Instead, inject a <style>
+  // that hides the entire app and shows only a print-only <div> containing
+  // the invoice HTML, then call window.print(), then clean up.
+  const PRINT_ID = "__invoice_print_root__";
+  const STYLE_ID = "__invoice_print_style__";
 
-  const iframe = document.createElement("iframe");
-  iframe.id = "__invoice_print_frame__";
-  iframe.style.cssText = "position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none;";
-  document.body.appendChild(iframe);
+  // Remove any leftover print elements from a previous call.
+  document.getElementById(PRINT_ID)?.remove();
+  document.getElementById(STYLE_ID)?.remove();
 
-  const doc = iframe.contentDocument ?? iframe.contentWindow?.document;
-  if (!doc) { iframe.remove(); return; }
-  doc.open();
-  doc.write(html);
-  doc.close();
+  // The style hides everything except our print div during printing.
+  const style = document.createElement("style");
+  style.id = STYLE_ID;
+  style.textContent = `
+    @media print {
+      body > *:not(#${PRINT_ID}) { display: none !important; }
+      #${PRINT_ID} { display: block !important; position: static !important; }
+    }
+    #${PRINT_ID} { display: none; }
+  `;
+  document.head.appendChild(style);
 
-  // Give the iframe time to render before triggering the print dialog.
+  const div = document.createElement("div");
+  div.id = PRINT_ID;
+  // Strip the outer <!DOCTYPE html><html><head>...</head><body> wrapper —
+  // we only need the inner body content since we're injecting into the
+  // existing document.
+  const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+  div.innerHTML = bodyMatch ? bodyMatch[1] : html;
+  document.body.appendChild(div);
+
+  // Also inject the invoice's <style> block into the document head so the
+  // print styles apply correctly.
+  const styleMatch = html.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
+  let invoiceStyle: HTMLStyleElement | null = null;
+  if (styleMatch) {
+    invoiceStyle = document.createElement("style");
+    invoiceStyle.id = "__invoice_inline_style__";
+    invoiceStyle.textContent = styleMatch[1];
+    document.head.appendChild(invoiceStyle);
+  }
+
   setTimeout(() => {
-    try { iframe.contentWindow?.print(); } catch { /* ignore */ }
-    // Clean up after another short delay (after the print dialog closes).
-    setTimeout(() => iframe.remove(), 2000);
-  }, 400);
+    window.print();
+    // Clean up after the print dialog closes.
+    setTimeout(() => {
+      document.getElementById(PRINT_ID)?.remove();
+      document.getElementById(STYLE_ID)?.remove();
+      document.getElementById("__invoice_inline_style__")?.remove();
+    }, 1500);
+  }, 200);
 }
 
 function statusConfigPlain(status: InvoiceStatus): { label: string; bg: string; fg: string } {
