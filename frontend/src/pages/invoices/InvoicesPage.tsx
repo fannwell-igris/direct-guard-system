@@ -330,11 +330,21 @@ function printInvoice(inv: Invoice, payments: Payment[], preparedByName?: string
 </body>
 </html>`;
 
-  const win = window.open("", "_blank");
-  if (!win) return;
-  win.document.write(html);
-  win.document.close();
-  setTimeout(() => win.print(), 400);
+  // Use a Blob URL instead of window.open("","_blank") — avoids the Windows
+  // "Get an app to open this 'about' link" dialog that appears when the
+  // blank window triggers OS protocol handling before content is written.
+  const blob = new Blob([html], { type: "text/html" });
+  const url = URL.createObjectURL(blob);
+  const win = window.open(url, "_blank");
+  if (!win) {
+    URL.revokeObjectURL(url);
+    alert("Pop-ups are blocked. Please allow pop-ups for this site and try again.");
+    return;
+  }
+  // Revoke after a short delay so the page has loaded before the URL is freed.
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  // Trigger the print dialog after the new tab has had time to render.
+  setTimeout(() => { try { win.print(); } catch { /* tab closed early */ } }, 800);
 }
 
 function statusConfigPlain(status: InvoiceStatus): { label: string; bg: string; fg: string } {
