@@ -481,32 +481,43 @@ export default function RosterPage() {
           {visibleEntries.map((entry) => (
             <div
               key={entry.id}
-              className="bg-white border border-gray-200 rounded-2xl px-4 py-3 flex items-center gap-4"
+              className="bg-white border border-gray-200 rounded-2xl px-4 py-3 space-y-2"
             >
-              <div className="w-10 h-10 rounded-full bg-magen-green-light text-magen-green-dark flex items-center justify-center flex-shrink-0">
-                <Calendar size={16} />
-              </div>
-
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-gray-900 truncate">{entry.employee?.fullName ?? "—"}</p>
-                <p className="text-xs text-gray-500 truncate">
-                  {entry.date.slice(0, 10)} · {entry.site?.siteName ?? "—"} ·{" "}
-                  {entry.shiftType?.name ?? "—"}
+              {/* Row 1: icon + name + status badge */}
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-magen-green-light text-magen-green-dark flex items-center justify-center flex-shrink-0">
+                  <Calendar size={15} />
+                </div>
+                <p className="flex-1 font-medium text-gray-900 text-sm leading-snug">
+                  {entry.employee?.fullName ?? "—"}
                 </p>
+                <span
+                  className={
+                    "text-xs font-medium px-2.5 py-1 rounded-full flex-shrink-0 " +
+                    (entry.status === "SCHEDULED"
+                      ? "bg-magen-green-light text-magen-green-dark"
+                      : "bg-gray-100 text-gray-500")
+                  }
+                >
+                  {entry.status}
+                </span>
               </div>
 
-              <span
-                className={
-                  "text-xs font-medium px-2.5 py-1 rounded-full flex-shrink-0 " +
-                  (entry.status === "SCHEDULED"
-                    ? "bg-magen-green-light text-magen-green-dark"
-                    : "bg-gray-100 text-gray-500")
-                }
-              >
-                {entry.status}
-              </span>
+              {/* Row 2: detail pills */}
+              <div className="flex flex-wrap gap-1.5 pl-12">
+                <span className="text-xs bg-gray-100 text-gray-600 rounded-md px-2 py-0.5">
+                  📅 {entry.date.slice(0, 10)}
+                </span>
+                <span className="text-xs bg-gray-100 text-gray-600 rounded-md px-2 py-0.5">
+                  📍 {entry.site?.siteName ?? "—"}
+                </span>
+                <span className="text-xs bg-gray-100 text-gray-600 rounded-md px-2 py-0.5">
+                  🕐 {entry.shiftType?.name ?? "—"}
+                </span>
+              </div>
 
-              <div className="flex items-center gap-1 flex-shrink-0">
+              {/* Row 3: actions (right-aligned) */}
+              <div className="flex items-center justify-end gap-1 pt-0.5">
                 <button
                   onClick={() => openEditForm(entry)}
                   title="Edit"
