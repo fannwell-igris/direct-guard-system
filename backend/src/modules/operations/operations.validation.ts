@@ -314,14 +314,6 @@ export interface MarkAllPresentInput {
   shiftTypeId?: string;
 }
 
-function parseOptionalId(v: unknown, fieldName: string): string | undefined {
-  if (v === undefined || v === null) return undefined;
-  if (typeof v !== "string" || v.trim() === "") {
-    throw ApiError.badRequest(`\`${fieldName}\` must be a non-empty string if provided.`);
-  }
-  return v.trim();
-}
-
 /** Validates POST /operations/sync-from-roster body. */
 export function parseSyncFromRosterInput(body: unknown): SyncFromRosterInput {
   if (typeof body !== "object" || body === null) {
