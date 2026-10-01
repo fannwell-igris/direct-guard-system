@@ -330,21 +330,28 @@ function printInvoice(inv: Invoice, payments: Payment[], preparedByName?: string
 </body>
 </html>`;
 
-  // Use a Blob URL instead of window.open("","_blank") — avoids the Windows
-  // "Get an app to open this 'about' link" dialog that appears when the
-  // blank window triggers OS protocol handling before content is written.
-  const blob = new Blob([html], { type: "text/html" });
-  const url = URL.createObjectURL(blob);
-  const win = window.open(url, "_blank");
-  if (!win) {
-    URL.revokeObjectURL(url);
-    alert("Pop-ups are blocked. Please allow pop-ups for this site and try again.");
-    return;
-  }
-  // Revoke after a short delay so the page has loaded before the URL is freed.
-  setTimeout(() => URL.revokeObjectURL(url), 5000);
-  // Trigger the print dialog after the new tab has had time to render.
-  setTimeout(() => { try { win.print(); } catch { /* tab closed early */ } }, 800);
+  // Use a hidden iframe so printing works in Electron (desktop app) where
+  // window.open() and blob: URLs are blocked by Electron's security policy.
+  const existingFrame = document.getElementById("__invoice_print_frame__") as HTMLIFrameElement | null;
+  if (existingFrame) existingFrame.remove();
+
+  const iframe = document.createElement("iframe");
+  iframe.id = "__invoice_print_frame__";
+  iframe.style.cssText = "position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none;";
+  document.body.appendChild(iframe);
+
+  const doc = iframe.contentDocument ?? iframe.contentWindow?.document;
+  if (!doc) { iframe.remove(); return; }
+  doc.open();
+  doc.write(html);
+  doc.close();
+
+  // Give the iframe time to render before triggering the print dialog.
+  setTimeout(() => {
+    try { iframe.contentWindow?.print(); } catch { /* ignore */ }
+    // Clean up after another short delay (after the print dialog closes).
+    setTimeout(() => iframe.remove(), 2000);
+  }, 400);
 }
 
 function statusConfigPlain(status: InvoiceStatus): { label: string; bg: string; fg: string } {
