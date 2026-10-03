@@ -342,7 +342,7 @@ function OverviewTab({ invoices, payrollRuns, opCosts, genExpenses, accounts, co
         </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4">
         <div className="card">
           <h3 className="font-semibold text-sm text-gray-700 mb-3">Income — This Month</h3>
           <table className="w-full text-sm">
