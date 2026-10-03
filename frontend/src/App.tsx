@@ -17,7 +17,7 @@ import InventoryPage from "./pages/inventory/InventoryPage";
 import InvoicesPage from "./pages/invoices/InvoicesPage";
 import PayrollPage from "./pages/payroll/PayrollPage";
 import TasksPage from "./pages/tasks/TasksPage";
-import DepartmentRequestsPage from "./pages/departments/DepartmentRequestsPage";
+import DepartmentRequestsPage from "./pages/department-requests/DepartmentRequestsPage";
 import DepartmentBudgetsPage from "./pages/departments/DepartmentBudgetsPage";
 import ExpensesPage from "./pages/expenses/ExpensesPage";
 import UsersPage from "./pages/users/UsersPage";
