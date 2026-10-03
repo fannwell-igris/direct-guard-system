@@ -346,17 +346,17 @@ function OverviewTab({ invoices, payrollRuns, opCosts, genExpenses, accounts, co
         <div className="card">
           <h3 className="font-semibold text-sm text-gray-700 mb-3">Income — This Month</h3>
           <div className="space-y-2 text-sm">
-            <div className="flex justify-between gap-2 flex-wrap"><span className="text-gray-500">Invoiced</span><span className="font-medium text-right">{fmt(totalInvoiced)}</span></div>
-            <div className="flex justify-between gap-2 flex-wrap"><span className="text-gray-500">Collected</span><span className="font-medium text-emerald-600 text-right">{fmt(totalReceived)}</span></div>
-            <div className="flex justify-between gap-2 flex-wrap border-t pt-2"><span className="text-gray-500">Outstanding (all-time)</span><span className="font-medium text-amber-600 text-right">{fmt(totalOutstanding)}</span></div>
+            <div className="flex justify-between gap-2 flex-wrap"><span className="text-gray-500 min-w-0">Invoiced</span><span className="font-medium shrink-0">{fmt(totalInvoiced)}</span></div>
+            <div className="flex justify-between gap-2 flex-wrap"><span className="text-gray-500 min-w-0">Collected</span><span className="font-medium text-emerald-600 shrink-0">{fmt(totalReceived)}</span></div>
+            <div className="flex justify-between gap-2 flex-wrap border-t pt-2"><span className="text-gray-500 min-w-0">Outstanding (all-time)</span><span className="font-medium text-amber-600 shrink-0">{fmt(totalOutstanding)}</span></div>
           </div>
         </div>
         <div className="card">
           <h3 className="font-semibold text-sm text-gray-700 mb-3">Expenses — This Month</h3>
           <div className="space-y-2 text-sm">
-            <div className="flex justify-between gap-2 flex-wrap"><span className="text-gray-500">Operational Costs</span><span className="font-medium text-right">{fmt(totalOpCosts)}</span></div>
-            <div className="flex justify-between gap-2 flex-wrap"><span className="text-gray-500">General Expenses</span><span className="font-medium text-right">{fmt(totalGenExp)}</span></div>
-            <div className="flex justify-between gap-2 flex-wrap border-t pt-2"><span className="text-gray-500">Payroll (net)</span><span className="font-medium text-right">{fmt(totalPayroll)}</span></div>
+            <div className="flex justify-between gap-2 flex-wrap"><span className="text-gray-500 min-w-0">Operational Costs</span><span className="font-medium shrink-0">{fmt(totalOpCosts)}</span></div>
+            <div className="flex justify-between gap-2 flex-wrap"><span className="text-gray-500 min-w-0">General Expenses</span><span className="font-medium shrink-0">{fmt(totalGenExp)}</span></div>
+            <div className="flex justify-between gap-2 flex-wrap border-t pt-2"><span className="text-gray-500 min-w-0">Payroll (net)</span><span className="font-medium shrink-0">{fmt(totalPayroll)}</span></div>
           </div>
         </div>
         <div className="card">
