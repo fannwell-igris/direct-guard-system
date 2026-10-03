@@ -342,48 +342,49 @@ function OverviewTab({ invoices, payrollRuns, opCosts, genExpenses, accounts, co
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4">
-        <div className="card">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="card p-4">
           <h3 className="font-semibold text-sm text-gray-700 mb-3">Income — This Month</h3>
           <table className="w-full text-sm">
+            <colgroup><col className="w-full" /><col style={{ whiteSpace: "nowrap" }} /></colgroup>
             <tbody>
-              <tr><td className="text-gray-500 py-0.5 pr-2">Invoiced</td><td className="font-medium text-right py-0.5">{fmt(totalInvoiced)}</td></tr>
-              <tr><td className="text-gray-500 py-0.5 pr-2">Collected</td><td className="font-medium text-emerald-600 text-right py-0.5">{fmt(totalReceived)}</td></tr>
-              <tr className="border-t"><td className="text-gray-500 pt-2 pr-2">Outstanding (all-time)</td><td className="font-medium text-amber-600 text-right pt-2">{fmt(totalOutstanding)}</td></tr>
+              <tr><td className="text-gray-500 py-0.5 pr-3">Invoiced</td><td className="font-medium text-right py-0.5 pl-2" style={{ whiteSpace: "nowrap" }}>{fmt(totalInvoiced)}</td></tr>
+              <tr><td className="text-gray-500 py-0.5 pr-3">Collected</td><td className="font-medium text-emerald-600 text-right py-0.5 pl-2" style={{ whiteSpace: "nowrap" }}>{fmt(totalReceived)}</td></tr>
+              <tr className="border-t"><td className="text-gray-500 pt-2 pr-3">Outstanding</td><td className="font-medium text-amber-600 text-right pt-2 pl-2" style={{ whiteSpace: "nowrap" }}>{fmt(totalOutstanding)}</td></tr>
             </tbody>
           </table>
         </div>
-        <div className="card">
+        <div className="card p-4">
           <h3 className="font-semibold text-sm text-gray-700 mb-3">Expenses — This Month</h3>
           <table className="w-full text-sm">
+            <colgroup><col className="w-full" /><col style={{ whiteSpace: "nowrap" }} /></colgroup>
             <tbody>
-              <tr><td className="text-gray-500 py-0.5 pr-2">Operational Costs</td><td className="font-medium text-right py-0.5">{fmt(totalOpCosts)}</td></tr>
-              <tr><td className="text-gray-500 py-0.5 pr-2">General Expenses</td><td className="font-medium text-right py-0.5">{fmt(totalGenExp)}</td></tr>
-              <tr className="border-t"><td className="text-gray-500 pt-2 pr-2">Payroll (net)</td><td className="font-medium text-right pt-2">{fmt(totalPayroll)}</td></tr>
+              <tr><td className="text-gray-500 py-0.5 pr-3">Op. Costs</td><td className="font-medium text-right py-0.5 pl-2" style={{ whiteSpace: "nowrap" }}>{fmt(totalOpCosts)}</td></tr>
+              <tr><td className="text-gray-500 py-0.5 pr-3">Gen. Expenses</td><td className="font-medium text-right py-0.5 pl-2" style={{ whiteSpace: "nowrap" }}>{fmt(totalGenExp)}</td></tr>
+              <tr className="border-t"><td className="text-gray-500 pt-2 pr-3">Payroll (net)</td><td className="font-medium text-right pt-2 pl-2" style={{ whiteSpace: "nowrap" }}>{fmt(totalPayroll)}</td></tr>
             </tbody>
           </table>
         </div>
-        <div className="card">
+        <div className="card p-4">
           <h3 className="font-semibold text-sm text-gray-700 mb-3">Funds on Hand</h3>
-          <div className="space-y-2 text-sm">
-            {accounts.length === 0 && <p className="text-gray-400 text-xs">No accounts configured. Add them in the Cash &amp; Accounts tab.</p>}
-            <table className="w-full text-sm">
-              <tbody>
-                {accounts.map((a) => (
-                  <tr key={a.id}>
-                    <td className="text-gray-500 py-0.5 pr-2">{a.label}</td>
-                    <td className="font-medium text-right py-0.5">{fmt(a.balance)}</td>
-                  </tr>
-                ))}
-                {accounts.length > 0 && (
-                  <tr className="border-t">
-                    <td className="text-gray-500 font-semibold pt-2">Total</td>
-                    <td className="font-bold text-right pt-2">{fmt(cashOnHand + bankTotal)}</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+          {accounts.length === 0 && <p className="text-gray-400 text-xs mb-2">No accounts configured. Add them in the Cash &amp; Accounts tab.</p>}
+          <table className="w-full text-sm">
+            <colgroup><col className="w-full" /><col style={{ whiteSpace: "nowrap" }} /></colgroup>
+            <tbody>
+              {accounts.map((a) => (
+                <tr key={a.id}>
+                  <td className="text-gray-500 py-0.5 pr-3">{a.label}</td>
+                  <td className="font-medium text-right py-0.5 pl-2" style={{ whiteSpace: "nowrap" }}>{fmt(a.balance)}</td>
+                </tr>
+              ))}
+              {accounts.length > 0 && (
+                <tr className="border-t">
+                  <td className="text-gray-500 font-semibold pt-2">Total</td>
+                  <td className="font-bold text-right pt-2 pl-2" style={{ whiteSpace: "nowrap" }}>{fmt(cashOnHand + bankTotal)}</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
