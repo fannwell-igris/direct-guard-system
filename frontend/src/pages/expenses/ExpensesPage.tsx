@@ -204,7 +204,12 @@ export default function OperationalCostsPage() {
   const [clientFilter, setClientFilter] = useState("");
   const [siteFilter, setSiteFilter] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
-  const [monthFrom, setMonthFrom] = useState("");
+  // Default to current month so the list opens showing this month's costs.
+  const currentMonthValue = (() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  })();
+  const [monthFrom, setMonthFrom] = useState(currentMonthValue);
   const [monthTo, setMonthTo] = useState("");
   const [page, setPage] = useState(1);
 
@@ -317,7 +322,7 @@ export default function OperationalCostsPage() {
     setClientFilter("");
     setSiteFilter("");
     setCategoryFilter("");
-    setMonthFrom("");
+    setMonthFrom(currentMonthValue);
     setMonthTo("");
     setPage(1);
   }
@@ -418,7 +423,13 @@ export default function OperationalCostsPage() {
     setPage(p);
   }
 
-  const hasFilters = clientFilter || siteFilter || categoryFilter || monthFrom || monthTo;
+  // "Has filters" is true when anything is set beyond the default (current month, no other filters).
+  const hasFilters =
+    clientFilter ||
+    siteFilter ||
+    categoryFilter ||
+    monthFrom !== currentMonthValue ||
+    monthTo;
   const pageTotal = totalAmount(costs);
 
   // ═══════════════════════════════════════════════════════════════════════════
