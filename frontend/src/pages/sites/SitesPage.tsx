@@ -24,11 +24,14 @@ interface Client {
   name: string;
 }
 
+type SiteShiftConfig = "DAY_ONLY" | "NIGHT_ONLY" | "BOTH";
+
 interface Site {
   id: string;
   siteName: string;
   location: string | null;
   notes: string | null;
+  activeShifts: SiteShiftConfig;
   status: "ACTIVE" | "INACTIVE" | "ARCHIVED";
   clientId: string;
   client?: { id: string; name: string };
@@ -90,6 +93,7 @@ interface SiteFormState {
   siteName: string;
   location: string;
   notes: string;
+  activeShifts: SiteShiftConfig;
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -99,7 +103,14 @@ const EMPTY_FORM: SiteFormState = {
   siteName: "",
   location: "",
   notes: "",
+  activeShifts: "BOTH",
 };
+
+const SHIFT_CONFIG_OPTIONS: { value: SiteShiftConfig; label: string }[] = [
+  { value: "BOTH", label: "Day & Night" },
+  { value: "DAY_ONLY", label: "Day Only" },
+  { value: "NIGHT_ONLY", label: "Night Only" },
+];
 
 const PAGE_SIZE = 15;
 
@@ -248,6 +259,25 @@ function SiteModal({
                 className="input resize-none"
                 rows={2}
               />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-gray-700">Active Shifts</label>
+              <div className="flex gap-3">
+                {SHIFT_CONFIG_OPTIONS.map((opt) => (
+                  <label key={opt.value} className="flex items-center gap-1.5 cursor-pointer text-sm text-gray-700">
+                    <input
+                      type="radio"
+                      name="activeShifts"
+                      value={opt.value}
+                      checked={form.activeShifts === opt.value}
+                      onChange={() => setForm({ ...form, activeShifts: opt.value })}
+                      className="accent-magen-green"
+                    />
+                    {opt.label}
+                  </label>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -408,6 +438,7 @@ export default function SitesPage() {
       siteName: site.siteName,
       location: site.location ?? "",
       notes: site.notes ?? "",
+      activeShifts: site.activeShifts ?? "BOTH",
     });
     setFormError(null);
     setEditingId(site.id);
@@ -428,6 +459,7 @@ export default function SitesPage() {
       siteName: form.siteName.trim(),
       location: form.location.trim() || null,
       notes: form.notes.trim() || null,
+      activeShifts: form.activeShifts,
     };
 
     try {
