@@ -1,4 +1,5 @@
-import { useEffect, useState, useCallback, FormEvent } from "react";
+import { useEffect, useState, useCallback, } from "react";
+import type { FormEvent } from "react";
 import { Clock, CheckCircle, XCircle, AlertCircle, ChevronDown, ChevronRight, Plus, X } from "lucide-react";
 import api from "../../api/client";
 
