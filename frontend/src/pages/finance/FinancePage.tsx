@@ -365,14 +365,14 @@ function OverviewTab({ invoices, payrollRuns, opCosts, genExpenses, accounts, co
             {accounts.length === 0 && <p className="text-gray-400 text-xs">No accounts configured. Add them in the Cash &amp; Accounts tab.</p>}
             {accounts.map((a) => (
               <div key={a.id} className="flex justify-between gap-2 flex-wrap">
-                <span className="text-gray-500">{a.label}</span>
-                <span className="font-medium text-right">{fmt(a.balance)}</span>
+                <span className="text-gray-500 min-w-0 break-words">{a.label}</span>
+                <span className="font-medium shrink-0">{fmt(a.balance)}</span>
               </div>
             ))}
             {accounts.length > 0 && (
               <div className="flex justify-between gap-2 flex-wrap border-t pt-2">
                 <span className="text-gray-500 font-semibold">Total</span>
-                <span className="font-bold text-right">{fmt(cashOnHand + bankTotal)}</span>
+                <span className="font-bold shrink-0">{fmt(cashOnHand + bankTotal)}</span>
               </div>
             )}
           </div>
@@ -1062,7 +1062,7 @@ export default function FinancePage() {
         fetch(`${API}/payroll/runs?pageSize=500`, { headers }),
         fetch(`${API}/operational-costs?pageSize=500`, { headers }),
         fetch(`${API}/general-expenses?pageSize=500`, { headers }),
-        fetch(`${API}/client-contracts?status=ACTIVE&pageSize=500`, { headers }),
+        fetch(`${API}/client-contracts?pageSize=500`, { headers }),
       ]);
       const [invJson, prJson, opJson, genJson, contractsJson] = await Promise.all([
         invRes.json(), prRes.json(), opRes.json(), genRes.json(), contractsRes.json(),
@@ -1071,9 +1071,13 @@ export default function FinancePage() {
       setPayrollRuns(prJson.data ?? []);
       setOpCosts(opJson.data ?? []);
       setGenExpenses(genJson.data ?? []);
-      const activeContracts: Array<{ amount?: number; monthlyValue?: number }> = contractsJson.data ?? [];
+      // Filter client-side: treat ACTIVE and EXPIRING_SOON as "currently active"
+      const allContracts: Array<{ amount?: number; status?: string }> = contractsJson.data ?? [];
+      const activeContracts = allContracts.filter(
+        (c) => c.status === "ACTIVE" || c.status === "EXPIRING_SOON"
+      );
       setActiveContractsCount(activeContracts.length);
-      setContractsValue(activeContracts.reduce((sum, c) => sum + Number(c.amount ?? c.monthlyValue ?? 0), 0));
+      setContractsValue(activeContracts.reduce((sum, c) => sum + Number(c.amount ?? 0), 0));
     } finally {
       setLoadingOverview(false);
     }
