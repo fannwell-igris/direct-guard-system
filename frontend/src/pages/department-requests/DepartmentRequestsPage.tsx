@@ -207,7 +207,7 @@ export default function DepartmentRequestsPage() {
   const loadRequests = useCallback(async () => {
     setIsLoading(true); setError(null);
     try {
-      const params: Record<string, string> = { pageSize: "200" };
+      const params: Record<string, string> = { pageSize: "100" };
       if (statusFilter) params.status = statusFilter;
       if (deptFilter)   params.departmentId = deptFilter;
       const res = await api.get("/department-requests", { params });
