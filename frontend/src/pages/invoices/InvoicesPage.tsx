@@ -19,6 +19,7 @@ import {
   AlertTriangle,
   Printer,
   Trash2,
+  Minus,
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import Modal from "../../components/ui/Modal";
@@ -157,7 +158,7 @@ function paidPercent(inv: Invoice): number {
 // prints that single amount as row "1" with the description built from
 // billingPeriod/site, same as before. Ask before adding real multi-line-item
 // support; that's a bigger, separate schema change, not bundled into this.
-function printInvoice(inv: Invoice, payments: Payment[], preparedByName?: string | null) {
+function printInvoice(inv: Invoice, payments: Payment[], preparedByName?: string | null, lineItems?: LineItem[]) {
   const generatedDate = new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" });
   const cfg = statusConfigPlain(inv.status);
 
@@ -275,12 +276,23 @@ function printInvoice(inv: Invoice, payments: Payment[], preparedByName?: string
       </tr>
     </thead>
     <tbody>
-      <tr>
-        <td class="rownum">1</td>
-        <td>Security services${inv.billingPeriod ? ` — ${inv.billingPeriod}` : ""}${inv.site ? ` (${inv.site.siteName})` : ""}</td>
-        <td class="num"></td>
-        <td class="num">${formatCurrency(inv.amount)}</td>
-      </tr>
+      ${(lineItems && lineItems.filter((li) => li.description.trim() && Number(li.amount) > 0).length > 1)
+        ? lineItems
+            .filter((li) => li.description.trim() && Number(li.amount) > 0)
+            .map((li, i) => `
+          <tr>
+            <td class="rownum">${i + 1}</td>
+            <td>${li.description}${inv.site ? ` (${inv.site.siteName})` : ""}</td>
+            <td class="num">${formatCurrency(li.amount)}</td>
+            <td class="num">${formatCurrency(li.amount)}</td>
+          </tr>`).join("")
+        : `<tr>
+            <td class="rownum">1</td>
+            <td>Security services${inv.billingPeriod ? ` — ${inv.billingPeriod}` : ""}${inv.site ? ` (${inv.site.siteName})` : ""}</td>
+            <td class="num"></td>
+            <td class="num">${formatCurrency(inv.amount)}</td>
+          </tr>`
+      }
     </tbody>
   </table>
 
@@ -394,6 +406,131 @@ function statusConfigPlain(status: InvoiceStatus): { label: string; bg: string; 
   }
 }
 
+// ─── Line items (frontend-only, summed into the single `amount` field) ────────
+
+interface LineItem {
+  description: string;
+  amount: string; // kept as string while editing
+}
+
+function blankLineItem(): LineItem {
+  return { description: "", amount: "" };
+}
+
+// ─── Receipt print ─────────────────────────────────────────────────────────────
+
+function printReceipt(inv: Invoice, payment: Payment, preparedByName?: string | null) {
+  const generatedDate = new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" });
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<title>Receipt — ${inv.invoiceNumber}</title>
+<style>
+  @page { size: A5 portrait; margin: 12mm 14mm 10mm; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; font-size: 12px; color: #1a1a1a; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 8px; border-bottom: 3px solid #09aa4c; margin-bottom: 16px; }
+  .header img.logo { height: 48px; }
+  .company-address { text-align: right; font-size: 9px; color: #444; line-height: 1.5; }
+  .doc-title h1 { font-size: 26px; font-weight: 800; color: #111; letter-spacing: 1px; margin-bottom: 4px; }
+  .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 9px; font-weight: 700; text-transform: uppercase; background: #dcfce7; color: #15803d; margin-bottom: 14px; }
+  .meta { border: 1px solid #e5e7eb; border-radius: 6px; padding: 10px 12px; margin-bottom: 14px; font-size: 11px; }
+  .meta-row { display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px solid #f3f4f6; }
+  .meta-row:last-child { border-bottom: none; }
+  .meta-row .label { color: #6b7280; }
+  .meta-row .value { font-weight: 600; text-align: right; }
+  .amount-box { background: #003770; color: #fff; border-radius: 8px; padding: 14px 16px; text-align: center; margin-bottom: 14px; }
+  .amount-box .amt-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.8; margin-bottom: 4px; }
+  .amount-box .amt-value { font-size: 24px; font-weight: 800; }
+  .signatures { margin-top: 28px; display: flex; gap: 24px; }
+  .sig { flex: 1; }
+  .sig .line { border-bottom: 1px solid #999; margin-bottom: 4px; height: 24px; }
+  .sig .sig-label { font-size: 9px; color: #6b7280; }
+  .footer { margin-top: 20px; border-top: 1px solid #e5e7eb; padding-top: 8px; font-size: 9px; color: #9ca3af; text-align: center; }
+  @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+</style>
+</head>
+<body>
+  <div class="header">
+    <img class="logo" src="${magenLogoUrl}" alt="Magen Security" />
+    <div class="company-address">
+      ${COMPANY_ADDRESS_LINES.map((l) => `<div>${l}</div>`).join("")}
+      <div style="color:#003770;font-weight:600;">${COMPANY_WEBSITE}</div>
+      <div>TPIN: ${COMPANY_TPIN}</div>
+    </div>
+  </div>
+
+  <div class="doc-title"><h1>RECEIPT</h1></div>
+  <div class="pill">Payment Confirmed</div>
+
+  <div class="meta">
+    <div class="meta-row"><span class="label">Invoice No.</span><span class="value">${inv.invoiceNumber}</span></div>
+    <div class="meta-row"><span class="label">Client</span><span class="value">${inv.client?.name ?? "—"}</span></div>
+    ${inv.site ? `<div class="meta-row"><span class="label">Site</span><span class="value">${inv.site.siteName}</span></div>` : ""}
+    ${inv.billingPeriod ? `<div class="meta-row"><span class="label">Period</span><span class="value">${inv.billingPeriod}</span></div>` : ""}
+    <div class="meta-row"><span class="label">Payment Date</span><span class="value">${formatDate(payment.paymentDate)}</span></div>
+    ${payment.paymentMethod ? `<div class="meta-row"><span class="label">Method</span><span class="value">${payment.paymentMethod}</span></div>` : ""}
+    ${payment.reference ? `<div class="meta-row"><span class="label">Reference</span><span class="value">${payment.reference}</span></div>` : ""}
+    ${payment.notes ? `<div class="meta-row"><span class="label">Notes</span><span class="value">${payment.notes}</span></div>` : ""}
+    <div class="meta-row"><span class="label">Invoice Total</span><span class="value">${formatCurrency(inv.amount)}</span></div>
+    <div class="meta-row"><span class="label">Outstanding After</span><span class="value">${formatCurrency(inv.outstandingBalance)}</span></div>
+  </div>
+
+  <div class="amount-box">
+    <div class="amt-label">Amount Received</div>
+    <div class="amt-value">${formatCurrency(payment.amount)}</div>
+  </div>
+
+  <div class="signatures">
+    <div class="sig"><div class="line"></div><div class="sig-label">Received by: ${preparedByName ?? ""}</div></div>
+    <div class="sig"><div class="line"></div><div class="sig-label">Client signature</div></div>
+  </div>
+
+  <div class="footer">Generated ${generatedDate} · Magen Security Limited · Visible · Vigilant · Always Ready</div>
+  <script>window.onload = function() { window.print(); };<\/script>
+</body>
+</html>`;
+
+  const PRINT_ID = "__receipt_print_root__";
+  const STYLE_ID = "__receipt_print_style__";
+  document.getElementById(PRINT_ID)?.remove();
+  document.getElementById(STYLE_ID)?.remove();
+
+  const style = document.createElement("style");
+  style.id = STYLE_ID;
+  style.textContent = `
+    @media print { body > *:not(#${PRINT_ID}) { display: none !important; } #${PRINT_ID} { display: block !important; position: static !important; } }
+    #${PRINT_ID} { display: none; }
+  `;
+  document.head.appendChild(style);
+
+  const div = document.createElement("div");
+  div.id = PRINT_ID;
+  const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+  div.innerHTML = bodyMatch ? bodyMatch[1] : html;
+  document.body.appendChild(div);
+
+  const styleMatch = html.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
+  let receiptStyle: HTMLStyleElement | null = null;
+  if (styleMatch) {
+    receiptStyle = document.createElement("style");
+    receiptStyle.id = "__receipt_inline_style__";
+    receiptStyle.textContent = styleMatch[1];
+    document.head.appendChild(receiptStyle);
+  }
+
+  setTimeout(() => {
+    window.print();
+    setTimeout(() => {
+      document.getElementById(PRINT_ID)?.remove();
+      document.getElementById(STYLE_ID)?.remove();
+      document.getElementById("__receipt_inline_style__")?.remove();
+    }, 1500);
+  }, 200);
+}
+
 // ─── Blank forms ──────────────────────────────────────────────────────────────
 
 interface InvoiceForm {
@@ -404,12 +541,15 @@ interface InvoiceForm {
   billingPeriod: string;
   amount: string;
   notes: string;
+  // Line items (frontend-only). When more than one item is present,
+  // billingPeriod is auto-derived from descriptions and amount is the sum.
+  lineItems: LineItem[];
 }
 
 function blankInvoiceForm(): InvoiceForm {
   const today = new Date().toISOString().slice(0, 10);
   const due = new Date(Date.now() + 30 * 86400_000).toISOString().slice(0, 10);
-  return { clientId: "", siteId: "", invoiceDate: today, dueDate: due, billingPeriod: "", amount: "", notes: "" };
+  return { clientId: "", siteId: "", invoiceDate: today, dueDate: due, billingPeriod: "", amount: "", notes: "", lineItems: [blankLineItem()] };
 }
 
 interface PaymentForm {
@@ -489,6 +629,9 @@ export default function InvoicesPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
+  // Track line items entered during create/edit so printInvoice can show them
+  const [lastLineItems, setLastLineItems] = useState<LineItem[]>([]);
+
   // ─── Load reference data ──────────────────────────────────────────────────
   useEffect(() => {
     fetch(`${API}/clients?pageSize=200`, { headers: authHeader })
@@ -552,8 +695,11 @@ export default function InvoicesPage() {
     const label = billingSuggestion.frequency.charAt(0) + billingSuggestion.frequency.slice(1).toLowerCase();
     setInvoiceForm((f) => ({
       ...f,
-      amount: String(billingSuggestion.amount),
+      amount: String(billingSuggestion!.amount),
       billingPeriod: f.billingPeriod || label,
+      lineItems: f.lineItems.length === 1 && !f.lineItems[0].amount
+        ? [{ description: f.lineItems[0].description || "Security services", amount: String(billingSuggestion!.amount) }]
+        : f.lineItems,
     }));
   }
 
@@ -640,6 +786,7 @@ export default function InvoicesPage() {
       billingPeriod: inv.billingPeriod ?? "",
       amount: String(Number(inv.amount)),
       notes: inv.notes ?? "",
+      lineItems: [{ description: inv.billingPeriod ?? "Security services", amount: String(Number(inv.amount)) }],
     });
     setInvoiceFormError(null);
     setInvoicePanel("edit");
@@ -651,15 +798,26 @@ export default function InvoicesPage() {
     if (!invoiceForm.clientId) return setInvoiceFormError("Please select a client.");
     if (!invoiceForm.invoiceDate) return setInvoiceFormError("Invoice date is required.");
     if (!invoiceForm.dueDate) return setInvoiceFormError("Due date is required.");
-    if (!invoiceForm.amount || Number(invoiceForm.amount) <= 0) return setInvoiceFormError("Enter a valid amount.");
+
+    // Compute totals from line items
+    const validItems = invoiceForm.lineItems.filter((li) => li.description.trim() && Number(li.amount) > 0);
+    if (validItems.length === 0) return setInvoiceFormError("Add at least one line item with a description and amount.");
+    const computedAmount = validItems.reduce((sum, li) => sum + Number(li.amount), 0);
+    if (computedAmount <= 0) return setInvoiceFormError("Total amount must be greater than zero.");
+
+    // Auto-build billingPeriod from line item descriptions when using multiple items
+    const billingPeriod = invoiceForm.billingPeriod.trim()
+      || (validItems.length > 1
+        ? validItems.map((li) => li.description.trim()).join(", ")
+        : validItems[0].description.trim());
 
     const payload = {
       clientId: invoiceForm.clientId,
       siteId: invoiceForm.siteId || null,
       invoiceDate: invoiceForm.invoiceDate,
       dueDate: invoiceForm.dueDate,
-      billingPeriod: invoiceForm.billingPeriod || null,
-      amount: Number(invoiceForm.amount),
+      billingPeriod: billingPeriod || null,
+      amount: computedAmount,
       notes: invoiceForm.notes || null,
     };
 
@@ -677,6 +835,7 @@ export default function InvoicesPage() {
         throw new Error(err.message || `Server error ${res.status}`);
       }
       const savedJson = await res.json();
+      setLastLineItems(validItems);
       setInvoicePanel("none");
       loadInvoices(page);
       loadInvoiceDetail(savedJson.data.id);
@@ -1072,20 +1231,81 @@ export default function InvoicesPage() {
                     </div>
                   )}
 
-                  {/* Billing period */}
+                  {/* Line items */}
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">Billing Period</label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs font-semibold text-gray-600">Line Items *</label>
+                      <button
+                        type="button"
+                        className="text-xs text-magen-green-dark font-medium flex items-center gap-0.5 hover:underline"
+                        onClick={() => setInvoiceForm((f) => ({ ...f, lineItems: [...f.lineItems, blankLineItem()] }))}
+                      >
+                        <Plus size={11} /> Add row
+                      </button>
+                    </div>
+                    <div className="space-y-1.5">
+                      {invoiceForm.lineItems.map((li, idx) => (
+                        <div key={idx} className="flex gap-1.5 items-center">
+                          <input
+                            type="text"
+                            className="input flex-1 text-sm"
+                            placeholder={`Description (e.g. Day Guarding — Oct 2026)`}
+                            value={li.description}
+                            onChange={(e) => {
+                              const items = [...invoiceForm.lineItems];
+                              items[idx] = { ...items[idx], description: e.target.value };
+                              setInvoiceForm((f) => ({ ...f, lineItems: items }));
+                            }}
+                          />
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            className="input w-28 text-sm text-right"
+                            placeholder="0.00"
+                            value={li.amount}
+                            onChange={(e) => {
+                              const items = [...invoiceForm.lineItems];
+                              items[idx] = { ...items[idx], amount: e.target.value };
+                              setInvoiceForm((f) => ({ ...f, lineItems: items }));
+                            }}
+                          />
+                          {invoiceForm.lineItems.length > 1 && (
+                            <button
+                              type="button"
+                              className="text-red-400 hover:text-red-600 shrink-0"
+                              onClick={() => setInvoiceForm((f) => ({ ...f, lineItems: f.lineItems.filter((_, i) => i !== idx) }))}
+                            >
+                              <Minus size={14} />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    {/* Running total */}
+                    {invoiceForm.lineItems.length > 1 && (
+                      <div className="flex justify-between text-xs text-gray-500 mt-1.5 px-0.5">
+                        <span>Total</span>
+                        <span className="font-semibold text-gray-700">
+                          ZMW {invoiceForm.lineItems
+                            .reduce((s, li) => s + (Number(li.amount) || 0), 0)
+                            .toLocaleString("en-ZM", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Billing period — optional override when using multi-line */}
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">
+                      Billing Period
+                      {invoiceForm.lineItems.length > 1 && (
+                        <span className="ml-1 font-normal text-gray-400">(auto-built from line items if blank)</span>
+                      )}
+                    </label>
                     <input type="text" className="input w-full" placeholder="e.g. September 2026"
                       value={invoiceForm.billingPeriod}
                       onChange={(e) => setInvoiceForm((f) => ({ ...f, billingPeriod: e.target.value }))} />
-                  </div>
-
-                  {/* Amount */}
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">Amount (ZMW) *</label>
-                    <input type="number" step="0.01" min="0.01" className="input w-full" placeholder="0.00"
-                      value={invoiceForm.amount}
-                      onChange={(e) => setInvoiceForm((f) => ({ ...f, amount: e.target.value }))} required />
                   </div>
 
                   {/* Notes */}
@@ -1193,7 +1413,7 @@ export default function InvoicesPage() {
                     <div className="flex gap-2 mb-3 flex-wrap">
                       <button
                         className="btn-secondary text-xs flex items-center gap-1"
-                        onClick={() => printInvoice(selectedInvoice, payments, user?.fullName)}
+                        onClick={() => printInvoice(selectedInvoice, payments, user?.fullName, lastLineItems)}
                       >
                         <Printer size={12} /> Print / Export PDF
                       </button>
@@ -1323,14 +1543,21 @@ export default function InvoicesPage() {
                       ) : (
                         <div className="space-y-2">
                           {payments.map((pmt) => (
-                            <div key={pmt.id} className="flex items-start justify-between bg-gray-50 rounded-lg px-3 py-2">
-                              <div>
+                            <div key={pmt.id} className="flex items-start justify-between bg-gray-50 rounded-lg px-3 py-2 gap-2">
+                              <div className="min-w-0 flex-1">
                                 <p className="text-sm font-medium text-gray-700">{formatCurrency(pmt.amount)}</p>
                                 <p className="text-xs text-gray-400">{formatDate(pmt.paymentDate)}</p>
                                 {pmt.paymentMethod && <p className="text-xs text-gray-400">{pmt.paymentMethod}</p>}
                                 {pmt.reference && <p className="text-xs text-gray-400">Ref: {pmt.reference}</p>}
+                                {pmt.notes && <p className="text-xs text-gray-400">{pmt.notes}</p>}
                               </div>
-                              {pmt.notes && <p className="text-xs text-gray-400 text-right max-w-[120px]">{pmt.notes}</p>}
+                              <button
+                                className="shrink-0 text-xs text-gray-400 hover:text-magen-navy flex items-center gap-0.5 mt-0.5"
+                                title="Print receipt for this payment"
+                                onClick={() => printReceipt(selectedInvoice, pmt, user?.fullName)}
+                              >
+                                <Printer size={11} /> Receipt
+                              </button>
                             </div>
                           ))}
                         </div>

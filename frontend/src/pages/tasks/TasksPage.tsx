@@ -18,9 +18,11 @@ interface Task {
   assignedToEmployeeId: string | null;
   assignedBy: string | null;
   dueDate: string | null;
+  createdAt: string | null;
   priority: "NORMAL" | "HIGH" | "URGENT" | "CRITICAL";
   status: "OPEN" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "CANCELLED";
   completedAt: string | null;
+  completedBy: string | null;   // name of the person who last changed the status
   notes: string | null;
   department?: { id: string; name: string };
   assignedToEmployee?: { id: string; fullName: string };
@@ -54,6 +56,97 @@ const STATUS_OPTIONS: Task["status"][] = ["OPEN", "IN_PROGRESS", "ON_HOLD", "COM
 // Roles that can create and fully edit tasks.
 const CAN_MANAGE_ROLES = new Set(["ADMIN", "MANAGER", "FINANCE"]);
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function priorityBadge(p: Task["priority"]) {
+  switch (p) {
+    case "CRITICAL": return "bg-red-100 text-red-700";
+    case "URGENT":   return "bg-orange-100 text-orange-700";
+    case "HIGH":     return "bg-amber-100 text-amber-700";
+    default:         return "bg-gray-100 text-gray-600";
+  }
+}
+
+function statusBadge(s: Task["status"]) {
+  switch (s) {
+    case "COMPLETED":  return "bg-green-100 text-green-700";
+    case "IN_PROGRESS": return "bg-blue-100 text-blue-700";
+    case "ON_HOLD":    return "bg-amber-100 text-amber-700";
+    case "CANCELLED":  return "bg-gray-100 text-gray-500";
+    default:           return "bg-slate-100 text-slate-600"; // OPEN
+  }
+}
+
+function statusLabel(s: Task["status"]) {
+  switch (s) {
+    case "IN_PROGRESS": return "In Progress";
+    case "ON_HOLD":     return "On Hold";
+    default:            return s.charAt(0) + s.slice(1).toLowerCase();
+  }
+}
+
+/** Returns a human-readable countdown / overdue label for a due date. */
+function dueDateLabel(dueDateStr: string | null): { text: string; cls: string } | null {
+  if (!dueDateStr) return null;
+  const now = new Date();
+  const due = new Date(dueDateStr);
+  // Normalise both to midnight local time for day-level comparison
+  const nowDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const dueDay = new Date(due.getFullYear(), due.getMonth(), due.getDate());
+  const diff = Math.round((dueDay.getTime() - nowDay.getTime()) / 86_400_000);
+
+  if (diff < 0) return { text: `${Math.abs(diff)}d overdue`, cls: "text-red-500" };
+  if (diff === 0) return { text: "Due today", cls: "text-orange-500 font-semibold" };
+  if (diff === 1) return { text: "Due tomorrow", cls: "text-amber-600" };
+  if (diff <= 7)  return { text: `${diff}d left`, cls: "text-amber-500" };
+  return {
+    text: due.toLocaleDateString("en-ZM", { day: "numeric", month: "short", year: "numeric" }),
+    cls: "text-gray-400",
+  };
+}
+
+function fmtDateTime(str: string | null) {
+  if (!str) return null;
+  return new Date(str).toLocaleString("en-ZM", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+// ── Password prompt (inline modal) ────────────────────────────────────────────
+
+function PasswordPrompt({ onConfirm, onCancel }: { onConfirm: (pw: string) => void; onCancel: () => void }) {
+  const [pw, setPw] = useState("");
+  return (
+    <Modal title="Confirm password to undo" onClose={onCancel} widthClass="max-w-sm">
+      <p className="text-sm text-gray-600 mb-3">
+        Enter your password to revert this completed task back to open.
+      </p>
+      <input
+        type="password"
+        autoFocus
+        className="w-full border border-gray-300 rounded px-3 py-2 text-sm mb-3"
+        placeholder="Your password…"
+        value={pw}
+        onChange={(e) => setPw(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); if (pw) onConfirm(pw); } }}
+      />
+      <div className="flex gap-2">
+        <button
+          type="button"
+          disabled={!pw}
+          onClick={() => onConfirm(pw)}
+          className="bg-green-600 text-white text-sm font-medium rounded px-4 py-2 hover:bg-green-700 disabled:opacity-50 flex-1"
+        >
+          Confirm
+        </button>
+        <button type="button" onClick={onCancel} className="text-sm border border-gray-300 rounded px-4 py-2 hover:bg-gray-100">
+          Cancel
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+
 export default function TasksPage() {
   const { user } = useAuth();
   const canManage = !!user && CAN_MANAGE_ROLES.has(user.role);
@@ -68,6 +161,9 @@ export default function TasksPage() {
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [formError, setFormError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Password-gate for undoing a COMPLETED task
+  const [pendingUndo, setPendingUndo] = useState<{ task: Task; status: Task["status"] } | null>(null);
 
   async function loadLookups() {
     try {
@@ -158,14 +254,28 @@ export default function TasksPage() {
     }
   }
 
-  // Status dropdown is available to everyone — assignees can mark their own
-  // task In Progress or Completed without needing full edit access.
-  async function handleStatusChange(task: Task, status: Task["status"]) {
+  // Status change — if reverting a COMPLETED task, require password first.
+  async function handleStatusChange(task: Task, newStatus: Task["status"]) {
+    if (task.status === "COMPLETED" && newStatus !== "COMPLETED") {
+      // Gate behind password prompt
+      setPendingUndo({ task, status: newStatus });
+      return;
+    }
+    await commitStatusChange(task, newStatus);
+  }
+
+  async function commitStatusChange(task: Task, newStatus: Task["status"], password?: string) {
     try {
-      await api.put(`/tasks/${task.id}`, { status });
+      const headers: Record<string, string> = {};
+      if (password) headers["x-confirm-password"] = password;
+      await api.put(`/tasks/${task.id}`, { status: newStatus }, { headers });
       await loadTasks();
     } catch (err: any) {
-      setError(err.response?.data?.message ?? "Failed to update status.");
+      if (err.response?.data?.code === "PASSWORD_CONFIRMATION_INVALID") {
+        setError("Incorrect password — status not changed.");
+      } else {
+        setError(err.response?.data?.message ?? "Failed to update status.");
+      }
     }
   }
 
@@ -190,6 +300,18 @@ export default function TasksPage() {
         <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded px-3 py-2">
           {error}
         </div>
+      )}
+
+      {/* Password gate for undoing COMPLETED tasks */}
+      {pendingUndo && (
+        <PasswordPrompt
+          onConfirm={async (pw) => {
+            const { task, status } = pendingUndo;
+            setPendingUndo(null);
+            await commitStatusChange(task, status, pw);
+          }}
+          onCancel={() => setPendingUndo(null)}
+        />
       )}
 
       {/* Edit / create modal — only reachable by canManage roles */}
@@ -249,6 +371,15 @@ export default function TasksPage() {
               </div>
 
               <div className="space-y-1">
+                <label className="text-sm font-medium text-gray-700">Assigned By</label>
+                <input
+                  value={form.assignedBy}
+                  onChange={(e) => setForm({ ...form, assignedBy: e.target.value })}
+                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                  placeholder="Name of assigner"
+                />
+              </div>
+              <div className="space-y-1">
                 <label className="text-sm font-medium text-gray-700">Priority</label>
                 <select
                   value={form.priority}
@@ -262,7 +393,8 @@ export default function TasksPage() {
                   ))}
                 </select>
               </div>
-              <div className="space-y-1">
+
+              <div className="space-y-1 col-span-2">
                 <label className="text-sm font-medium text-gray-700">Due Date</label>
                 <input
                   type="date"
@@ -316,49 +448,104 @@ export default function TasksPage() {
                 <th className="text-left px-4 py-3">Department</th>
                 <th className="text-left px-4 py-3">Assigned To</th>
                 <th className="text-left px-4 py-3">Priority</th>
+                <th className="text-left px-4 py-3">Due / Given</th>
                 <th className="text-left px-4 py-3">Status</th>
                 {canManage && <th className="text-right px-4 py-3">Actions</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {tasks.map((task) => (
-                <tr key={task.id}>
-                  <td className="px-4 py-3 font-medium text-gray-900">{task.title}</td>
-                  <td className="px-4 py-3 text-gray-600">{task.department?.name ?? "—"}</td>
-                  <td className="px-4 py-3 text-gray-600">{task.assignedToEmployee?.fullName ?? "—"}</td>
-                  <td className="px-4 py-3 text-gray-600">{task.priority}</td>
-                  <td className="px-4 py-3">
-                    <select
-                      value={task.status}
-                      onChange={(e) => handleStatusChange(task, e.target.value as Task["status"])}
-                      className={
-                        "text-xs font-medium px-2 py-1 rounded-full border-0 " +
-                        (task.status === "COMPLETED"
-                          ? "bg-green-100 text-green-700"
-                          : task.status === "CANCELLED"
-                          ? "bg-gray-100 text-gray-600"
-                          : "bg-green-100 text-green-700")
-                      }
-                    >
-                      {STATUS_OPTIONS.map((s) => (
-                        <option key={s} value={s}>
-                          {s}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  {canManage && (
-                    <td className="px-4 py-3 text-right">
-                      <button
-                        onClick={() => openEditForm(task)}
-                        className="text-green-600 hover:underline"
-                      >
-                        Edit
-                      </button>
+              {tasks.map((task) => {
+                const due = dueDateLabel(task.dueDate);
+                const isCompleted = task.status === "COMPLETED";
+                const isCancelled = task.status === "CANCELLED";
+                return (
+                  <tr key={task.id} className={isCompleted ? "bg-green-50/40" : isCancelled ? "bg-gray-50/60 opacity-70" : ""}>
+                    {/* Title + description + assignedBy */}
+                    <td className="px-4 py-3 max-w-xs">
+                      <p className={`font-medium text-gray-900 ${isCompleted ? "line-through text-gray-500" : ""}`}>
+                        {task.title}
+                      </p>
+                      {task.description && (
+                        <p className="text-xs text-gray-400 mt-0.5 truncate max-w-[200px]">{task.description}</p>
+                      )}
+                      {task.assignedBy && (
+                        <p className="text-xs text-gray-400 mt-0.5">by {task.assignedBy}</p>
+                      )}
                     </td>
-                  )}
-                </tr>
-              ))}
+
+                    <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
+                      {task.department?.name ?? "—"}
+                    </td>
+
+                    <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
+                      {task.assignedToEmployee?.fullName ?? "—"}
+                    </td>
+
+                    {/* Priority */}
+                    <td className="px-4 py-3">
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${priorityBadge(task.priority)}`}>
+                        {task.priority}
+                      </span>
+                    </td>
+
+                    {/* Due date + given date */}
+                    <td className="px-4 py-3 min-w-[130px]">
+                      {task.dueDate && (
+                        <div>
+                          <p className={`text-xs font-medium ${due?.cls ?? "text-gray-400"}`}>
+                            {due?.text ?? "—"}
+                          </p>
+                          <p className="text-xs text-gray-400">
+                            Due {new Date(task.dueDate).toLocaleDateString("en-ZM", { day: "numeric", month: "short" })}
+                          </p>
+                        </div>
+                      )}
+                      {task.createdAt && (
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          Given {new Date(task.createdAt).toLocaleDateString("en-ZM", { day: "numeric", month: "short", year: "numeric" })}
+                        </p>
+                      )}
+                      {!task.dueDate && !task.createdAt && <span className="text-gray-400">—</span>}
+                    </td>
+
+                    {/* Status — inline select + completion info */}
+                    <td className="px-4 py-3 min-w-[160px]">
+                      <select
+                        value={task.status}
+                        onChange={(e) => handleStatusChange(task, e.target.value as Task["status"])}
+                        className={`text-xs font-medium px-2 py-1 rounded-full border-0 cursor-pointer ${statusBadge(task.status)}`}
+                      >
+                        {STATUS_OPTIONS.map((s) => (
+                          <option key={s} value={s}>
+                            {statusLabel(s)}
+                          </option>
+                        ))}
+                      </select>
+                      {/* Who toggled + when */}
+                      {isCompleted && task.completedAt && (
+                        <p className="text-xs text-gray-400 mt-1">
+                          ✓ {fmtDateTime(task.completedAt)}
+                          {task.completedBy ? ` · ${task.completedBy}` : ""}
+                        </p>
+                      )}
+                      {task.status === "COMPLETED" && (
+                        <p className="text-xs text-amber-600 mt-0.5">🔒 Password needed to undo</p>
+                      )}
+                    </td>
+
+                    {canManage && (
+                      <td className="px-4 py-3 text-right whitespace-nowrap">
+                        <button
+                          onClick={() => openEditForm(task)}
+                          className="text-green-600 hover:underline text-xs"
+                        >
+                          Edit
+                        </button>
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}

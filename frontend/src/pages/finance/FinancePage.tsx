@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   TrendingUp, TrendingDown, DollarSign, Wallet, Building2,
-  RefreshCw, Plus, Trash2, Edit2, Check, X, ChevronLeft,
-  ChevronRight, FileText, CreditCard, Banknote, PiggyBank,
+  RefreshCw, Plus, Trash2, Edit2, Check, X,
+  FileText, CreditCard, Banknote, PiggyBank, ShieldCheck,
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 
@@ -131,7 +131,7 @@ function KpiTile({ label, value, sub, color, icon: Icon }: {
         <p className="text-xs font-semibold uppercase tracking-wider opacity-70">{label}</p>
         <Icon size={18} className={iconColors[color]} />
       </div>
-      <p className="text-2xl font-bold">{value}</p>
+      <p className="text-2xl font-bold min-w-0 break-all leading-tight">{value}</p>
       {sub && <p className="text-xs mt-1 opacity-60">{sub}</p>}
     </div>
   );
@@ -274,12 +274,14 @@ function printFinanceSummary(data: {
 
 // ── Overview Tab ──────────────────────────────────────────────────────────────
 
-function OverviewTab({ invoices, payrollRuns, opCosts, genExpenses, accounts }: {
+function OverviewTab({ invoices, payrollRuns, opCosts, genExpenses, accounts, contractsValue, activeContractsCount }: {
   invoices: Invoice[];
   payrollRuns: PayrollRun[];
   opCosts: OperationalCost[];
   genExpenses: GeneralExpense[];
   accounts: AccountEntry[];
+  contractsValue: number;
+  activeContractsCount: number;
 }) {
   // Current-month filter — dashboard tiles show only the active month
   const currentMonth = new Date().toISOString().slice(0, 7);
@@ -328,21 +330,33 @@ function OverviewTab({ invoices, payrollRuns, opCosts, genExpenses, accounts }: 
         <KpiTile label="Gen. Expenses" value={fmt(totalGenExp)} sub={`${monthGenExp_.length} entries this month`} color="red" icon={Wallet} />
       </div>
 
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="lg:col-span-4">
+          <KpiTile
+            label="Active Contracts Value"
+            value={fmt(contractsValue)}
+            sub={`${activeContractsCount} active contract${activeContractsCount !== 1 ? "s" : ""}`}
+            color="green"
+            icon={ShieldCheck}
+          />
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="card">
           <h3 className="font-semibold text-sm text-gray-700 mb-3">Income — This Month</h3>
           <div className="space-y-2 text-sm">
-            <div className="flex justify-between"><span className="text-gray-500">Invoiced</span><span className="font-medium">{fmt(totalInvoiced)}</span></div>
-            <div className="flex justify-between"><span className="text-gray-500">Collected</span><span className="font-medium text-emerald-600">{fmt(totalReceived)}</span></div>
-            <div className="flex justify-between border-t pt-2"><span className="text-gray-500">Outstanding (all-time)</span><span className="font-medium text-amber-600">{fmt(totalOutstanding)}</span></div>
+            <div className="flex justify-between gap-2 flex-wrap"><span className="text-gray-500">Invoiced</span><span className="font-medium text-right">{fmt(totalInvoiced)}</span></div>
+            <div className="flex justify-between gap-2 flex-wrap"><span className="text-gray-500">Collected</span><span className="font-medium text-emerald-600 text-right">{fmt(totalReceived)}</span></div>
+            <div className="flex justify-between gap-2 flex-wrap border-t pt-2"><span className="text-gray-500">Outstanding (all-time)</span><span className="font-medium text-amber-600 text-right">{fmt(totalOutstanding)}</span></div>
           </div>
         </div>
         <div className="card">
           <h3 className="font-semibold text-sm text-gray-700 mb-3">Expenses — This Month</h3>
           <div className="space-y-2 text-sm">
-            <div className="flex justify-between"><span className="text-gray-500">Operational Costs</span><span className="font-medium">{fmt(totalOpCosts)}</span></div>
-            <div className="flex justify-between"><span className="text-gray-500">General Expenses</span><span className="font-medium">{fmt(totalGenExp)}</span></div>
-            <div className="flex justify-between border-t pt-2"><span className="text-gray-500">Payroll (net)</span><span className="font-medium">{fmt(totalPayroll)}</span></div>
+            <div className="flex justify-between gap-2 flex-wrap"><span className="text-gray-500">Operational Costs</span><span className="font-medium text-right">{fmt(totalOpCosts)}</span></div>
+            <div className="flex justify-between gap-2 flex-wrap"><span className="text-gray-500">General Expenses</span><span className="font-medium text-right">{fmt(totalGenExp)}</span></div>
+            <div className="flex justify-between gap-2 flex-wrap border-t pt-2"><span className="text-gray-500">Payroll (net)</span><span className="font-medium text-right">{fmt(totalPayroll)}</span></div>
           </div>
         </div>
         <div className="card">
@@ -350,15 +364,15 @@ function OverviewTab({ invoices, payrollRuns, opCosts, genExpenses, accounts }: 
           <div className="space-y-2 text-sm">
             {accounts.length === 0 && <p className="text-gray-400 text-xs">No accounts configured. Add them in the Cash &amp; Accounts tab.</p>}
             {accounts.map((a) => (
-              <div key={a.id} className="flex justify-between">
+              <div key={a.id} className="flex justify-between gap-2 flex-wrap">
                 <span className="text-gray-500">{a.label}</span>
-                <span className="font-medium">{fmt(a.balance)}</span>
+                <span className="font-medium text-right">{fmt(a.balance)}</span>
               </div>
             ))}
             {accounts.length > 0 && (
-              <div className="flex justify-between border-t pt-2">
+              <div className="flex justify-between gap-2 flex-wrap border-t pt-2">
                 <span className="text-gray-500 font-semibold">Total</span>
-                <span className="font-bold">{fmt(cashOnHand + bankTotal)}</span>
+                <span className="font-bold text-right">{fmt(cashOnHand + bankTotal)}</span>
               </div>
             )}
           </div>
@@ -546,7 +560,6 @@ function AccountsTab({ accounts, onChange }: { accounts: AccountEntry[]; onChang
 
 // ── Income Tab ────────────────────────────────────────────────────────────────
 
-const INV_PAGE = 20;
 const STATUS_COLORS: Record<string, string> = {
   DRAFT: "bg-gray-100 text-gray-600",
   ISSUED: "bg-blue-100 text-blue-700",
@@ -559,32 +572,37 @@ const STATUS_COLORS: Record<string, string> = {
 function IncomeTab() {
   const { token } = useAuth();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [statusFilter, setStatusFilter] = useState("");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  const [openMonths, setOpenMonths] = useState<Set<string>>(new Set([currentMonth]));
 
-  const load = useCallback(async (p: number) => {
+  const toggleMonth = (m: string) =>
+    setOpenMonths((prev) => { const s = new Set(prev); s.has(m) ? s.delete(m) : s.add(m); return s; });
+
+  const load = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ page: String(p), pageSize: String(INV_PAGE) });
+      const params = new URLSearchParams({ pageSize: "500" });
       if (statusFilter) params.set("status", statusFilter);
-      if (dateFrom) params.set("dateFrom", dateFrom);
-      if (dateTo) params.set("dateTo", dateTo);
       const res = await fetch(`${API}/invoices?${params}`, { headers: { Authorization: `Bearer ${token}` } });
       const json = await res.json();
       setInvoices(json.data ?? []);
-      setTotal(json.pagination?.total ?? 0);
     } finally {
       setLoading(false);
     }
-  }, [token, statusFilter, dateFrom, dateTo]);
+  }, [token, statusFilter]);
 
-  useEffect(() => { load(1); setPage(1); }, [load]);
+  useEffect(() => { load(); }, [load]);
 
-  const pages = Math.max(1, Math.ceil(total / INV_PAGE));
+  // Group by invoice month
+  const byMonth = invoices.reduce<Record<string, Invoice[]>>((acc, i) => {
+    const key = i.invoiceDate?.slice(0, 7) ?? "unknown";
+    (acc[key] ??= []).push(i);
+    return acc;
+  }, {});
+  const monthKeys = Object.keys(byMonth).sort((a, b) => b.localeCompare(a));
+
   const totalAmount = invoices.reduce((s, i) => s + Number(i.amount), 0);
   const totalPaid = invoices.reduce((s, i) => s + Number(i.amountPaid), 0);
   const totalOut = invoices.reduce((s, i) => s + Number(i.outstandingBalance), 0);
@@ -601,71 +619,77 @@ function IncomeTab() {
             ))}
           </select>
         </div>
-        <div>
-          <label className="block text-xs text-gray-500 mb-1">From</label>
-          <input className="input text-sm" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
-        </div>
-        <div>
-          <label className="block text-xs text-gray-500 mb-1">To</label>
-          <input className="input text-sm" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
-        </div>
-        <button className="btn-secondary text-sm flex items-center gap-1.5" onClick={() => load(page)} disabled={loading}>
+        <button className="btn-secondary text-sm flex items-center gap-1.5" onClick={load} disabled={loading}>
           <RefreshCw size={13} className={loading ? "animate-spin" : ""} /> Refresh
         </button>
       </div>
 
       <div className="grid grid-cols-3 gap-3">
-        <div className="card text-center"><p className="text-xs text-gray-500 mb-1">Invoiced</p><p className="font-bold text-gray-900">{fmt(totalAmount)}</p></div>
-        <div className="card text-center"><p className="text-xs text-gray-500 mb-1">Collected</p><p className="font-bold text-emerald-600">{fmt(totalPaid)}</p></div>
+        <div className="card text-center"><p className="text-xs text-gray-500 mb-1">Total Invoiced</p><p className="font-bold text-gray-900">{fmt(totalAmount)}</p></div>
+        <div className="card text-center"><p className="text-xs text-gray-500 mb-1">Total Collected</p><p className="font-bold text-emerald-600">{fmt(totalPaid)}</p></div>
         <div className="card text-center"><p className="text-xs text-gray-500 mb-1">Outstanding</p><p className="font-bold text-amber-600">{fmt(totalOut)}</p></div>
       </div>
 
-      <div className="card p-0 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b">
-              <tr>
-                {["Invoice #","Date","Due Date","Client","Site","Amount","Paid","Outstanding","Status"].map((h) => (
-                  <th key={h} className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {loading && (
-                <tr><td colSpan={9} className="px-4 py-8 text-center text-gray-400 text-sm">Loading…</td></tr>
+      {loading && <p className="text-center text-sm text-gray-400 py-8">Loading…</p>}
+      {!loading && monthKeys.length === 0 && <p className="text-center text-sm text-gray-400 py-8">No invoices found.</p>}
+
+      <div className="space-y-2">
+        {monthKeys.map((mk) => {
+          const rows = byMonth[mk];
+          const mTotal = rows.reduce((s, i) => s + Number(i.amount), 0);
+          const mPaid  = rows.reduce((s, i) => s + Number(i.amountPaid), 0);
+          const isOpen = openMonths.has(mk);
+          const label  = mk === "unknown" ? "Unknown date" : fmtMonth(mk + "-01");
+          return (
+            <div key={mk} className="card p-0 overflow-hidden">
+              <button
+                onClick={() => toggleMonth(mk)}
+                className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
+              >
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs transition-transform ${isOpen ? "rotate-90" : ""}`}>▶</span>
+                  <span className="font-semibold text-sm text-gray-800">{label}</span>
+                  <span className="text-xs text-gray-400">{rows.length} invoice{rows.length !== 1 ? "s" : ""}</span>
+                </div>
+                <div className="flex items-center gap-4 text-sm">
+                  <span className="text-gray-500">Invoiced <span className="font-bold text-gray-900">{fmt(mTotal)}</span></span>
+                  <span className="text-gray-500">Collected <span className="font-bold text-emerald-600">{fmt(mPaid)}</span></span>
+                </div>
+              </button>
+              {isOpen && (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="border-b bg-white">
+                      <tr>
+                        {["Invoice #","Due Date","Client","Site","Amount","Paid","Outstanding","Status"].map((h) => (
+                          <th key={h} className="px-4 py-2 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {rows.map((inv) => (
+                        <tr key={inv.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-2.5 font-mono text-xs font-medium text-gray-900">{inv.invoiceNumber}</td>
+                          <td className="px-4 py-2.5 text-gray-500 whitespace-nowrap">{fmtDate(inv.dueDate)}</td>
+                          <td className="px-4 py-2.5 text-gray-700">{inv.client?.name ?? "—"}</td>
+                          <td className="px-4 py-2.5 text-gray-500">{inv.site?.siteName ?? "—"}</td>
+                          <td className="px-4 py-2.5 font-medium text-gray-900 whitespace-nowrap">{fmt(Number(inv.amount))}</td>
+                          <td className="px-4 py-2.5 text-emerald-600 whitespace-nowrap">{fmt(Number(inv.amountPaid))}</td>
+                          <td className="px-4 py-2.5 text-amber-600 whitespace-nowrap">{fmt(Number(inv.outstandingBalance))}</td>
+                          <td className="px-4 py-2.5">
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[inv.status] ?? ""}`}>
+                              {inv.status.replace("_", " ")}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
-              {!loading && invoices.length === 0 && (
-                <tr><td colSpan={9} className="px-4 py-8 text-center text-gray-400 text-sm">No invoices found.</td></tr>
-              )}
-              {invoices.map((inv) => (
-                <tr key={inv.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-2.5 font-mono text-xs font-medium text-gray-900">{inv.invoiceNumber}</td>
-                  <td className="px-4 py-2.5 text-gray-700 whitespace-nowrap">{fmtDate(inv.invoiceDate)}</td>
-                  <td className="px-4 py-2.5 text-gray-700 whitespace-nowrap">{fmtDate(inv.dueDate)}</td>
-                  <td className="px-4 py-2.5 text-gray-700">{inv.client?.name ?? "—"}</td>
-                  <td className="px-4 py-2.5 text-gray-500">{inv.site?.siteName ?? "—"}</td>
-                  <td className="px-4 py-2.5 font-medium text-gray-900 whitespace-nowrap">{fmt(Number(inv.amount))}</td>
-                  <td className="px-4 py-2.5 text-emerald-600 whitespace-nowrap">{fmt(Number(inv.amountPaid))}</td>
-                  <td className="px-4 py-2.5 text-amber-600 whitespace-nowrap">{fmt(Number(inv.outstandingBalance))}</td>
-                  <td className="px-4 py-2.5">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[inv.status] ?? ""}`}>
-                      {inv.status.replace("_", " ")}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        {pages > 1 && (
-          <div className="px-4 py-3 border-t flex items-center justify-between bg-gray-50">
-            <p className="text-xs text-gray-500">{total} records · page {page} of {pages}</p>
-            <div className="flex gap-1">
-              <button className="btn-secondary text-xs px-2 py-1" onClick={() => { const np = page - 1; setPage(np); load(np); }} disabled={page <= 1}><ChevronLeft size={12} /></button>
-              <button className="btn-secondary text-xs px-2 py-1" onClick={() => { const np = page + 1; setPage(np); load(np); }} disabled={page >= pages}><ChevronRight size={12} /></button>
             </div>
-          </div>
-        )}
+          );
+        })}
       </div>
     </div>
   );
@@ -673,53 +697,63 @@ function IncomeTab() {
 
 // ── Expenses Tab ──────────────────────────────────────────────────────────────
 
-const EXP_PAGE = 20;
+const EXP_PAGE = 200; // fetch more so we can group client-side
 
 function ExpensesTab() {
   const { token } = useAuth();
   const [opCosts, setOpCosts] = useState<OperationalCost[]>([]);
   const [genExp, setGenExp] = useState<GeneralExpense[]>([]);
-  const [opTotal, setOpTotal] = useState(0);
-  const [genTotal, setGenTotal] = useState(0);
-  const [opPage, setOpPage] = useState(1);
-  const [genPage, setGenPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [subTab, setSubTab] = useState<"operational" | "general">("operational");
-  const [monthFrom, setMonthFrom] = useState("");
-  const [monthTo, setMonthTo] = useState("");
   const [catFilter, setCatFilter] = useState("");
+  // which month groups are expanded; current month open by default
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  const [openMonths, setOpenMonths] = useState<Set<string>>(new Set([currentMonth]));
 
-  const loadOp = useCallback(async (p: number) => {
+  const toggleMonth = (m: string) =>
+    setOpenMonths((prev) => { const s = new Set(prev); s.has(m) ? s.delete(m) : s.add(m); return s; });
+
+  const loadOp = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ page: String(p), pageSize: String(EXP_PAGE) });
-      if (monthFrom) params.set("monthFrom", monthFrom);
-      if (monthTo) params.set("monthTo", monthTo);
+      const params = new URLSearchParams({ pageSize: String(EXP_PAGE) });
       if (catFilter) params.set("costCategory", catFilter);
       const res = await fetch(`${API}/operational-costs?${params}`, { headers: { Authorization: `Bearer ${token}` } });
       const json = await res.json();
       setOpCosts(json.data ?? []);
-      setOpTotal(json.pagination?.total ?? 0);
     } finally { setLoading(false); }
-  }, [token, monthFrom, monthTo, catFilter]);
+  }, [token, catFilter]);
 
-  const loadGen = useCallback(async (p: number) => {
+  const loadGen = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ page: String(p), pageSize: String(EXP_PAGE) });
+      const params = new URLSearchParams({ pageSize: String(EXP_PAGE) });
       if (catFilter) params.set("category", catFilter);
       const res = await fetch(`${API}/general-expenses?${params}`, { headers: { Authorization: `Bearer ${token}` } });
       const json = await res.json();
       setGenExp(json.data ?? []);
-      setGenTotal(json.pagination?.total ?? 0);
     } finally { setLoading(false); }
   }, [token, catFilter]);
 
-  useEffect(() => { loadOp(1); setOpPage(1); }, [loadOp]);
-  useEffect(() => { loadGen(1); setGenPage(1); }, [loadGen]);
+  useEffect(() => { loadOp(); }, [loadOp]);
+  useEffect(() => { loadGen(); }, [loadGen]);
 
-  const opPages = Math.max(1, Math.ceil(opTotal / EXP_PAGE));
-  const genPages = Math.max(1, Math.ceil(genTotal / EXP_PAGE));
+  // Group operational costs by month key
+  const opByMonth = opCosts.reduce<Record<string, OperationalCost[]>>((acc, c) => {
+    const key = c.month?.slice(0, 7) ?? "unknown";
+    (acc[key] ??= []).push(c);
+    return acc;
+  }, {});
+  const opMonthKeys = Object.keys(opByMonth).sort((a, b) => b.localeCompare(a));
+
+  // Group general expenses by month key
+  const genByMonth = genExp.reduce<Record<string, GeneralExpense[]>>((acc, e) => {
+    const key = e.date?.slice(0, 7) ?? "unknown";
+    (acc[key] ??= []).push(e);
+    return acc;
+  }, {});
+  const genMonthKeys = Object.keys(genByMonth).sort((a, b) => b.localeCompare(a));
+
   const opSum = opCosts.reduce((s, c) => s + Number(c.amount), 0);
   const genSum = genExp.reduce((s, e) => s + Number(e.amount), 0);
 
@@ -728,33 +762,21 @@ function ExpensesTab() {
       <div className="flex gap-2">
         <button onClick={() => setSubTab("operational")}
           className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${subTab === "operational" ? "bg-magen-navy text-white" : "bg-white border text-gray-600 hover:bg-gray-50"}`}>
-          Operational Costs <span className="ml-1.5 text-xs opacity-70">({opTotal})</span>
+          Operational Costs <span className="ml-1.5 text-xs opacity-70">({opCosts.length})</span>
         </button>
         <button onClick={() => setSubTab("general")}
           className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${subTab === "general" ? "bg-magen-navy text-white" : "bg-white border text-gray-600 hover:bg-gray-50"}`}>
-          General Expenses <span className="ml-1.5 text-xs opacity-70">({genTotal})</span>
+          General Expenses <span className="ml-1.5 text-xs opacity-70">({genExp.length})</span>
         </button>
       </div>
 
       <div className="flex flex-wrap gap-3 items-end">
-        {subTab === "operational" && (
-          <>
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Month From</label>
-              <input className="input text-sm" type="month" value={monthFrom} onChange={(e) => setMonthFrom(e.target.value)} />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Month To</label>
-              <input className="input text-sm" type="month" value={monthTo} onChange={(e) => setMonthTo(e.target.value)} />
-            </div>
-          </>
-        )}
         <div>
           <label className="block text-xs text-gray-500 mb-1">Category</label>
           <input className="input text-sm" value={catFilter} onChange={(e) => setCatFilter(e.target.value)} placeholder="Filter by category…" />
         </div>
         <button className="btn-secondary text-sm flex items-center gap-1.5"
-          onClick={() => subTab === "operational" ? loadOp(opPage) : loadGen(genPage)} disabled={loading}>
+          onClick={() => subTab === "operational" ? loadOp() : loadGen()} disabled={loading}>
           <RefreshCw size={13} className={loading ? "animate-spin" : ""} /> Refresh
         </button>
       </div>
@@ -762,44 +784,59 @@ function ExpensesTab() {
       {subTab === "operational" && (
         <>
           <div className="grid grid-cols-2 gap-3">
-            <div className="card text-center"><p className="text-xs text-gray-500 mb-1">Page Total</p><p className="font-bold text-gray-900">{fmt(opSum)}</p></div>
-            <div className="card text-center"><p className="text-xs text-gray-500 mb-1">Records Found</p><p className="font-bold text-gray-900">{opTotal}</p></div>
+            <div className="card text-center"><p className="text-xs text-gray-500 mb-1">Total</p><p className="font-bold text-gray-900">{fmt(opSum)}</p></div>
+            <div className="card text-center"><p className="text-xs text-gray-500 mb-1">Records</p><p className="font-bold text-gray-900">{opCosts.length}</p></div>
           </div>
-          <div className="card p-0 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 border-b">
-                  <tr>
-                    {["Month","Client","Site","Category","Amount","Notes"].map((h) => (
-                      <th key={h} className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {loading && <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400 text-sm">Loading…</td></tr>}
-                  {!loading && opCosts.length === 0 && <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400 text-sm">No records found.</td></tr>}
-                  {opCosts.map((c) => (
-                    <tr key={c.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-2.5 whitespace-nowrap">{fmtMonth(c.month)}</td>
-                      <td className="px-4 py-2.5">{c.client?.name ?? "—"}</td>
-                      <td className="px-4 py-2.5 text-gray-500">{c.site?.siteName ?? "—"}</td>
-                      <td className="px-4 py-2.5"><span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-xs">{c.costCategory}</span></td>
-                      <td className="px-4 py-2.5 font-medium text-gray-900 whitespace-nowrap">{fmt(Number(c.amount))}</td>
-                      <td className="px-4 py-2.5 text-gray-500 text-xs">{c.notes ?? "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {opPages > 1 && (
-              <div className="px-4 py-3 border-t flex items-center justify-between bg-gray-50">
-                <p className="text-xs text-gray-500">{opTotal} records · page {opPage} of {opPages}</p>
-                <div className="flex gap-1">
-                  <button className="btn-secondary text-xs px-2 py-1" onClick={() => { const np = opPage - 1; setOpPage(np); loadOp(np); }} disabled={opPage <= 1}><ChevronLeft size={12} /></button>
-                  <button className="btn-secondary text-xs px-2 py-1" onClick={() => { const np = opPage + 1; setOpPage(np); loadOp(np); }} disabled={opPage >= opPages}><ChevronRight size={12} /></button>
+
+          {loading && <p className="text-center text-sm text-gray-400 py-8">Loading…</p>}
+          {!loading && opMonthKeys.length === 0 && <p className="text-center text-sm text-gray-400 py-8">No records found.</p>}
+
+          <div className="space-y-2">
+            {opMonthKeys.map((mk) => {
+              const rows = opByMonth[mk];
+              const monthTotal = rows.reduce((s, c) => s + Number(c.amount), 0);
+              const isOpen = openMonths.has(mk);
+              const label = mk === "unknown" ? "Unknown month" : fmtMonth(mk + "-01");
+              return (
+                <div key={mk} className="card p-0 overflow-hidden">
+                  <button
+                    onClick={() => toggleMonth(mk)}
+                    className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className={`text-xs transition-transform ${isOpen ? "rotate-90" : ""}`}>▶</span>
+                      <span className="font-semibold text-sm text-gray-800">{label}</span>
+                      <span className="text-xs text-gray-400">{rows.length} record{rows.length !== 1 ? "s" : ""}</span>
+                    </div>
+                    <span className="font-bold text-sm text-gray-900">{fmt(monthTotal)}</span>
+                  </button>
+                  {isOpen && (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead className="border-b bg-white">
+                          <tr>
+                            {["Client","Site","Category","Amount","Notes"].map((h) => (
+                              <th key={h} className="px-4 py-2 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                          {rows.map((c) => (
+                            <tr key={c.id} className="hover:bg-gray-50">
+                              <td className="px-4 py-2.5">{c.client?.name ?? "—"}</td>
+                              <td className="px-4 py-2.5 text-gray-500">{c.site?.siteName ?? "—"}</td>
+                              <td className="px-4 py-2.5"><span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-xs">{c.costCategory}</span></td>
+                              <td className="px-4 py-2.5 font-medium text-gray-900 whitespace-nowrap">{fmt(Number(c.amount))}</td>
+                              <td className="px-4 py-2.5 text-gray-400 text-xs">{c.notes ?? "—"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
-              </div>
-            )}
+              );
+            })}
           </div>
         </>
       )}
@@ -807,43 +844,59 @@ function ExpensesTab() {
       {subTab === "general" && (
         <>
           <div className="grid grid-cols-2 gap-3">
-            <div className="card text-center"><p className="text-xs text-gray-500 mb-1">Page Total</p><p className="font-bold text-gray-900">{fmt(genSum)}</p></div>
-            <div className="card text-center"><p className="text-xs text-gray-500 mb-1">Records Found</p><p className="font-bold text-gray-900">{genTotal}</p></div>
+            <div className="card text-center"><p className="text-xs text-gray-500 mb-1">Total</p><p className="font-bold text-gray-900">{fmt(genSum)}</p></div>
+            <div className="card text-center"><p className="text-xs text-gray-500 mb-1">Records</p><p className="font-bold text-gray-900">{genExp.length}</p></div>
           </div>
-          <div className="card p-0 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 border-b">
-                  <tr>
-                    {["Date","Department","Category","Description","Amount"].map((h) => (
-                      <th key={h} className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {loading && <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-400 text-sm">Loading…</td></tr>}
-                  {!loading && genExp.length === 0 && <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-400 text-sm">No expenses found.</td></tr>}
-                  {genExp.map((e) => (
-                    <tr key={e.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-2.5 whitespace-nowrap">{fmtDate(e.date)}</td>
-                      <td className="px-4 py-2.5">{e.department?.name ?? "—"}</td>
-                      <td className="px-4 py-2.5"><span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-xs">{e.category}</span></td>
-                      <td className="px-4 py-2.5 text-gray-700">{e.description}</td>
-                      <td className="px-4 py-2.5 font-medium text-gray-900 whitespace-nowrap">{fmt(Number(e.amount))}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {genPages > 1 && (
-              <div className="px-4 py-3 border-t flex items-center justify-between bg-gray-50">
-                <p className="text-xs text-gray-500">{genTotal} records · page {genPage} of {genPages}</p>
-                <div className="flex gap-1">
-                  <button className="btn-secondary text-xs px-2 py-1" onClick={() => { const np = genPage - 1; setGenPage(np); loadGen(np); }} disabled={genPage <= 1}><ChevronLeft size={12} /></button>
-                  <button className="btn-secondary text-xs px-2 py-1" onClick={() => { const np = genPage + 1; setGenPage(np); loadGen(np); }} disabled={genPage >= genPages}><ChevronRight size={12} /></button>
+
+          {loading && <p className="text-center text-sm text-gray-400 py-8">Loading…</p>}
+          {!loading && genMonthKeys.length === 0 && <p className="text-center text-sm text-gray-400 py-8">No expenses found.</p>}
+
+          <div className="space-y-2">
+            {genMonthKeys.map((mk) => {
+              const rows = genByMonth[mk];
+              const monthTotal = rows.reduce((s, e) => s + Number(e.amount), 0);
+              const isOpen = openMonths.has(mk);
+              const label = mk === "unknown" ? "Unknown date" : fmtMonth(mk + "-01");
+              return (
+                <div key={mk} className="card p-0 overflow-hidden">
+                  <button
+                    onClick={() => toggleMonth(mk)}
+                    className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className={`text-xs transition-transform ${isOpen ? "rotate-90" : ""}`}>▶</span>
+                      <span className="font-semibold text-sm text-gray-800">{label}</span>
+                      <span className="text-xs text-gray-400">{rows.length} record{rows.length !== 1 ? "s" : ""}</span>
+                    </div>
+                    <span className="font-bold text-sm text-gray-900">{fmt(monthTotal)}</span>
+                  </button>
+                  {isOpen && (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead className="border-b bg-white">
+                          <tr>
+                            {["Date","Department","Category","Description","Amount"].map((h) => (
+                              <th key={h} className="px-4 py-2 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                          {rows.map((e) => (
+                            <tr key={e.id} className="hover:bg-gray-50">
+                              <td className="px-4 py-2.5 whitespace-nowrap text-gray-500">{fmtDate(e.date)}</td>
+                              <td className="px-4 py-2.5">{e.department?.name ?? "—"}</td>
+                              <td className="px-4 py-2.5"><span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-xs">{e.category}</span></td>
+                              <td className="px-4 py-2.5 text-gray-700">{e.description}</td>
+                              <td className="px-4 py-2.5 font-medium text-gray-900 whitespace-nowrap">{fmt(Number(e.amount))}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
-              </div>
-            )}
+              );
+            })}
           </div>
         </>
       )}
@@ -853,7 +906,6 @@ function ExpensesTab() {
 
 // ── Payroll Costs Tab ─────────────────────────────────────────────────────────
 
-const PR_PAGE = 20;
 const PR_STATUS_COLORS: Record<string, string> = {
   DRAFT: "bg-gray-100 text-gray-600",
   UNDER_REVIEW: "bg-blue-100 text-blue-700",
@@ -864,24 +916,32 @@ const PR_STATUS_COLORS: Record<string, string> = {
 function PayrollCostsTab() {
   const { token } = useAuth();
   const [runs, setRuns] = useState<PayrollRun[]>([]);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
+  const currentYear = String(new Date().getFullYear());
+  const [openYears, setOpenYears] = useState<Set<string>>(new Set([currentYear]));
 
-  const load = useCallback(async (p: number) => {
+  const toggleYear = (y: string) =>
+    setOpenYears((prev) => { const s = new Set(prev); s.has(y) ? s.delete(y) : s.add(y); return s; });
+
+  const load = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ page: String(p), pageSize: String(PR_PAGE) });
-      const res = await fetch(`${API}/payroll/runs?${params}`, { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(`${API}/payroll/runs?pageSize=500`, { headers: { Authorization: `Bearer ${token}` } });
       const json = await res.json();
       setRuns(json.data ?? []);
-      setTotal(json.pagination?.total ?? 0);
     } finally { setLoading(false); }
   }, [token]);
 
-  useEffect(() => { load(1); }, [load]);
+  useEffect(() => { load(); }, [load]);
 
-  const pages = Math.max(1, Math.ceil(total / PR_PAGE));
+  // Group by year of periodEnd
+  const byYear = runs.reduce<Record<string, PayrollRun[]>>((acc, r) => {
+    const y = r.periodEnd?.slice(0, 4) ?? "unknown";
+    (acc[y] ??= []).push(r);
+    return acc;
+  }, {});
+  const yearKeys = Object.keys(byYear).sort((a, b) => b.localeCompare(a));
+
   const totalNet = runs.reduce((s, r) => s + Number(r.totalNet ?? 0), 0);
   const totalGross = runs.reduce((s, r) => s + Number(r.totalGross ?? 0), 0);
   const totalDeductions = runs.reduce((s, r) => s + Number(r.totalDeductions ?? 0), 0);
@@ -891,61 +951,74 @@ function PayrollCostsTab() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-base font-semibold text-gray-800">Payroll Costs</h2>
-          <p className="text-xs text-gray-500 mt-0.5">Summary of payroll runs — gross pay, deductions, and net cost to the company.</p>
+          <p className="text-xs text-gray-500 mt-0.5">Payroll runs grouped by year — gross pay, deductions, and net cost.</p>
         </div>
-        <button className="btn-secondary text-sm flex items-center gap-1.5" onClick={() => load(page)} disabled={loading}>
+        <button className="btn-secondary text-sm flex items-center gap-1.5" onClick={load} disabled={loading}>
           <RefreshCw size={13} className={loading ? "animate-spin" : ""} /> Refresh
         </button>
       </div>
 
       <div className="grid grid-cols-3 gap-3">
-        <div className="card text-center"><p className="text-xs text-gray-500 mb-1">Gross Pay (page)</p><p className="font-bold text-gray-900">{fmt(totalGross)}</p></div>
-        <div className="card text-center"><p className="text-xs text-gray-500 mb-1">Deductions (page)</p><p className="font-bold text-red-600">{fmt(totalDeductions)}</p></div>
-        <div className="card text-center"><p className="text-xs text-gray-500 mb-1">Net Cost (page)</p><p className="font-bold text-gray-900">{fmt(totalNet)}</p></div>
+        <div className="card text-center"><p className="text-xs text-gray-500 mb-1">Total Gross</p><p className="font-bold text-gray-900">{fmt(totalGross)}</p></div>
+        <div className="card text-center"><p className="text-xs text-gray-500 mb-1">Total Deductions</p><p className="font-bold text-red-600">{fmt(totalDeductions)}</p></div>
+        <div className="card text-center"><p className="text-xs text-gray-500 mb-1">Total Net</p><p className="font-bold text-gray-900">{fmt(totalNet)}</p></div>
       </div>
 
-      <div className="card p-0 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b">
-              <tr>
-                {["Period","Created","Employees","Gross Pay","Deductions","Net Pay","Status"].map((h) => (
-                  <th key={h} className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {loading && <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400 text-sm">Loading…</td></tr>}
-              {!loading && runs.length === 0 && <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400 text-sm">No payroll runs found.</td></tr>}
-              {runs.map((r) => (
-                <tr key={r.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-2.5 whitespace-nowrap font-medium text-gray-900">
-                    {fmtDate(r.periodStart)} – {fmtDate(r.periodEnd)}
-                  </td>
-                  <td className="px-4 py-2.5 whitespace-nowrap text-gray-500">{fmtDate(r.createdAt)}</td>
-                  <td className="px-4 py-2.5 text-gray-700">{r.employeeCount ?? "—"}</td>
-                  <td className="px-4 py-2.5 font-medium text-gray-900 whitespace-nowrap">{fmt(Number(r.totalGross ?? 0))}</td>
-                  <td className="px-4 py-2.5 text-red-600 whitespace-nowrap">{fmt(Number(r.totalDeductions ?? 0))}</td>
-                  <td className="px-4 py-2.5 font-bold text-gray-900 whitespace-nowrap">{fmt(Number(r.totalNet ?? 0))}</td>
-                  <td className="px-4 py-2.5">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${PR_STATUS_COLORS[r.status] ?? ""}`}>
-                      {r.status.replace("_", " ")}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        {pages > 1 && (
-          <div className="px-4 py-3 border-t flex items-center justify-between bg-gray-50">
-            <p className="text-xs text-gray-500">{total} runs · page {page} of {pages}</p>
-            <div className="flex gap-1">
-              <button className="btn-secondary text-xs px-2 py-1" onClick={() => { const np = page - 1; setPage(np); load(np); }} disabled={page <= 1}><ChevronLeft size={12} /></button>
-              <button className="btn-secondary text-xs px-2 py-1" onClick={() => { const np = page + 1; setPage(np); load(np); }} disabled={page >= pages}><ChevronRight size={12} /></button>
+      {loading && <p className="text-center text-sm text-gray-400 py-8">Loading…</p>}
+      {!loading && yearKeys.length === 0 && <p className="text-center text-sm text-gray-400 py-8">No payroll runs found.</p>}
+
+      <div className="space-y-2">
+        {yearKeys.map((yr) => {
+          const rows = byYear[yr];
+          const yearNet = rows.reduce((s, r) => s + Number(r.totalNet ?? 0), 0);
+          const isOpen = openYears.has(yr);
+          return (
+            <div key={yr} className="card p-0 overflow-hidden">
+              <button
+                onClick={() => toggleYear(yr)}
+                className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
+              >
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs transition-transform ${isOpen ? "rotate-90" : ""}`}>▶</span>
+                  <span className="font-semibold text-sm text-gray-800">{yr === "unknown" ? "Unknown year" : yr}</span>
+                  <span className="text-xs text-gray-400">{rows.length} run{rows.length !== 1 ? "s" : ""}</span>
+                </div>
+                <span className="font-bold text-sm text-gray-900">{fmt(yearNet)} net</span>
+              </button>
+              {isOpen && (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="border-b bg-white">
+                      <tr>
+                        {["Period","Employees","Gross Pay","Deductions","Net Pay","Status"].map((h) => (
+                          <th key={h} className="px-4 py-2 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {rows.map((r) => (
+                        <tr key={r.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-2.5 whitespace-nowrap font-medium text-gray-900">
+                            {fmtDate(r.periodStart)} – {fmtDate(r.periodEnd)}
+                          </td>
+                          <td className="px-4 py-2.5 text-gray-700">{r.employeeCount ?? "—"}</td>
+                          <td className="px-4 py-2.5 font-medium text-gray-900 whitespace-nowrap">{fmt(Number(r.totalGross ?? 0))}</td>
+                          <td className="px-4 py-2.5 text-red-600 whitespace-nowrap">{fmt(Number(r.totalDeductions ?? 0))}</td>
+                          <td className="px-4 py-2.5 font-bold text-gray-900 whitespace-nowrap">{fmt(Number(r.totalNet ?? 0))}</td>
+                          <td className="px-4 py-2.5">
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${PR_STATUS_COLORS[r.status] ?? ""}`}>
+                              {r.status.replace("_", " ")}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
-          </div>
-        )}
+          );
+        })}
       </div>
     </div>
   );
@@ -969,6 +1042,8 @@ export default function FinancePage() {
   const [payrollRuns, setPayrollRuns] = useState<PayrollRun[]>([]);
   const [opCosts, setOpCosts] = useState<OperationalCost[]>([]);
   const [genExpenses, setGenExpenses] = useState<GeneralExpense[]>([]);
+  const [contractsValue, setContractsValue] = useState(0);
+  const [activeContractsCount, setActiveContractsCount] = useState(0);
   const [loadingOverview, setLoadingOverview] = useState(false);
 
   const [accounts, setAccounts] = useState<AccountEntry[]>(loadAccounts);
@@ -982,19 +1057,23 @@ export default function FinancePage() {
     setLoadingOverview(true);
     try {
       const headers = { Authorization: `Bearer ${token}` };
-      const [invRes, prRes, opRes, genRes] = await Promise.all([
+      const [invRes, prRes, opRes, genRes, contractsRes] = await Promise.all([
         fetch(`${API}/invoices?pageSize=500`, { headers }),
         fetch(`${API}/payroll/runs?pageSize=500`, { headers }),
         fetch(`${API}/operational-costs?pageSize=500`, { headers }),
         fetch(`${API}/general-expenses?pageSize=500`, { headers }),
+        fetch(`${API}/client-contracts?status=ACTIVE&pageSize=500`, { headers }),
       ]);
-      const [invJson, prJson, opJson, genJson] = await Promise.all([
-        invRes.json(), prRes.json(), opRes.json(), genRes.json(),
+      const [invJson, prJson, opJson, genJson, contractsJson] = await Promise.all([
+        invRes.json(), prRes.json(), opRes.json(), genRes.json(), contractsRes.json(),
       ]);
       setInvoices(invJson.data ?? []);
       setPayrollRuns(prJson.data ?? []);
       setOpCosts(opJson.data ?? []);
       setGenExpenses(genJson.data ?? []);
+      const activeContracts: Array<{ amount?: number; monthlyValue?: number }> = contractsJson.data ?? [];
+      setActiveContractsCount(activeContracts.length);
+      setContractsValue(activeContracts.reduce((sum, c) => sum + Number(c.amount ?? c.monthlyValue ?? 0), 0));
     } finally {
       setLoadingOverview(false);
     }
@@ -1017,25 +1096,27 @@ export default function FinancePage() {
       </div>
 
       {/* Tab nav */}
-      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit">
-        {TABS.map(({ key, label, icon: Icon }) => (
-          <button
-            key={key}
-            onClick={() => setActiveTab(key)}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
-              activeTab === key ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
-            }`}
-          >
-            <Icon size={14} />
-            {label}
-          </button>
-        ))}
+      <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+        <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-max min-w-full sm:w-fit">
+          {TABS.map(({ key, label, icon: Icon }) => (
+            <button
+              key={key}
+              onClick={() => setActiveTab(key)}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
+                activeTab === key ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              <Icon size={14} />
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {activeTab === "overview" && (
         loadingOverview
           ? <div className="text-center py-16 text-gray-400 text-sm">Loading finance overview…</div>
-          : <OverviewTab invoices={invoices} payrollRuns={payrollRuns} opCosts={opCosts} genExpenses={genExpenses} accounts={accounts} />
+          : <OverviewTab invoices={invoices} payrollRuns={payrollRuns} opCosts={opCosts} genExpenses={genExpenses} accounts={accounts} contractsValue={contractsValue} activeContractsCount={activeContractsCount} />
       )}
       {activeTab === "accounts" && <AccountsTab accounts={accounts} onChange={handleAccountsChange} />}
       {activeTab === "income" && <IncomeTab />}
