@@ -170,6 +170,12 @@ enum ContractType {
   FIXED_TERM
   ANNUAL
 }
+
+enum SiteShiftConfig {
+  DAY_ONLY
+  NIGHT_ONLY
+  BOTH
+}
 // ---------- CORE MODELS ----------
 
 model Client {
@@ -205,12 +211,13 @@ model Site {
   client      Client   @relation(fields: [clientId], references: [id], onDelete: Restrict)
     siteCoverage  SiteCoverage[]
 
-  siteName    String
-  location    String?
-  status      RecordStatus @default(ACTIVE)
-  notes       String?
-  dateAdded   DateTime @default(now())
-  lastUpdated DateTime @updatedAt
+  siteName     String
+  location     String?
+  activeShifts SiteShiftConfig @default(BOTH)
+  status       RecordStatus @default(ACTIVE)
+  notes        String?
+  dateAdded    DateTime @default(now())
+  lastUpdated  DateTime @updatedAt
 
   employees         Employee[]
   clientContracts   ClientContract[]

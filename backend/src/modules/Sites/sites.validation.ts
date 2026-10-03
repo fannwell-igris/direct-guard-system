@@ -1,4 +1,4 @@
-import { RecordStatus } from "@prisma/client";
+import { RecordStatus, SiteShiftConfig } from "@prisma/client";
 import { ApiError } from "../../middleware/errorHandler";
 
 export interface SiteCreateInput {
@@ -6,6 +6,7 @@ export interface SiteCreateInput {
   siteName: string;
   location?: string | null;
   notes?: string | null;
+  activeShifts?: SiteShiftConfig;
 }
 
 export interface SiteUpdateInput {
@@ -13,7 +14,10 @@ export interface SiteUpdateInput {
   siteName?: string;
   location?: string | null;
   notes?: string | null;
+  activeShifts?: SiteShiftConfig;
 }
+
+const VALID_SHIFT_CONFIGS = Object.values(SiteShiftConfig);
 
 function trimOrNull(v: unknown): string | null | undefined {
   if (v === undefined) return undefined;
@@ -43,11 +47,20 @@ export function parseSiteCreate(body: unknown): SiteCreateInput {
     throw ApiError.badRequest("`siteName` must be 255 characters or fewer.");
   }
 
+  let activeShifts: SiteShiftConfig | undefined;
+  if (b.activeShifts !== undefined) {
+    if (!VALID_SHIFT_CONFIGS.includes(b.activeShifts as SiteShiftConfig)) {
+      throw ApiError.badRequest(`\`activeShifts\` must be one of: ${VALID_SHIFT_CONFIGS.join(", ")}.`);
+    }
+    activeShifts = b.activeShifts as SiteShiftConfig;
+  }
+
   return {
     clientId,
     siteName,
     location: trimOrNull(b.location) ?? null,
     notes: trimOrNull(b.notes) ?? null,
+    activeShifts,
   };
 }
 
@@ -74,6 +87,13 @@ export function parseSiteUpdate(body: unknown): SiteUpdateInput {
 
   if (b.location !== undefined) out.location = trimOrNull(b.location);
   if (b.notes !== undefined) out.notes = trimOrNull(b.notes);
+
+  if (b.activeShifts !== undefined) {
+    if (!VALID_SHIFT_CONFIGS.includes(b.activeShifts as SiteShiftConfig)) {
+      throw ApiError.badRequest(`\`activeShifts\` must be one of: ${VALID_SHIFT_CONFIGS.join(", ")}.`);
+    }
+    out.activeShifts = b.activeShifts as SiteShiftConfig;
+  }
 
   if (Object.keys(out).length === 0) {
     throw ApiError.badRequest("Request body must include at least one field to update.");

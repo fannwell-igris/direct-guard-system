@@ -36,7 +36,7 @@ export async function listCoverageForDate(date: Date) {
   const [sites, shiftTypes, coverageRows, operationsRecords] = await Promise.all([
     prisma.site.findMany({
       where: { status: "ACTIVE" },
-      select: { id: true, siteName: true },
+      select: { id: true, siteName: true, activeShifts: true },
       orderBy: { siteName: "asc" },
     }),
     prisma.shiftType.findMany({
@@ -69,11 +69,24 @@ export async function listCoverageForDate(date: Date) {
     attendanceByKey.set(k, existing);
   }
 
-  return sites.map((site) => ({
+  return sites.map((site) => {
+    // Filter which shift types are shown based on the site's activeShifts
+    // setting. Matching is case-insensitive on the shift type name so
+    // "Day Shift", "day shift", etc. all work. Sites configured as BOTH
+    // (the default) receive every active shift type unchanged.
+    const applicableShifts = shiftTypes.filter((st) => {
+      if (site.activeShifts === "BOTH") return true;
+      const nameLower = st.name.toLowerCase();
+      if (site.activeShifts === "DAY_ONLY") return nameLower.includes("day");
+      if (site.activeShifts === "NIGHT_ONLY") return nameLower.includes("night");
+      return true;
+    });
+
+    return {
     siteId: site.id,
     siteName: site.siteName,
     date,
-    shifts: shiftTypes.map((st) => {
+    shifts: applicableShifts.map((st) => {
       const k = key(site.id, st.id);
       const row = coverageByKey.get(k);
       const attendance = attendanceByKey.get(k);
@@ -91,7 +104,8 @@ export async function listCoverageForDate(date: Date) {
           : null,
       };
     }),
-  }));
+  };
+  });
 }
 
 /**
