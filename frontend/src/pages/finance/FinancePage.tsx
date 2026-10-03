@@ -1062,7 +1062,7 @@ export default function FinancePage() {
         fetch(`${API}/payroll/runs?pageSize=500`, { headers }),
         fetch(`${API}/operational-costs?pageSize=500`, { headers }),
         fetch(`${API}/general-expenses?pageSize=500`, { headers }),
-        fetch(`${API}/client-contracts?pageSize=500`, { headers }),
+        fetch(`${API}/client-contracts?pageSize=100`, { headers }),
       ]);
       const [invJson, prJson, opJson, genJson, contractsJson] = await Promise.all([
         invRes.json(), prRes.json(), opRes.json(), genRes.json(), contractsRes.json(),
