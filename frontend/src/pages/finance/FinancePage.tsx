@@ -347,9 +347,9 @@ function OverviewTab({ invoices, payrollRuns, opCosts, genExpenses, accounts, co
           <h3 className="font-semibold text-sm text-gray-700 mb-3">Income — This Month</h3>
           <table className="w-full text-sm">
             <tbody>
-              <tr><td className="text-gray-500 py-0.5 pr-2">Invoiced</td><td className="font-medium text-right py-0.5 whitespace-nowrap">{fmt(totalInvoiced)}</td></tr>
-              <tr><td className="text-gray-500 py-0.5 pr-2">Collected</td><td className="font-medium text-emerald-600 text-right py-0.5 whitespace-nowrap">{fmt(totalReceived)}</td></tr>
-              <tr className="border-t"><td className="text-gray-500 pt-2 pr-2">Outstanding (all-time)</td><td className="font-medium text-amber-600 text-right pt-2 whitespace-nowrap">{fmt(totalOutstanding)}</td></tr>
+              <tr><td className="text-gray-500 py-0.5 pr-2">Invoiced</td><td className="font-medium text-right py-0.5">{fmt(totalInvoiced)}</td></tr>
+              <tr><td className="text-gray-500 py-0.5 pr-2">Collected</td><td className="font-medium text-emerald-600 text-right py-0.5">{fmt(totalReceived)}</td></tr>
+              <tr className="border-t"><td className="text-gray-500 pt-2 pr-2">Outstanding (all-time)</td><td className="font-medium text-amber-600 text-right pt-2">{fmt(totalOutstanding)}</td></tr>
             </tbody>
           </table>
         </div>
@@ -357,9 +357,9 @@ function OverviewTab({ invoices, payrollRuns, opCosts, genExpenses, accounts, co
           <h3 className="font-semibold text-sm text-gray-700 mb-3">Expenses — This Month</h3>
           <table className="w-full text-sm">
             <tbody>
-              <tr><td className="text-gray-500 py-0.5 pr-2">Operational Costs</td><td className="font-medium text-right py-0.5 whitespace-nowrap">{fmt(totalOpCosts)}</td></tr>
-              <tr><td className="text-gray-500 py-0.5 pr-2">General Expenses</td><td className="font-medium text-right py-0.5 whitespace-nowrap">{fmt(totalGenExp)}</td></tr>
-              <tr className="border-t"><td className="text-gray-500 pt-2 pr-2">Payroll (net)</td><td className="font-medium text-right pt-2 whitespace-nowrap">{fmt(totalPayroll)}</td></tr>
+              <tr><td className="text-gray-500 py-0.5 pr-2">Operational Costs</td><td className="font-medium text-right py-0.5">{fmt(totalOpCosts)}</td></tr>
+              <tr><td className="text-gray-500 py-0.5 pr-2">General Expenses</td><td className="font-medium text-right py-0.5">{fmt(totalGenExp)}</td></tr>
+              <tr className="border-t"><td className="text-gray-500 pt-2 pr-2">Payroll (net)</td><td className="font-medium text-right pt-2">{fmt(totalPayroll)}</td></tr>
             </tbody>
           </table>
         </div>
@@ -372,13 +372,13 @@ function OverviewTab({ invoices, payrollRuns, opCosts, genExpenses, accounts, co
                 {accounts.map((a) => (
                   <tr key={a.id}>
                     <td className="text-gray-500 py-0.5 pr-2">{a.label}</td>
-                    <td className="font-medium text-right py-0.5 whitespace-nowrap">{fmt(a.balance)}</td>
+                    <td className="font-medium text-right py-0.5">{fmt(a.balance)}</td>
                   </tr>
                 ))}
                 {accounts.length > 0 && (
                   <tr className="border-t">
                     <td className="text-gray-500 font-semibold pt-2">Total</td>
-                    <td className="font-bold text-right pt-2 whitespace-nowrap">{fmt(cashOnHand + bankTotal)}</td>
+                    <td className="font-bold text-right pt-2">{fmt(cashOnHand + bankTotal)}</td>
                   </tr>
                 )}
               </tbody>
