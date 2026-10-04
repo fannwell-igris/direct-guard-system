@@ -189,9 +189,9 @@ function printPayrollRun(run: PayrollRun, lineItems: PayrollLineItem[]) {
 </head>
 <body>
   <div class="header">
-    <div class="logo">MAGEN<span>.</span></div>
+    <div class="logo">DIRECT GUARD<span>.</span></div>
     <div class="generated">
-      <strong>Magen Security Services</strong><br/>
+      <strong>Direct Guard Limited</strong><br/>
       Generated: ${generatedDate}
     </div>
   </div>
@@ -222,7 +222,7 @@ function printPayrollRun(run: PayrollRun, lineItems: PayrollLineItem[]) {
       </tr>
     </tfoot>
   </table>
-  <div class="footer">Magen Security &middot; Confidential &mdash; For internal use only</div>
+  <div class="footer">Direct Guard Limited &middot; Confidential &mdash; For internal use only</div>
 </body>
 </html>`;
 
@@ -327,8 +327,8 @@ function printPayslip(payslip: Payslip, runPeriod: string) {
 <body>
   <div class="header">
     <div>
-      <div class="logo">MAGEN<span>.</span></div>
-      <div class="co">Magen Security Services</div>
+      <div class="logo">DIRECT GUARD<span>.</span></div>
+      <div class="co">Direct Guard Limited</div>
     </div>
     <div>
       <div class="slip-label">Pay Slip</div>
@@ -373,7 +373,7 @@ function printPayslip(payslip: Payslip, runPeriod: string) {
     <div class="net-label">Take-Home Pay</div>
     <div class="net-amount">${fmt(payslip.netPay)}</div>
   </div>
-  <div class="footer">Magen Security &middot; Confidential &mdash; This is a computer-generated payslip</div>
+  <div class="footer">Direct Guard Limited &middot; Confidential &mdash; This is a computer-generated payslip</div>
 </body>
 </html>`;
 

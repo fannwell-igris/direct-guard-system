@@ -22,14 +22,14 @@ import {
 import { useAuth } from "../../contexts/AuthContext";
 import Modal from "../../components/ui/Modal";
 import { requestPasswordConfirmation } from "../../lib/passwordConfirmController";
-import magenLogoUrl from "../../assets/magen-logo.svg";
+import magenLogoUrl from "../../assets/dg-logo.svg";
 
 // ─── Company details for printable quotation ──────────────────────────────────
 const COMPANY_TPIN = "2503459511";
 const COMPANY_ADDRESS_LINES = ["13 Kabulonga Road,", "100/608, Ibex Hill Lusaka."];
-const COMPANY_WEBSITE = "www.magensecurityltd.com";
+const COMPANY_WEBSITE = "www.directguardlimited.com";
 const COMPANY_PHONES = ["+260 760-271807", "+260 974-763639"];
-const COMPANY_EMAILS = ["info@magensecurityltd.com", "sales@magensecurityltd.com"];
+const COMPANY_EMAILS = ["info@directguardlimited.com", "sales@directguardlimited.com"];
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -217,7 +217,7 @@ function printQuotation(q: Quotation) {
 </head>
 <body>
   <div class="header">
-    <img class="logo" src="${magenLogoUrl}" alt="Magen Security" />
+    <img class="logo" src="${magenLogoUrl}" alt="Direct Guard Limited" />
     <div class="company-address">
       ${COMPANY_ADDRESS_LINES.map((l) => `<div>${l}</div>`).join("")}
       <div class="website">${COMPANY_WEBSITE}</div>
@@ -320,7 +320,7 @@ function printQuotation(q: Quotation) {
     </div>
     <div class="tagline">
       Security You Can Trust
-      <span>www.magensecurityltd.com</span>
+      <span>www.directguardlimited.com</span>
     </div>
   </div>
 </body>

@@ -318,7 +318,7 @@ export default function DashboardPage() {
             <p className="text-sm text-white/60 font-medium">{greeting()},</p>
             <h1 className="text-2xl font-bold mt-0.5">{user?.fullName}</h1>
             <p className="text-sm text-white/50 mt-0.5">
-              {role} · Magen Security System
+              {role} · Direct Guard System
             </p>
           </div>
           <div className="hidden sm:flex items-center gap-2 bg-white/10 rounded-xl px-4 py-2.5">

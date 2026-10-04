@@ -28,18 +28,16 @@ import Modal from "../../components/ui/Modal";
 // way pages built on that client do (see api/client.ts's interceptor) —
 // wired in by hand below for the new delete action instead.
 import { requestPasswordConfirmation } from "../../lib/passwordConfirmController";
-import magenLogoUrl from "../../assets/magen-logo.svg";
+import magenLogoUrl from "../../assets/dg-logo.svg";
 
-// Magen Security's own registration/contact details for the invoice
-// letterhead — matches the real branded invoice template (address, phone,
-// email, TPIN). Update here if any of these change; there's nowhere else
-// in the app these are stored yet (see the removed NOTE below this file
-// used to carry — no Settings/Client record holds them).
+// Direct Guard Limited registration/contact details for the invoice
+// letterhead. Update here if any of these change; there's nowhere else
+// in the app these are stored yet.
 const COMPANY_TPIN = "2503459511";
 const COMPANY_ADDRESS_LINES = ["13 Kabulonga Road,", "100/608, Ibex Hill Lusaka."];
-const COMPANY_WEBSITE = "www.magensecurityltd.com";
+const COMPANY_WEBSITE = "www.directguardlimited.com";
 const COMPANY_PHONES = ["+260 760-271807", "+260 974-763639"];
-const COMPANY_EMAILS = ["info@magensecurityltd.com", "sales@magensecurityltd.com", "admin@magensecurityltd.com"];
+const COMPANY_EMAILS = ["info@directguardlimited.com", "sales@directguardlimited.com", "admin@directguardlimited.com"];
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -149,7 +147,7 @@ function paidPercent(inv: Invoice): number {
 }
 
 // ─── PDF export ───────────────────────────────────────────────────────────────
-// Rebuilt (2026-09-24) to match Magen Security's actual branded invoice
+// Rebuilt (2026-09-24) — adapted for Direct Guard Limited branding
 // letterhead (logo, address block, numbered item table, signature lines,
 // footer with contact icons) instead of the earlier generic layout — see
 // the real invoice sample this was matched against. The underlying data
@@ -238,7 +236,7 @@ function printInvoice(inv: Invoice, payments: Payment[], preparedByName?: string
 </head>
 <body>
   <div class="header">
-    <img class="logo" src="${magenLogoUrl}" alt="Magen Security" />
+    <img class="logo" src="${magenLogoUrl}" alt="Direct Guard Limited" />
     <div class="company-address">
       ${COMPANY_ADDRESS_LINES.map((l) => `<div>${l}</div>`).join("")}
       <div class="website">${COMPANY_WEBSITE}</div>
@@ -337,7 +335,7 @@ function printInvoice(inv: Invoice, payments: Payment[], preparedByName?: string
       <div>${COMPANY_EMAILS.join(" &middot; ")}</div>
       <div style="margin-top:4px;color:#999;">Generated ${generatedDate}</div>
     </div>
-    <div class="tagline">Visible &middot; Vigilant &middot; Always Ready<span>Magen Security Limited</span></div>
+    <div class="tagline">Professional &middot; Reliable &middot; Always Ready<span>Direct Guard Limited</span></div>
   </div>
 </body>
 </html>`;
@@ -454,7 +452,7 @@ function printReceipt(inv: Invoice, payment: Payment, preparedByName?: string | 
 </head>
 <body>
   <div class="header">
-    <img class="logo" src="${magenLogoUrl}" alt="Magen Security" />
+    <img class="logo" src="${magenLogoUrl}" alt="Direct Guard Limited" />
     <div class="company-address">
       ${COMPANY_ADDRESS_LINES.map((l) => `<div>${l}</div>`).join("")}
       <div style="color:#003770;font-weight:600;">${COMPANY_WEBSITE}</div>
@@ -488,7 +486,7 @@ function printReceipt(inv: Invoice, payment: Payment, preparedByName?: string | 
     <div class="sig"><div class="line"></div><div class="sig-label">Client signature</div></div>
   </div>
 
-  <div class="footer">Generated ${generatedDate} · Magen Security Limited · Visible · Vigilant · Always Ready</div>
+  <div class="footer">Generated ${generatedDate} · Direct Guard Limited · Professional · Reliable · Always Ready</div>
   <script>window.onload = function() { window.print(); };<\/script>
 </body>
 </html>`;

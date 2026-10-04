@@ -47,7 +47,7 @@ export default function LoginPage() {
         className="w-full max-w-sm bg-white rounded-lg shadow p-8 space-y-5"
       >
         <div>
-          <h1 className="text-xl font-semibold text-gray-900">Company Management System</h1>
+          <h1 className="text-xl font-semibold text-gray-900">Direct Guard Limited</h1>
           <p className="text-sm text-gray-500 mt-1">Sign in to continue</p>
         </div>
 

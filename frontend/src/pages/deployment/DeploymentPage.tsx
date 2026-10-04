@@ -116,7 +116,7 @@ function printDeploymentReport(
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Deployment Records — Magen Security</title>
+  <title>Deployment Records — Direct Guard</title>
   <style>
     @page { size: A4 landscape; margin: 16mm; }
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, sans-serif; }
@@ -138,8 +138,8 @@ function printDeploymentReport(
 <body>
   <header>
     <div>
-      <div class="logo">MAGEN</div>
-      <div style="font-size:10px;color:#555;margin-top:2px;">Magen Security Management System</div>
+      <div class="logo">DIRECT GUARD</div>
+      <div style="font-size:10px;color:#555;margin-top:2px;">Direct Guard Management System</div>
     </div>
     <div class="meta">
       <div>Generated: ${new Date().toLocaleString("en-GB")}</div>
@@ -164,7 +164,7 @@ function printDeploymentReport(
     </thead>
     <tbody>${rows}</tbody>
   </table>
-  <footer>Magen Security Management System · Confidential · Generated ${new Date().toLocaleDateString("en-GB")}</footer>
+  <footer>Direct Guard Management System · Confidential · Generated ${new Date().toLocaleDateString("en-GB")}</footer>
 </body>
 </html>`;
 

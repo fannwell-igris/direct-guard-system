@@ -281,7 +281,7 @@ export default function UsersPage() {
               <>
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Email *</label>
-                  <input type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="input" placeholder="john@magensecurity.com" />
+                  <input type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="input" placeholder="john@directguardlimited.com" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Password *</label>
