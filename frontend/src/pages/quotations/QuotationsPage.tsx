@@ -465,12 +465,24 @@ export default function QuotationsPage() {
     setFormError(null);
     setSubmitting(true);
     try {
+      // Only keep items that have a non-empty description
       const lineItems = form.lineItems
-        .filter((li) => li.description.trim() || li.amount)
-        .map((li) => ({ description: li.description.trim(), amount: parseFloat(li.amount) || 0 }));
+        .filter((li) => li.description.trim())
+        .map((li) => {
+          const amount = parseFloat(li.amount);
+          return { description: li.description.trim(), amount: isNaN(amount) ? 0 : amount };
+        });
 
       if (lineItems.length === 0) {
         setFormError("At least one line item with a description is required.");
+        setSubmitting(false);
+        return;
+      }
+
+      // Validate no negative amounts before sending
+      const negativeItem = lineItems.find((li) => li.amount < 0);
+      if (negativeItem) {
+        setFormError(`Line item "${negativeItem.description}" has a negative amount. Amounts must be 0 or more.`);
         setSubmitting(false);
         return;
       }
@@ -485,7 +497,13 @@ export default function QuotationsPage() {
         notes: form.notes.trim() || null,
       };
       if (!editId && form.startingNumber.trim()) {
-        body.startingNumber = parseInt(form.startingNumber.trim(), 10);
+        const sn = parseInt(form.startingNumber.trim(), 10);
+        if (isNaN(sn) || sn < 1) {
+          setFormError("Starting number must be a positive whole number.");
+          setSubmitting(false);
+          return;
+        }
+        body.startingNumber = sn;
       }
 
       const url = editId ? `${API}/quotations/${editId}` : `${API}/quotations`;
