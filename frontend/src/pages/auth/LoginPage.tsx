@@ -3,13 +3,12 @@ import type { FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import PasswordInput from "../../components/ui/PasswordInput";
+import dgLogoUrl from "../../assets/dg-logo.svg";
 
 // "Remember me" only ever stores the email locally, pre-filled on the next
 // visit — never the password. Saving the password itself is left to the
 // browser's own (encrypted, OS-level) password manager, which the
-// autoComplete attributes below opt into; the app storing a raw or
-// lightly-obfuscated password itself would be a real security risk on a
-// shared computer.
+// autoComplete attributes below opt into.
 const REMEMBERED_EMAIL_KEY = "cms_remembered_email";
 
 export default function LoginPage() {
@@ -41,72 +40,119 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <form
-        onSubmit={handleSubmit}
-        className="w-full max-w-sm bg-white rounded-lg shadow p-8 space-y-5"
+    <div className="min-h-screen flex">
+
+      {/* ── Left panel — brand ── */}
+      <div
+        className="hidden lg:flex flex-col justify-between w-[46%] flex-shrink-0 px-14 py-12"
+        style={{ background: "linear-gradient(160deg, #1a1f3c 0%, #0d1022 100%)" }}
       >
+        {/* Logo */}
+        <img src={dgLogoUrl} alt="Direct Guard Limited" className="w-56" />
+
+        {/* Centre copy */}
         <div>
-          <h1 className="text-xl font-semibold text-gray-900">Direct Guard Limited</h1>
-          <p className="text-sm text-gray-500 mt-1">Sign in to continue</p>
+          <p
+            className="text-4xl font-bold leading-snug mb-4"
+            style={{ color: "#EEA135" }}
+          >
+            Protecting People.<br />Securing Futures.
+          </p>
+          <p className="text-white/50 text-sm leading-relaxed max-w-xs">
+            Centralised management for operations, workforce, finance, and client records — built for Direct Guard Limited.
+          </p>
         </div>
 
-        {error && (
-          <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded px-3 py-2">
-            {error}
+        {/* Footer */}
+        <p className="text-white/20 text-xs">
+          © {new Date().getFullYear()} Direct Guard Limited. All rights reserved.
+        </p>
+      </div>
+
+      {/* ── Right panel — form ── */}
+      <div className="flex-1 flex items-center justify-center bg-gray-50 px-6 py-12">
+        <div className="w-full max-w-sm">
+
+          {/* Mobile logo */}
+          <div
+            className="lg:hidden flex items-center justify-center rounded-2xl px-8 py-5 mb-8"
+            style={{ background: "#1a1f3c" }}
+          >
+            <img src={dgLogoUrl} alt="Direct Guard Limited" className="w-48" />
           </div>
-        )}
 
-        <div className="space-y-1">
-          <label htmlFor="email" className="text-sm font-medium text-gray-700">
-            Email
-          </label>
-          <input
-            id="email"
-            name="email"
-            type="email"
-            autoComplete="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-          />
+          <h2 className="text-2xl font-bold text-gray-900 mb-1">Welcome back</h2>
+          <p className="text-sm text-gray-500 mb-8">Sign in to the Direct Guard system</p>
+
+          {error && (
+            <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-4 py-3 mb-5">
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div className="space-y-1.5">
+              <label htmlFor="email" className="text-sm font-medium text-gray-700">
+                Email address
+              </label>
+              <input
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@directguardlimited.com"
+                className="w-full border border-gray-300 rounded-lg px-3.5 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:border-transparent transition"
+                style={{ "--tw-ring-color": "#EEA135" } as React.CSSProperties}
+                onFocus={(e) => (e.currentTarget.style.boxShadow = "0 0 0 3px #EEA13530, 0 0 0 1px #EEA135")}
+                onBlur={(e) => (e.currentTarget.style.boxShadow = "")}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label htmlFor="password" className="text-sm font-medium text-gray-700">
+                Password
+              </label>
+              <PasswordInput
+                id="password"
+                name="password"
+                autoComplete="current-password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3.5 py-2.5 text-sm text-gray-900 focus:outline-none transition"
+                onFocus={(e) => (e.currentTarget.style.boxShadow = "0 0 0 3px #EEA13530, 0 0 0 1px #EEA135")}
+                onBlur={(e) => (e.currentTarget.style.boxShadow = "")}
+              />
+            </div>
+
+            <label className="flex items-center gap-2.5 text-sm text-gray-600 select-none cursor-pointer">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="w-4 h-4 rounded border-gray-300"
+                style={{ accentColor: "#EEA135" }}
+              />
+              Remember my email on this device
+            </label>
+
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full text-white rounded-lg py-2.5 text-sm font-semibold disabled:opacity-60 transition-opacity"
+              style={{ background: isSubmitting ? "#c8852a" : "#EEA135" }}
+              onMouseEnter={(e) => !isSubmitting && (e.currentTarget.style.background = "#c8852a")}
+              onMouseLeave={(e) => !isSubmitting && (e.currentTarget.style.background = "#EEA135")}
+            >
+              {isSubmitting ? "Signing in…" : "Sign in"}
+            </button>
+          </form>
         </div>
+      </div>
 
-        <div className="space-y-1">
-          <label htmlFor="password" className="text-sm font-medium text-gray-700">
-            Password
-          </label>
-          <PasswordInput
-            id="password"
-            name="password"
-            autoComplete="current-password"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-          />
-        </div>
-
-        <label className="flex items-center gap-2 text-sm text-gray-600 select-none">
-          <input
-            type="checkbox"
-            checked={rememberMe}
-            onChange={(e) => setRememberMe(e.target.checked)}
-            className="rounded border-gray-300 text-green-600 focus:ring-green-500"
-          />
-          Remember my email on this device
-        </label>
-
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className="w-full bg-green-600 text-white rounded py-2 text-sm font-medium hover:bg-green-700 disabled:opacity-60"
-        >
-          {isSubmitting ? "Signing in..." : "Sign in"}
-        </button>
-      </form>
     </div>
   );
 }
-

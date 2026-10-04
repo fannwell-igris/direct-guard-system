@@ -9,11 +9,12 @@
  * standardized here to one value (#09AA4C, roughly their average).
  */
 @theme {
-  --color-magen-navy: #003770;
-  --color-magen-navy-light: #0a4a8f;
-  --color-magen-green: #09aa4c;
-  --color-magen-green-dark: #077a37;
-  --color-magen-green-light: #e7f7ed;
+  /* Direct Guard brand — deep charcoal + amber/orange primary */
+  --color-magen-navy: #1a1f3c;
+  --color-magen-navy-light: #252b52;
+  --color-magen-green: #EEA135;
+  --color-magen-green-dark: #c8852a;
+  --color-magen-green-light: #fef3e2;
 }
 
 /* ── Page transition ─────────────────────────────────────────────────────── */

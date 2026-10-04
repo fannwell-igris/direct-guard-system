@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
+import dgLogoUrl from "../../assets/dg-logo.svg";
 import {
   LayoutDashboard, ChevronDown, ChevronLeft, ChevronRight, X,
   Bell, Activity, Building2, MapPin, Users, FileText, CalendarDays,
@@ -225,9 +226,11 @@ export default function Sidebar({ mobileOpen, onCloseMobile }: SidebarProps) {
       >
         {/* Logo + close (mobile) / collapse toggle (desktop) */}
         <div className={cn("flex items-center mb-6 px-4 justify-between", effectiveCollapsed && "md:justify-center md:px-2")}>
-          <div className={cn("text-white font-bold text-sm tracking-wide", effectiveCollapsed && "md:hidden")}>
-            DIRECT GUARD SYSTEM
-          </div>
+          <img
+            src={dgLogoUrl}
+            alt="Direct Guard"
+            className={cn("h-7 w-auto object-contain", effectiveCollapsed && "md:hidden")}
+          />
           {/* Mobile: closes the drawer */}
           <button
             onClick={onCloseMobile}
