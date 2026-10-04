@@ -81,6 +81,36 @@ app.get("/health/db", async (_req, res) => {
   }
 });
 
+// TEMPORARY debug endpoint — returns the admin row as Prisma sees it (first
+// 20 chars of passwordHash only, not the full hash). Remove after login works.
+app.get("/health/admin-debug", async (_req, res) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { email: "admin@directguardlimited.com" },
+      select: { id: true, email: true, fullName: true, role: true, isActive: true,
+                passwordHash: true },
+    });
+    if (!user) {
+      return res.status(404).json({ found: false, message: "Admin user not in DB" });
+    }
+    res.json({
+      found: true,
+      id: user.id,
+      email: user.email,
+      fullName: user.fullName,
+      role: user.role,
+      isActive: user.isActive,
+      hashPrefix: user.passwordHash.slice(0, 20) + "…",
+      hashLength: user.passwordHash.length,
+    });
+  } catch (error) {
+    res.status(500).json({
+      found: false,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+});
+
 // Auth module — POST /login is public. GET /me applies its own
 // requireAuth directly, since this router is mounted BEFORE the global
 // requireAuth below (has to be, so /login stays reachable without a token).
