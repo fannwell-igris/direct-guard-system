@@ -28,75 +28,75 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: "Overview",
     items: [
-      { label: "Alerts", to: "/alerts", icon: Bell },
+      { label: "Alerts",        to: "/alerts",        icon: Bell },
       { label: "Site Coverage", to: "/site-coverage", icon: Activity },
-      { label: "Messages", to: "/messages", icon: MessageSquare },
+      { label: "Messages",      to: "/messages",      icon: MessageSquare },
     ],
   },
   {
     label: "Workforce",
     roles: ["ADMIN", "MANAGER", "OPERATIONS", "HR", "PAYROLL", "MARKETING"],
     items: [
-      { label: "Clients", to: "/clients", icon: Building2 },
-      { label: "Sites", to: "/sites", icon: MapPin },
+      { label: "Clients",   to: "/clients",   icon: Building2 },
+      { label: "Sites",     to: "/sites",     icon: MapPin },
       { label: "Employees", to: "/employees", icon: Users },
       { label: "Contracts", to: "/contracts", icon: FileText },
-      { label: "Roster", to: "/roster", icon: CalendarDays },
+      { label: "Roster",    to: "/roster",    icon: CalendarDays },
     ],
   },
   {
     label: "Operations",
     roles: ["ADMIN", "MANAGER", "OPERATIONS", "HR", "PAYROLL"],
     items: [
-      { label: "Operations Records", to: "/operations", icon: ClipboardList },
-      { label: "Weekly Plans", to: "/operations/weekly-plans", icon: CalendarRange },
-      { label: "Attendance Calendar", to: "/operations/calendar", icon: CalendarDays },
-      { label: "Field Receipts", to: "/operations/field-receipts", icon: Receipt },
-      { label: "Deployment", to: "/deployment", icon: UserCheck },
-      { label: "Inventory & Assets", to: "/inventory", icon: Package },
-      { label: "Tasks", to: "/tasks", icon: CheckSquare },
-      { label: "Department Requests", to: "/department-requests", icon: Inbox },
-      { label: "Department Budgets", to: "/department-budgets", icon: PiggyBank },
+      { label: "Operations Records",    to: "/operations",              icon: ClipboardList },
+      { label: "Weekly Plans",          to: "/operations/weekly-plans", icon: CalendarRange },
+      { label: "Attendance Calendar",   to: "/operations/calendar",     icon: CalendarDays },
+      { label: "Field Receipts",        to: "/operations/field-receipts", icon: Receipt },
+      { label: "Deployment",            to: "/deployment",              icon: UserCheck },
+      { label: "Inventory & Assets",    to: "/inventory",               icon: Package },
+      { label: "Tasks",                 to: "/tasks",                   icon: CheckSquare },
+      { label: "Department Requests",   to: "/department-requests",     icon: Inbox },
+      { label: "Department Budgets",    to: "/department-budgets",      icon: PiggyBank },
     ],
   },
   {
     label: "Marketing",
     roles: ["ADMIN", "MANAGER", "MARKETING"],
     items: [
-      { label: "Dashboard", to: "/marketing/dashboard", icon: LayoutGrid },
-      { label: "Prospects", to: "/marketing/prospects", icon: Target },
-      { label: "Activities", to: "/marketing/activities", icon: ClipboardCheck },
-      { label: "Field Visits", to: "/marketing/field-visits", icon: Navigation },
-      { label: "Tasks", to: "/tasks", icon: CheckSquare },
-      { label: "Targets", to: "/marketing/targets", icon: Flag },
-      { label: "Requests", to: "/department-requests", icon: Inbox },
-      { label: "Budgets", to: "/department-budgets", icon: PiggyBank },
-      { label: "Expenses", to: "/marketing/expenses", icon: DollarSign },
-      { label: "Reports", to: "/marketing/reports", icon: FileText },
-      { label: "Management View", to: "/marketing/management", icon: BarChart3 },
+      { label: "Dashboard",        to: "/marketing/dashboard",   icon: LayoutGrid },
+      { label: "Prospects",        to: "/marketing/prospects",   icon: Target },
+      { label: "Activities",       to: "/marketing/activities",  icon: ClipboardCheck },
+      { label: "Field Visits",     to: "/marketing/field-visits",icon: Navigation },
+      { label: "Tasks",            to: "/tasks",                 icon: CheckSquare },
+      { label: "Targets",          to: "/marketing/targets",     icon: Flag },
+      { label: "Requests",         to: "/department-requests",   icon: Inbox },
+      { label: "Budgets",          to: "/department-budgets",    icon: PiggyBank },
+      { label: "Expenses",         to: "/marketing/expenses",    icon: DollarSign },
+      { label: "Reports",          to: "/marketing/reports",     icon: FileText },
+      { label: "Management View",  to: "/marketing/management",  icon: BarChart3 },
     ],
   },
   {
     label: "Finance",
     roles: ["ADMIN", "MANAGER", "PAYROLL"],
     items: [
-      { label: "Finance Overview", to: "/finance", icon: TrendingUp },
-      { label: "Department Budgets", to: "/department-budgets", icon: PiggyBank },
-      { label: "Payroll", to: "/payroll", icon: Wallet },
-      { label: "Salary Advances", to: "/finance/salary-advances", icon: ClipboardList },
-      { label: "Invoices & Payments", to: "/invoices", icon: Receipt },
-      { label: "Quotations", to: "/quotations", icon: FileText },
-      { label: "Expenses & Costs", to: "/expenses", icon: DollarSign },
-      { label: "Inventory & Assets", to: "/inventory", icon: Package },
+      { label: "Finance Overview",  to: "/finance",                  icon: TrendingUp },
+      { label: "Department Budgets",to: "/department-budgets",       icon: PiggyBank },
+      { label: "Payroll",           to: "/payroll",                  icon: Wallet },
+      { label: "Salary Advances",   to: "/finance/salary-advances",  icon: ClipboardList },
+      { label: "Invoices & Payments",to: "/invoices",                icon: Receipt },
+      { label: "Quotations",        to: "/quotations",               icon: FileText },
+      { label: "Expenses & Costs",  to: "/expenses",                 icon: DollarSign },
+      { label: "Inventory & Assets",to: "/inventory",               icon: Package },
     ],
   },
   {
     label: "Admin",
     roles: ["ADMIN"],
     items: [
-      { label: "Users & Roles", to: "/users", icon: UserCog },
-      { label: "Departments", to: "/departments", icon: Building2 },
-      { label: "Settings", to: "/settings", icon: SettingsIcon },
+      { label: "Users & Roles", to: "/users",       icon: UserCog },
+      { label: "Departments",   to: "/departments", icon: Building2 },
+      { label: "Settings",      to: "/settings",    icon: SettingsIcon },
     ],
   },
 ];
@@ -188,7 +188,7 @@ export default function Sidebar({ mobileOpen, onCloseMobile }: SidebarProps) {
       {mobileOpen && (
         <div
           className="fixed inset-0 z-30 md:hidden"
-          style={{ background: "rgba(4,6,14,0.7)", backdropFilter: "blur(2px)" }}
+          style={{ background: "rgba(0,0,0,0.35)", backdropFilter: "blur(2px)" }}
           onClick={onCloseMobile}
           aria-hidden="true"
         />
@@ -202,53 +202,48 @@ export default function Sidebar({ mobileOpen, onCloseMobile }: SidebarProps) {
           "md:static md:inset-auto md:h-full md:translate-x-0",
           effectiveCollapsed ? "md:w-[62px]" : "md:w-56"
         )}
-        style={{ background: "#080C18", borderRight: "1px solid #111A2C" }}
+        style={{ background: "#FFFFFF", borderRight: "1px solid #E5E7EB" }}
       >
-        {/* ── Logo row ───────────────────────────────────────── */}
+        {/* ── Logo row ── */}
         <div
           className={cn(
             "flex items-center h-[60px] flex-shrink-0 px-4",
             effectiveCollapsed ? "md:justify-center md:px-0" : "justify-between"
           )}
-          style={{ borderBottom: "1px solid #111A2C" }}
+          style={{ borderBottom: "1px solid #F3F4F6" }}
         >
           {!effectiveCollapsed && (
-            <img
-              src={dgLogoUrl}
-              alt="Direct Guard"
-              className="h-7 w-auto object-contain"
-            />
+            <img src={dgLogoUrl} alt="Direct Guard" className="h-7 w-auto object-contain" />
           )}
 
           {/* Mobile close */}
           <button
             onClick={onCloseMobile}
-            className="md:hidden w-8 h-8 flex items-center justify-center rounded-lg transition-colors"
-            style={{ color: "#4A5E7A" }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#E2EAF8"; (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.06)"; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#4A5E7A"; (e.currentTarget as HTMLButtonElement).style.background = "transparent"; }}
-            title="Close menu"
+            className="md:hidden w-8 h-8 flex items-center justify-center rounded-lg"
+            style={{ color: "#9CA3AF" }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#F9FAFB"; (e.currentTarget as HTMLButtonElement).style.color = "#374151"; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "transparent"; (e.currentTarget as HTMLButtonElement).style.color = "#9CA3AF"; }}
           >
             <X size={16} />
           </button>
 
-          {/* Desktop toggle */}
+          {/* Desktop collapse toggle */}
           <button
             onClick={() => setRailCollapsed((v) => !v)}
-            className="hidden md:flex w-8 h-8 items-center justify-center rounded-lg transition-colors flex-shrink-0"
-            style={{ color: "#4A5E7A" }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#E2EAF8"; (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.06)"; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#4A5E7A"; (e.currentTarget as HTMLButtonElement).style.background = "transparent"; }}
+            className="hidden md:flex w-8 h-8 items-center justify-center rounded-lg flex-shrink-0 transition-colors"
+            style={{ color: "#9CA3AF" }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#F9FAFB"; (e.currentTarget as HTMLButtonElement).style.color = "#374151"; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "transparent"; (e.currentTarget as HTMLButtonElement).style.color = "#9CA3AF"; }}
             title={railCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
             {railCollapsed ? <ChevronRight size={15} /> : <ChevronLeft size={15} />}
           </button>
         </div>
 
-        {/* ── Navigation ─────────────────────────────────────── */}
+        {/* ── Navigation ── */}
         <div className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto overflow-x-hidden">
 
-          {/* Dashboard — always first */}
+          {/* Dashboard */}
           <NavLink
             to="/dashboard"
             label="Dashboard"
@@ -257,27 +252,24 @@ export default function Sidebar({ mobileOpen, onCloseMobile }: SidebarProps) {
             collapsed={effectiveCollapsed}
           />
 
-          {/* Section divider */}
-          {!effectiveCollapsed && (
+          {!effectiveCollapsed ? (
             <div className="pt-2 pb-1 px-1">
-              <div style={{ height: 1, background: "#111A2C" }} />
+              <div style={{ height: 1, background: "#F3F4F6" }} />
             </div>
-          )}
-          {effectiveCollapsed && <div className="py-1.5" />}
+          ) : <div className="py-1.5" />}
 
           {/* Groups */}
           {visibleGroups.map((group) => {
             const isGroupCollapsed = collapsedGroups[group.label] ?? true;
             return (
               <div key={group.label}>
-                {/* Group header */}
                 {!effectiveCollapsed ? (
                   <button
                     onClick={() => toggleGroup(group.label)}
-                    className="w-full flex items-center justify-between px-2 py-1.5 rounded-md transition-colors group"
-                    style={{ color: "#3E4F6E" }}
-                    onMouseEnter={(e) => (e.currentTarget.style.color = "#7B8CB0")}
-                    onMouseLeave={(e) => (e.currentTarget.style.color = "#3E4F6E")}
+                    className="w-full flex items-center justify-between px-2 py-1.5 rounded-md transition-colors"
+                    style={{ color: "#9CA3AF" }}
+                    onMouseEnter={(e) => (e.currentTarget.style.color = "#6B7280")}
+                    onMouseLeave={(e) => (e.currentTarget.style.color = "#9CA3AF")}
                   >
                     <span className="text-[10px] font-bold uppercase tracking-widest">
                       {group.label}
@@ -288,18 +280,16 @@ export default function Sidebar({ mobileOpen, onCloseMobile }: SidebarProps) {
                     />
                   </button>
                 ) : (
-                  /* Collapsed: tiny divider between groups */
                   <div className="py-1 px-2">
-                    <div style={{ height: 1, background: "#111A2C" }} />
+                    <div style={{ height: 1, background: "#F3F4F6" }} />
                   </div>
                 )}
 
-                {/* Group items */}
                 {(effectiveCollapsed || !isGroupCollapsed) && (
                   <div className="space-y-0.5">
                     {group.items.map((item) => (
                       <NavLink
-                        key={item.to}
+                        key={item.to + item.label}
                         to={item.to}
                         label={item.label}
                         icon={item.icon}
@@ -314,14 +304,13 @@ export default function Sidebar({ mobileOpen, onCloseMobile }: SidebarProps) {
           })}
         </div>
 
-        {/* ── Bottom spacer ──────────────────────────────────── */}
         <div style={{ height: 12 }} />
       </nav>
     </>
   );
 }
 
-/* ─── NavLink ──────────────────────────────────────────────────── */
+/* ── NavLink ─────────────────────────────────────────────── */
 interface NavLinkProps {
   to: string;
   label: string;
@@ -342,35 +331,37 @@ function NavLink({ to, label, icon: Icon, isActive, collapsed }: NavLinkProps) {
       style={
         isActive
           ? {
-              background: "rgba(240,168,48,0.10)",
-              color: "#F0A830",
+              background: "#FFF7E6",
+              color: "#B45309",
+              fontWeight: 600,
             }
           : {
-              color: "#5B7090",
+              color: "#6B7280",
+              fontWeight: 400,
             }
       }
       onMouseEnter={(e) => {
         if (!isActive) {
-          (e.currentTarget as HTMLAnchorElement).style.background = "rgba(255,255,255,0.04)";
-          (e.currentTarget as HTMLAnchorElement).style.color = "#A8BEDC";
+          (e.currentTarget as HTMLAnchorElement).style.background = "#F9FAFB";
+          (e.currentTarget as HTMLAnchorElement).style.color = "#374151";
         }
       }}
       onMouseLeave={(e) => {
         if (!isActive) {
           (e.currentTarget as HTMLAnchorElement).style.background = "transparent";
-          (e.currentTarget as HTMLAnchorElement).style.color = "#5B7090";
+          (e.currentTarget as HTMLAnchorElement).style.color = "#6B7280";
         }
       }}
     >
       {/* Active left accent bar */}
       {isActive && (
         <span
-          className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 rounded-full"
+          className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] rounded-full"
           style={{ height: "60%", background: "#F0A830" }}
         />
       )}
       <Icon size={15} />
-      {!collapsed && <span className={cn("truncate font-medium", isActive ? "" : "font-normal")}>{label}</span>}
+      {!collapsed && <span className="truncate">{label}</span>}
     </Link>
   );
 }
