@@ -4,12 +4,9 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import PasswordInput from "../../components/ui/PasswordInput";
 import dgLogoUrl from "../../assets/dg-logo.svg";
+import { Shield } from "lucide-react";
 
-// "Remember me" only ever stores the email locally, pre-filled on the next
-// visit — never the password. Saving the password itself is left to the
-// browser's own (encrypted, OS-level) password manager, which the
-// autoComplete attributes below opt into.
-const REMEMBERED_EMAIL_KEY = "cms_remembered_email";
+const REMEMBERED_EMAIL_KEY = "dg_remembered_email";
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -33,66 +30,115 @@ export default function LoginPage() {
       }
       navigate("/", { replace: true });
     } catch (err: any) {
-      setError(err.response?.data?.message ?? "Login failed. Check your email and password.");
+      setError(err.response?.data?.message ?? "Invalid email or password.");
     } finally {
       setIsSubmitting(false);
     }
   }
 
+  /* shared input style handlers */
+  const inputFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+    e.currentTarget.style.borderColor = "#F0A830";
+    e.currentTarget.style.boxShadow = "0 0 0 3px rgba(240,168,48,0.14)";
+  };
+  const inputBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    e.currentTarget.style.borderColor = "#1C2A42";
+    e.currentTarget.style.boxShadow = "none";
+  };
+
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen flex" style={{ background: "#070912" }}>
 
-      {/* ── Left panel — brand ── */}
+      {/* ── Left brand panel ──────────────────────────────────────── */}
       <div
-        className="hidden lg:flex flex-col justify-between w-[46%] flex-shrink-0 px-14 py-12"
-        style={{ background: "linear-gradient(160deg, #1a1f3c 0%, #0d1022 100%)" }}
+        className="hidden lg:flex flex-col justify-between w-[44%] flex-shrink-0 px-14 py-12 relative overflow-hidden"
+        style={{ background: "#080C18", borderRight: "1px solid #111A2C" }}
       >
-        {/* Logo */}
-        <img src={dgLogoUrl} alt="Direct Guard Limited" className="w-56" />
+        {/* Subtle radial accent */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background: "radial-gradient(ellipse 70% 50% at 30% 60%, rgba(240,168,48,0.05) 0%, transparent 70%)",
+          }}
+        />
 
-        {/* Centre copy */}
-        <div>
-          <p
-            className="text-4xl font-bold leading-snug mb-4"
-            style={{ color: "#EEA135" }}
+        {/* Logo */}
+        <img src={dgLogoUrl} alt="Direct Guard Limited" className="w-52 relative z-10" />
+
+        {/* Headline copy */}
+        <div className="relative z-10">
+          {/* Shield icon accent */}
+          <div
+            className="w-12 h-12 rounded-xl flex items-center justify-center mb-8"
+            style={{ background: "rgba(240,168,48,0.10)", border: "1px solid rgba(240,168,48,0.20)" }}
           >
-            Protecting People.<br />Securing Futures.
+            <Shield size={22} style={{ color: "#F0A830" }} />
+          </div>
+
+          <h1
+            className="text-3xl font-bold leading-tight mb-4"
+            style={{ color: "#E2EAF8" }}
+          >
+            Protecting People.<br />
+            <span style={{ color: "#F0A830" }}>Securing Futures.</span>
+          </h1>
+          <p className="text-sm leading-relaxed max-w-xs" style={{ color: "#4A5E7A" }}>
+            Centralised operations management for Direct Guard Limited — workforce, clients, finance, and field operations in one secure platform.
           </p>
-          <p className="text-white/50 text-sm leading-relaxed max-w-xs">
-            Centralised management for operations, workforce, finance, and client records — built for Direct Guard Limited.
-          </p>
+
+          {/* Feature pills */}
+          <div className="flex flex-wrap gap-2 mt-8">
+            {["Workforce Management", "Live Site Coverage", "Finance & Payroll", "Field Operations"].map((f) => (
+              <span
+                key={f}
+                className="text-xs px-3 py-1 rounded-full"
+                style={{ background: "#111A2C", color: "#7B8CB0", border: "1px solid #1C2A42" }}
+              >
+                {f}
+              </span>
+            ))}
+          </div>
         </div>
 
         {/* Footer */}
-        <p className="text-white/20 text-xs">
+        <p className="text-xs relative z-10" style={{ color: "#2A3D58" }}>
           © {new Date().getFullYear()} Direct Guard Limited. All rights reserved.
         </p>
       </div>
 
-      {/* ── Right panel — form ── */}
-      <div className="flex-1 flex items-center justify-center bg-gray-50 px-6 py-12">
-        <div className="w-full max-w-sm">
+      {/* ── Right form panel ──────────────────────────────────────── */}
+      <div className="flex-1 flex items-center justify-center px-6 py-12">
+        <div className="w-full max-w-[360px]">
 
           {/* Mobile logo */}
-          <div
-            className="lg:hidden flex items-center justify-center rounded-2xl px-8 py-5 mb-8"
-            style={{ background: "#1a1f3c" }}
-          >
-            <img src={dgLogoUrl} alt="Direct Guard Limited" className="w-48" />
+          <div className="lg:hidden flex items-center justify-center mb-10">
+            <img src={dgLogoUrl} alt="Direct Guard Limited" className="w-44" />
           </div>
 
-          <h2 className="text-2xl font-bold text-gray-900 mb-1">Welcome back</h2>
-          <p className="text-sm text-gray-500 mb-8">Sign in to the Direct Guard system</p>
+          {/* Heading */}
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold mb-1" style={{ color: "#E2EAF8" }}>
+              Sign in
+            </h2>
+            <p className="text-sm" style={{ color: "#4A5E7A" }}>
+              Access the Direct Guard management system
+            </p>
+          </div>
 
+          {/* Error */}
           {error && (
-            <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-4 py-3 mb-5">
-              {error}
+            <div
+              className="flex items-start gap-3 text-sm rounded-lg px-4 py-3 mb-6"
+              style={{ background: "#2D0A0A", color: "#F87171", border: "1px solid #7F1D1D" }}
+            >
+              <span>{error}</span>
             </div>
           )}
 
+          {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-1.5">
-              <label htmlFor="email" className="text-sm font-medium text-gray-700">
+              <label htmlFor="email" className="block text-sm font-medium" style={{ color: "#A8BEDC" }}>
                 Email address
               </label>
               <input
@@ -104,15 +150,19 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@directguardlimited.com"
-                className="w-full border border-gray-300 rounded-lg px-3.5 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:border-transparent transition"
-                style={{ "--tw-ring-color": "#EEA135" } as React.CSSProperties}
-                onFocus={(e) => (e.currentTarget.style.boxShadow = "0 0 0 3px #EEA13530, 0 0 0 1px #EEA135")}
-                onBlur={(e) => (e.currentTarget.style.boxShadow = "")}
+                onFocus={inputFocus}
+                onBlur={inputBlur}
+                className="w-full rounded-lg px-3.5 py-2.5 text-sm transition-all outline-none"
+                style={{
+                  background: "#0A1020",
+                  border: "1px solid #1C2A42",
+                  color: "#E2EAF8",
+                }}
               />
             </div>
 
             <div className="space-y-1.5">
-              <label htmlFor="password" className="text-sm font-medium text-gray-700">
+              <label htmlFor="password" className="block text-sm font-medium" style={{ color: "#A8BEDC" }}>
                 Password
               </label>
               <PasswordInput
@@ -122,37 +172,54 @@ export default function LoginPage() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3.5 py-2.5 text-sm text-gray-900 focus:outline-none transition"
-                onFocus={(e) => (e.currentTarget.style.boxShadow = "0 0 0 3px #EEA13530, 0 0 0 1px #EEA135")}
-                onBlur={(e) => (e.currentTarget.style.boxShadow = "")}
+                onFocus={inputFocus}
+                onBlur={inputBlur}
+                className="w-full rounded-lg px-3.5 py-2.5 text-sm outline-none transition-all"
+                style={{
+                  background: "#0A1020",
+                  border: "1px solid #1C2A42",
+                  color: "#E2EAF8",
+                } as React.CSSProperties}
               />
             </div>
 
-            <label className="flex items-center gap-2.5 text-sm text-gray-600 select-none cursor-pointer">
+            {/* Remember me */}
+            <label className="flex items-center gap-2.5 select-none cursor-pointer">
               <input
                 type="checkbox"
                 checked={rememberMe}
                 onChange={(e) => setRememberMe(e.target.checked)}
-                className="w-4 h-4 rounded border-gray-300"
-                style={{ accentColor: "#EEA135" }}
+                className="w-4 h-4 rounded"
+                style={{ accentColor: "#F0A830" }}
               />
-              Remember my email on this device
+              <span className="text-sm" style={{ color: "#4A5E7A" }}>
+                Remember my email on this device
+              </span>
             </label>
 
+            {/* Submit */}
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full text-white rounded-lg py-2.5 text-sm font-semibold disabled:opacity-60 transition-opacity"
-              style={{ background: isSubmitting ? "#c8852a" : "#EEA135" }}
-              onMouseEnter={(e) => !isSubmitting && (e.currentTarget.style.background = "#c8852a")}
-              onMouseLeave={(e) => !isSubmitting && (e.currentTarget.style.background = "#EEA135")}
+              className="w-full rounded-lg py-2.5 text-sm font-semibold transition-all"
+              style={{
+                background: "#F0A830",
+                color: "#070912",
+                opacity: isSubmitting ? 0.65 : 1,
+                boxShadow: isSubmitting ? "none" : "0 4px 16px rgba(240,168,48,0.28)",
+              }}
+              onMouseEnter={(e) => {
+                if (!isSubmitting) e.currentTarget.style.background = "#D4912B";
+              }}
+              onMouseLeave={(e) => {
+                if (!isSubmitting) e.currentTarget.style.background = "#F0A830";
+              }}
             >
               {isSubmitting ? "Signing in…" : "Sign in"}
             </button>
           </form>
         </div>
       </div>
-
     </div>
   );
 }

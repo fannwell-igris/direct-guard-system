@@ -15,7 +15,7 @@ import { useAuth } from "../../contexts/AuthContext";
 interface NavItem {
   label: string;
   to: string;
-  icon: React.ComponentType<{ size?: number }>;
+  icon: React.ComponentType<{ size?: number; className?: string }>;
 }
 
 interface NavGroup {
@@ -101,13 +101,11 @@ const NAV_GROUPS: NavGroup[] = [
   },
 ];
 
-const COLLAPSE_STORAGE_KEY = "cms_sidebar_collapsed";
-const GROUPS_STORAGE_KEY = "cms_sidebar_groups";
+const COLLAPSE_STORAGE_KEY = "dg_sidebar_collapsed";
+const GROUPS_STORAGE_KEY   = "dg_sidebar_groups";
 
 interface SidebarProps {
-  /** On phone/tablet widths the sidebar is an off-canvas drawer — this controls whether it's open. Ignored at md+ widths, where it's always visible. */
   mobileOpen: boolean;
-  /** Called when the drawer should close (backdrop tap, nav link tap, or Escape) — mobile only. */
   onCloseMobile: () => void;
 }
 
@@ -116,18 +114,11 @@ export default function Sidebar({ mobileOpen, onCloseMobile }: SidebarProps) {
   const { user } = useAuth();
   const role = user?.role ?? "STAFF";
 
-  // Close the mobile drawer automatically whenever the route changes, so
-  // tapping a nav link takes you to the page instead of leaving the menu
-  // open over it.
   useEffect(() => {
     onCloseMobile();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname]);
 
-  // Rail collapsed — default true (icon-only rail). This is a desktop-only
-  // preference; on phone/tablet the drawer always shows full labels
-  // regardless of this setting (see `effectiveCollapsed` below) — an
-  // icon-only sidebar makes no sense inside a full-width mobile drawer.
   const [railCollapsed, setRailCollapsed] = useState(() => {
     const stored = localStorage.getItem(COLLAPSE_STORAGE_KEY);
     return stored === null ? true : stored === "true";
@@ -137,23 +128,17 @@ export default function Sidebar({ mobileOpen, onCloseMobile }: SidebarProps) {
     localStorage.setItem(COLLAPSE_STORAGE_KEY, String(railCollapsed));
   }, [railCollapsed]);
 
-  // Track whether we're below the md breakpoint (Tailwind's md = 768px) so
-  // the collapse/expand behavior can differ between the desktop rail and
-  // the mobile drawer, in JS (needed for layout branching, not just CSS).
   const [isMobile, setIsMobile] = useState(
     () => typeof window !== "undefined" && window.innerWidth < 768
   );
   useEffect(() => {
-    function onResize() {
-      setIsMobile(window.innerWidth < 768);
-    }
+    const onResize = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
   const effectiveCollapsed = railCollapsed && !isMobile;
 
-  // All groups collapsed by default
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>(() => {
     try {
       const stored = localStorage.getItem(GROUPS_STORAGE_KEY);
@@ -164,9 +149,6 @@ export default function Sidebar({ mobileOpen, onCloseMobile }: SidebarProps) {
     return defaults;
   });
 
-  // Accordion: only the group containing the active page stays open —
-  // navigating into a different group auto-closes whichever one was open
-  // before, instead of every visited group staying expanded forever.
   useEffect(() => {
     const activeGroup = NAV_GROUPS.find((g) =>
       g.items.some((item) => location.pathname === item.to)
@@ -185,8 +167,6 @@ export default function Sidebar({ mobileOpen, onCloseMobile }: SidebarProps) {
     localStorage.setItem(GROUPS_STORAGE_KEY, JSON.stringify(collapsedGroups));
   }, [collapsedGroups]);
 
-  // Same accordion rule for a manual click: opening a group closes every
-  // other one; clicking the already-open group just closes it.
   function toggleGroup(label: string) {
     setCollapsedGroups((prev) => {
       const isCurrentlyCollapsed = prev[label] ?? true;
@@ -204,10 +184,11 @@ export default function Sidebar({ mobileOpen, onCloseMobile }: SidebarProps) {
 
   return (
     <>
-      {/* Mobile backdrop — tapping it closes the drawer. Desktop never renders this. */}
+      {/* Mobile backdrop */}
       {mobileOpen && (
         <div
-          className="fixed inset-0 bg-black/40 z-30 md:hidden"
+          className="fixed inset-0 z-30 md:hidden"
+          style={{ background: "rgba(4,6,14,0.7)", backdropFilter: "blur(2px)" }}
           onClick={onCloseMobile}
           aria-hidden="true"
         />
@@ -215,110 +196,181 @@ export default function Sidebar({ mobileOpen, onCloseMobile }: SidebarProps) {
 
       <nav
         className={cn(
-          "py-4 overflow-y-auto transition-all duration-200 flex flex-col bg-magen-navy",
-          // Mobile: fixed off-canvas drawer, slides in/out over the page.
+          "flex flex-col overflow-y-auto overflow-x-hidden transition-all duration-200 flex-shrink-0",
           "fixed inset-y-0 left-0 z-40 w-64 -translate-x-full",
           mobileOpen && "translate-x-0",
-          // Desktop (md+): back to the normal static rail in the flex layout.
-          "md:static md:inset-auto md:h-full md:flex-shrink-0 md:translate-x-0",
-          effectiveCollapsed ? "md:w-16" : "md:w-56"
+          "md:static md:inset-auto md:h-full md:translate-x-0",
+          effectiveCollapsed ? "md:w-[62px]" : "md:w-56"
         )}
+        style={{ background: "#080C18", borderRight: "1px solid #111A2C" }}
       >
-        {/* Logo + close (mobile) / collapse toggle (desktop) */}
-        <div className={cn("flex items-center mb-6 px-4 justify-between", effectiveCollapsed && "md:justify-center md:px-2")}>
-          <img
-            src={dgLogoUrl}
-            alt="Direct Guard"
-            className={cn("h-7 w-auto object-contain", effectiveCollapsed && "md:hidden")}
-          />
-          {/* Mobile: closes the drawer */}
+        {/* ── Logo row ───────────────────────────────────────── */}
+        <div
+          className={cn(
+            "flex items-center h-[60px] flex-shrink-0 px-4",
+            effectiveCollapsed ? "md:justify-center md:px-0" : "justify-between"
+          )}
+          style={{ borderBottom: "1px solid #111A2C" }}
+        >
+          {!effectiveCollapsed && (
+            <img
+              src={dgLogoUrl}
+              alt="Direct Guard"
+              className="h-7 w-auto object-contain"
+            />
+          )}
+
+          {/* Mobile close */}
           <button
             onClick={onCloseMobile}
-            className="w-7 h-7 flex items-center justify-center rounded-md text-white/50 hover:bg-white/10 hover:text-white flex-shrink-0 transition-colors md:hidden"
+            className="md:hidden w-8 h-8 flex items-center justify-center rounded-lg transition-colors"
+            style={{ color: "#4A5E7A" }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#E2EAF8"; (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.06)"; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#4A5E7A"; (e.currentTarget as HTMLButtonElement).style.background = "transparent"; }}
             title="Close menu"
           >
             <X size={16} />
           </button>
-          {/* Desktop: collapses/expands the rail */}
+
+          {/* Desktop toggle */}
           <button
             onClick={() => setRailCollapsed((v) => !v)}
-            className="hidden md:flex w-7 h-7 items-center justify-center rounded-md text-white/50 hover:bg-white/10 hover:text-white flex-shrink-0 transition-colors"
+            className="hidden md:flex w-8 h-8 items-center justify-center rounded-lg transition-colors flex-shrink-0"
+            style={{ color: "#4A5E7A" }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#E2EAF8"; (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.06)"; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#4A5E7A"; (e.currentTarget as HTMLButtonElement).style.background = "transparent"; }}
             title={railCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
             {railCollapsed ? <ChevronRight size={15} /> : <ChevronLeft size={15} />}
           </button>
         </div>
 
-      {/* Dashboard */}
-      <ul className="space-y-0.5 mb-2 px-1.5">
-        <li>
-          <Link
+        {/* ── Navigation ─────────────────────────────────────── */}
+        <div className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto overflow-x-hidden">
+
+          {/* Dashboard — always first */}
+          <NavLink
             to="/dashboard"
-            title="Dashboard"
-            className={cn(
-              "flex items-center gap-2 py-2 text-sm rounded-lg font-medium transition-colors",
-              effectiveCollapsed ? "justify-center px-2" : "px-3",
-              isDashboardActive
-                ? "bg-magen-green text-white"
-                : "text-white/70 hover:bg-white/10 hover:text-white"
-            )}
-          >
-            <LayoutDashboard size={16} />
-            {!effectiveCollapsed && "Dashboard"}
-          </Link>
-        </li>
-      </ul>
+            label="Dashboard"
+            icon={LayoutDashboard}
+            isActive={isDashboardActive}
+            collapsed={effectiveCollapsed}
+          />
 
-      {/* Nav groups */}
-      {visibleGroups.map((group) => {
-        const isGroupCollapsed = collapsedGroups[group.label] ?? true;
-        return (
-          <div key={group.label} className="mb-0.5 px-1.5">
-            {!effectiveCollapsed && (
-              <button
-                onClick={() => toggleGroup(group.label)}
-                className="w-full flex items-center justify-between px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-white/40 hover:text-white/60 transition-colors"
-              >
-                {group.label}
-                <ChevronDown
-                  size={12}
-                  className={cn("transition-transform duration-150", isGroupCollapsed && "-rotate-90")}
-                />
-              </button>
-            )}
-            {(effectiveCollapsed || !isGroupCollapsed) && (
-              <ul className="space-y-0.5">
-                {group.items.map((item) => {
-                  const isActive = location.pathname === item.to;
-                  const Icon = item.icon;
-                  return (
-                    <li key={item.to}>
-                      <Link
+          {/* Section divider */}
+          {!effectiveCollapsed && (
+            <div className="pt-2 pb-1 px-1">
+              <div style={{ height: 1, background: "#111A2C" }} />
+            </div>
+          )}
+          {effectiveCollapsed && <div className="py-1.5" />}
+
+          {/* Groups */}
+          {visibleGroups.map((group) => {
+            const isGroupCollapsed = collapsedGroups[group.label] ?? true;
+            return (
+              <div key={group.label}>
+                {/* Group header */}
+                {!effectiveCollapsed ? (
+                  <button
+                    onClick={() => toggleGroup(group.label)}
+                    className="w-full flex items-center justify-between px-2 py-1.5 rounded-md transition-colors group"
+                    style={{ color: "#3E4F6E" }}
+                    onMouseEnter={(e) => (e.currentTarget.style.color = "#7B8CB0")}
+                    onMouseLeave={(e) => (e.currentTarget.style.color = "#3E4F6E")}
+                  >
+                    <span className="text-[10px] font-bold uppercase tracking-widest">
+                      {group.label}
+                    </span>
+                    <ChevronDown
+                      size={11}
+                      className={cn("transition-transform duration-150", isGroupCollapsed && "-rotate-90")}
+                    />
+                  </button>
+                ) : (
+                  /* Collapsed: tiny divider between groups */
+                  <div className="py-1 px-2">
+                    <div style={{ height: 1, background: "#111A2C" }} />
+                  </div>
+                )}
+
+                {/* Group items */}
+                {(effectiveCollapsed || !isGroupCollapsed) && (
+                  <div className="space-y-0.5">
+                    {group.items.map((item) => (
+                      <NavLink
+                        key={item.to}
                         to={item.to}
-                        title={item.label}
-                        className={cn(
-                          "flex items-center gap-2.5 py-2 text-sm rounded-lg transition-colors",
-                          effectiveCollapsed ? "justify-center px-2" : "px-3",
-                          isActive
-                            ? "bg-magen-green text-white font-medium"
-                            : "text-white/70 hover:bg-white/10 hover:text-white"
-                        )}
-                      >
-                        <Icon size={16} />
-                        {!effectiveCollapsed && item.label}
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </div>
-        );
-      })}
+                        label={item.label}
+                        icon={item.icon}
+                        isActive={location.pathname === item.to}
+                        collapsed={effectiveCollapsed}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
 
-        {/* Spacer */}
-        <div className="flex-1" />
+        {/* ── Bottom spacer ──────────────────────────────────── */}
+        <div style={{ height: 12 }} />
       </nav>
     </>
+  );
+}
+
+/* ─── NavLink ──────────────────────────────────────────────────── */
+interface NavLinkProps {
+  to: string;
+  label: string;
+  icon: React.ComponentType<{ size?: number; className?: string }>;
+  isActive: boolean;
+  collapsed: boolean;
+}
+
+function NavLink({ to, label, icon: Icon, isActive, collapsed }: NavLinkProps) {
+  return (
+    <Link
+      to={to}
+      title={collapsed ? label : undefined}
+      className={cn(
+        "relative flex items-center gap-2.5 py-2 text-sm rounded-lg transition-all duration-100 select-none",
+        collapsed ? "justify-center px-0 mx-0.5" : "px-3"
+      )}
+      style={
+        isActive
+          ? {
+              background: "rgba(240,168,48,0.10)",
+              color: "#F0A830",
+            }
+          : {
+              color: "#5B7090",
+            }
+      }
+      onMouseEnter={(e) => {
+        if (!isActive) {
+          (e.currentTarget as HTMLAnchorElement).style.background = "rgba(255,255,255,0.04)";
+          (e.currentTarget as HTMLAnchorElement).style.color = "#A8BEDC";
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (!isActive) {
+          (e.currentTarget as HTMLAnchorElement).style.background = "transparent";
+          (e.currentTarget as HTMLAnchorElement).style.color = "#5B7090";
+        }
+      }}
+    >
+      {/* Active left accent bar */}
+      {isActive && (
+        <span
+          className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 rounded-full"
+          style={{ height: "60%", background: "#F0A830" }}
+        />
+      )}
+      <Icon size={15} />
+      {!collapsed && <span className={cn("truncate font-medium", isActive ? "" : "font-normal")}>{label}</span>}
+    </Link>
   );
 }

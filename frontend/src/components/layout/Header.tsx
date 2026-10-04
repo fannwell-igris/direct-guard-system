@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Search, Bell, ChevronDown, LogOut, Menu } from "lucide-react";
+import { Search, Bell, ChevronDown, LogOut, Menu, User } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import api from "../../api/client";
 
@@ -26,7 +26,6 @@ const MIN_QUERY_LENGTH = 2;
 const DEBOUNCE_MS = 300;
 const RESULTS_PER_CATEGORY = 5;
 
-/** Small photo thumbnail for an employee search hit, for quick recognition. */
 function ResultAvatar({ employee }: { employee: EmployeeHit }) {
   const [photoSrc, setPhotoSrc] = useState<string | null>(null);
   const [imgError, setImgError] = useState(false);
@@ -55,7 +54,10 @@ function ResultAvatar({ employee }: { employee: EmployeeHit }) {
   const showPhoto = employee.photoFilename && photoSrc && !imgError;
 
   return (
-    <div className="w-7 h-7 rounded-full bg-magen-green-light text-magen-green-dark text-[10px] font-semibold flex items-center justify-center overflow-hidden flex-shrink-0">
+    <div
+      className="w-6 h-6 rounded-full text-[10px] font-semibold flex items-center justify-center overflow-hidden flex-shrink-0"
+      style={{ background: "#1A2840", color: "#F0A830" }}
+    >
       {showPhoto ? (
         <img src={photoSrc} alt={employee.fullName} className="w-full h-full object-cover" onError={() => setImgError(true)} />
       ) : (
@@ -65,24 +67,7 @@ function ResultAvatar({ employee }: { employee: EmployeeHit }) {
   );
 }
 
-/**
- * Top header bar -- did not exist at all before this (2026-09-14).
- * Global search (2026-09-24): searches Employees, Clients, and Sites in
- * parallel via their existing `?search=` list filters (the only three
- * modules with server-side text search today -- Invoices/Contracts/etc.
- * don't support it yet, so they're left out of this pass rather than
- * silently returning nothing useful). Clicking a result navigates to that
- * module's list page as `?q=<term>`, which that page picks up on mount and
- * runs through its own existing search box -- see the matching `useEffect`
- * in EmployeesPage/ClientsPage/SitesPage. A user without permission to view
- * a given module (403) just gets an empty section for it, not an error.
- * Alerts icon links to the existing /alerts page rather than showing a
- * live unread count, since that would need a dedicated "unread count"
- * concept the Alerts API doesn't have (GET /api/alerts today just returns
- * everything currently true, with no read/unread state to count).
- */
 interface HeaderProps {
-  /** Opens the mobile sidebar drawer. The hamburger button that calls this only renders below the md breakpoint. */
   onMenuClick: () => void;
 }
 
@@ -131,84 +116,133 @@ export default function Header({ onMenuClick }: HeaderProps) {
     setIsOpen(false);
   }
 
+  const roleLabel: Record<string, string> = {
+    ADMIN: "Administrator",
+    MANAGER: "Manager",
+    OPERATIONS: "Operations",
+    HR: "HR",
+    PAYROLL: "Payroll",
+    MARKETING: "Marketing",
+    STAFF: "Staff",
+  };
+
   return (
-    <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-3 sm:px-6 gap-3 flex-shrink-0">
-      <div className="flex items-center gap-2 min-w-0 flex-1">
+    <header
+      className="h-[60px] flex items-center justify-between px-4 gap-4 flex-shrink-0"
+      style={{
+        background: "#0A0E1C",
+        borderBottom: "1px solid #111A2C",
+      }}
+    >
+      {/* Left: hamburger (mobile) + search */}
+      <div className="flex items-center gap-3 min-w-0 flex-1">
         <button
           onClick={onMenuClick}
-          className="w-9 h-9 flex items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-magen-navy flex-shrink-0 md:hidden"
+          className="md:hidden w-8 h-8 flex items-center justify-center rounded-lg transition-colors flex-shrink-0"
+          style={{ color: "#4A5E7A" }}
           title="Open menu"
         >
-          <Menu size={20} />
+          <Menu size={18} />
         </button>
 
-        <div className="relative w-full max-w-80 hidden sm:block" ref={searchBoxRef}>
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+        {/* Search */}
+        <div className="relative w-full max-w-72 hidden sm:block" ref={searchBoxRef}>
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "#3E4F6E" }} />
           <input
             type="text"
-            placeholder="Search employees, clients, sites..."
+            placeholder="Search employees, clients, sites…"
             value={query}
             onChange={(e) => { setQuery(e.target.value); setIsOpen(true); }}
             onFocus={() => setIsOpen(true)}
             onBlur={() => setTimeout(() => setIsOpen(false), 150)}
-            className="w-full pl-9 pr-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-magen-green/40 focus:bg-white"
+            className="w-full pl-8 pr-3 py-1.5 text-sm rounded-lg transition-all"
+            style={{
+              background: "#0D1526",
+              border: "1px solid #1C2A42",
+              color: "#E2EAF8",
+              outline: "none",
+            }}
+            onFocusCapture={(e) => {
+              (e.target as HTMLInputElement).style.borderColor = "#F0A830";
+              (e.target as HTMLInputElement).style.boxShadow = "0 0 0 3px rgba(240,168,48,0.12)";
+            }}
+            onBlurCapture={(e) => {
+              (e.target as HTMLInputElement).style.borderColor = "#1C2A42";
+              (e.target as HTMLInputElement).style.boxShadow = "none";
+            }}
           />
 
           {showDropdown && (
-            <div className="absolute left-0 right-0 mt-1.5 bg-white border border-gray-200 rounded-lg shadow-lg max-h-96 overflow-y-auto z-50">
+            <div
+              className="absolute left-0 right-0 mt-1.5 rounded-xl max-h-96 overflow-y-auto z-50"
+              style={{
+                background: "#0D1526",
+                border: "1px solid #1C2A42",
+                boxShadow: "0 16px 48px rgba(0,0,0,0.5)",
+              }}
+            >
               {isSearching ? (
-                <div className="px-3 py-3 text-sm text-gray-400">Searching...</div>
+                <div className="px-4 py-3 text-sm" style={{ color: "#7B8CB0" }}>Searching…</div>
               ) : totalResults === 0 ? (
-                <div className="px-3 py-3 text-sm text-gray-400">No matches for "{query.trim()}"</div>
+                <div className="px-4 py-3 text-sm" style={{ color: "#7B8CB0" }}>No matches for "{query.trim()}"</div>
               ) : (
                 <>
                   {results.employees.length > 0 && (
-                    <div className="py-1.5">
-                      <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-gray-400">Employees</div>
+                    <div className="py-2">
+                      <div className="px-4 pb-1 text-[10px] font-bold uppercase tracking-widest" style={{ color: "#3E4F6E" }}>Employees</div>
                       {results.employees.map((e) => (
                         <button
                           key={e.id}
                           onClick={() => goTo("/employees")}
-                          className="w-full flex items-center gap-2.5 px-3 py-1.5 text-sm text-left hover:bg-gray-50"
+                          className="w-full flex items-center gap-2.5 px-4 py-1.5 text-sm text-left transition-colors"
+                          style={{ color: "#CBD5E8" }}
+                          onMouseEnter={(el) => (el.currentTarget.style.background = "rgba(255,255,255,0.04)")}
+                          onMouseLeave={(el) => (el.currentTarget.style.background = "transparent")}
                         >
                           <ResultAvatar employee={e} />
                           <div className="min-w-0">
-                            <div className="font-medium text-gray-900 truncate">{e.fullName}</div>
-                            <div className="text-xs text-gray-400 truncate">{e.position ?? "—"}</div>
+                            <div className="truncate font-medium" style={{ color: "#E2EAF8" }}>{e.fullName}</div>
+                            <div className="text-xs truncate" style={{ color: "#7B8CB0" }}>{e.position ?? "—"}</div>
                           </div>
                         </button>
                       ))}
                     </div>
                   )}
                   {results.clients.length > 0 && (
-                    <div className="py-1.5 border-t border-gray-100">
-                      <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-gray-400">Clients</div>
+                    <div className="py-2" style={{ borderTop: "1px solid #1C2A42" }}>
+                      <div className="px-4 pb-1 text-[10px] font-bold uppercase tracking-widest" style={{ color: "#3E4F6E" }}>Clients</div>
                       {results.clients.map((c) => (
                         <button
                           key={c.id}
                           onClick={() => goTo("/clients")}
-                          className="w-full flex items-center gap-2.5 px-3 py-1.5 text-sm text-left hover:bg-gray-50"
+                          className="w-full flex items-center gap-2.5 px-4 py-1.5 text-sm text-left transition-colors"
+                          style={{ color: "#CBD5E8" }}
+                          onMouseEnter={(el) => (el.currentTarget.style.background = "rgba(255,255,255,0.04)")}
+                          onMouseLeave={(el) => (el.currentTarget.style.background = "transparent")}
                         >
                           <div className="min-w-0">
-                            <div className="font-medium text-gray-900 truncate">{c.name}</div>
-                            {c.location && <div className="text-xs text-gray-400 truncate">{c.location}</div>}
+                            <div className="truncate font-medium" style={{ color: "#E2EAF8" }}>{c.name}</div>
+                            {c.location && <div className="text-xs truncate" style={{ color: "#7B8CB0" }}>{c.location}</div>}
                           </div>
                         </button>
                       ))}
                     </div>
                   )}
                   {results.sites.length > 0 && (
-                    <div className="py-1.5 border-t border-gray-100">
-                      <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-gray-400">Sites</div>
+                    <div className="py-2" style={{ borderTop: "1px solid #1C2A42" }}>
+                      <div className="px-4 pb-1 text-[10px] font-bold uppercase tracking-widest" style={{ color: "#3E4F6E" }}>Sites</div>
                       {results.sites.map((s) => (
                         <button
                           key={s.id}
                           onClick={() => goTo("/sites")}
-                          className="w-full flex items-center gap-2.5 px-3 py-1.5 text-sm text-left hover:bg-gray-50"
+                          className="w-full flex items-center gap-2.5 px-4 py-1.5 text-sm text-left transition-colors"
+                          style={{ color: "#CBD5E8" }}
+                          onMouseEnter={(el) => (el.currentTarget.style.background = "rgba(255,255,255,0.04)")}
+                          onMouseLeave={(el) => (el.currentTarget.style.background = "transparent")}
                         >
                           <div className="min-w-0">
-                            <div className="font-medium text-gray-900 truncate">{s.siteName}</div>
-                            {s.location && <div className="text-xs text-gray-400 truncate">{s.location}</div>}
+                            <div className="truncate font-medium" style={{ color: "#E2EAF8" }}>{s.siteName}</div>
+                            {s.location && <div className="text-xs truncate" style={{ color: "#7B8CB0" }}>{s.location}</div>}
                           </div>
                         </button>
                       ))}
@@ -221,40 +255,72 @@ export default function Header({ onMenuClick }: HeaderProps) {
         </div>
       </div>
 
-      <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
+      {/* Right: bell + user */}
+      <div className="flex items-center gap-1 flex-shrink-0">
         <Link
           to="/alerts"
-          className="w-9 h-9 flex items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 hover:text-magen-navy"
+          className="w-9 h-9 flex items-center justify-center rounded-lg transition-colors"
+          style={{ color: "#4A5E7A" }}
           title="Alerts"
+          onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = "#E2EAF8"; (e.currentTarget as HTMLAnchorElement).style.background = "rgba(255,255,255,0.05)"; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = "#4A5E7A"; (e.currentTarget as HTMLAnchorElement).style.background = "transparent"; }}
         >
-          <Bell size={18} />
+          <Bell size={17} />
         </Link>
 
+        {/* User dropdown */}
         <div className="relative">
           <button
             onClick={() => setMenuOpen((v) => !v)}
             onBlur={() => setTimeout(() => setMenuOpen(false), 150)}
-            className="flex items-center gap-2 pl-1 pr-2 py-1 rounded-full hover:bg-gray-100"
+            className="flex items-center gap-2.5 pl-2 pr-3 py-1.5 rounded-lg transition-colors"
+            style={{ color: "#E2EAF8" }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.05)")}
+            onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
           >
-            <div className="w-8 h-8 rounded-full bg-magen-navy text-white text-xs font-semibold flex items-center justify-center flex-shrink-0">
-              {user ? initials(user.fullName) : "?"}
+            {/* Avatar */}
+            <div
+              className="w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center flex-shrink-0"
+              style={{ background: "#1A2840", color: "#F0A830", border: "1px solid #243350" }}
+            >
+              {user ? initials(user.fullName) : <User size={13} />}
             </div>
-            <div className="text-left hidden sm:block">
-              <div className="text-sm font-medium text-gray-900 leading-tight">{user?.fullName ?? "..."}</div>
-              <div className="text-xs text-gray-400 leading-tight">{user?.role ?? ""}</div>
+            <div className="text-left hidden sm:block leading-none">
+              <div className="text-sm font-medium leading-tight" style={{ color: "#E2EAF8" }}>
+                {user?.fullName ?? "…"}
+              </div>
+              <div className="text-[11px] leading-tight mt-0.5" style={{ color: "#7B8CB0" }}>
+                {roleLabel[user?.role ?? ""] ?? user?.role ?? ""}
+              </div>
             </div>
-            <ChevronDown size={14} className="text-gray-400" />
+            <ChevronDown size={13} style={{ color: "#4A5E7A" }} />
           </button>
 
           {menuOpen && (
-            <div className="absolute right-0 mt-2 w-44 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-50">
-              <div className="px-3 py-2 border-b border-gray-100">
-                <div className="text-sm font-medium text-gray-900 truncate">{user?.fullName}</div>
-                <div className="text-xs text-gray-400 truncate">{user?.email}</div>
+            <div
+              className="absolute right-0 mt-1.5 w-52 rounded-xl py-1.5 z-50"
+              style={{
+                background: "#0D1526",
+                border: "1px solid #1C2A42",
+                boxShadow: "0 16px 48px rgba(0,0,0,0.5)",
+              }}
+            >
+              {/* User info */}
+              <div className="px-4 py-2.5" style={{ borderBottom: "1px solid #1C2A42" }}>
+                <div className="text-sm font-semibold truncate" style={{ color: "#E2EAF8" }}>
+                  {user?.fullName}
+                </div>
+                <div className="text-xs truncate mt-0.5" style={{ color: "#7B8CB0" }}>
+                  {user?.email}
+                </div>
               </div>
+              {/* Logout */}
               <button
                 onClick={logout}
-                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors mt-0.5"
+                style={{ color: "#F87171" }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(248,113,113,0.08)")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
               >
                 <LogOut size={14} />
                 Log out
