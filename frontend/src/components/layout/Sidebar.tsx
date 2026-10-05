@@ -1,15 +1,14 @@
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import dgLogoUrl from "../../assets/dg-logo.svg";
 import {
-  LayoutDashboard, ChevronDown, ChevronLeft, ChevronRight, X,
+  LayoutDashboard, X,
   Bell, Activity, Building2, MapPin, Users, FileText, CalendarDays,
   ClipboardList, CheckSquare, Inbox, Wallet, Receipt, DollarSign,
   Package, UserCog, Settings as SettingsIcon, TrendingUp, MessageSquare,
   UserCheck, Target, ClipboardCheck, LayoutGrid, Navigation, Flag, BarChart3,
-  PiggyBank, CalendarRange,
+  PiggyBank, CalendarRange, Shield,
 } from "lucide-react";
-import { cn } from "../../lib/utils";
 import { useAuth } from "../../contexts/AuthContext";
 
 interface NavItem {
@@ -48,46 +47,46 @@ const NAV_GROUPS: NavGroup[] = [
     label: "Operations",
     roles: ["ADMIN", "MANAGER", "OPERATIONS", "HR", "PAYROLL"],
     items: [
-      { label: "Operations Records",    to: "/operations",              icon: ClipboardList },
-      { label: "Weekly Plans",          to: "/operations/weekly-plans", icon: CalendarRange },
-      { label: "Attendance Calendar",   to: "/operations/calendar",     icon: CalendarDays },
-      { label: "Field Receipts",        to: "/operations/field-receipts", icon: Receipt },
-      { label: "Deployment",            to: "/deployment",              icon: UserCheck },
-      { label: "Inventory & Assets",    to: "/inventory",               icon: Package },
-      { label: "Tasks",                 to: "/tasks",                   icon: CheckSquare },
-      { label: "Department Requests",   to: "/department-requests",     icon: Inbox },
-      { label: "Department Budgets",    to: "/department-budgets",      icon: PiggyBank },
+      { label: "Operations Records",   to: "/operations",                icon: ClipboardList },
+      { label: "Weekly Plans",         to: "/operations/weekly-plans",   icon: CalendarRange },
+      { label: "Attendance Calendar",  to: "/operations/calendar",       icon: CalendarDays },
+      { label: "Field Receipts",       to: "/operations/field-receipts", icon: Receipt },
+      { label: "Deployment",           to: "/deployment",                icon: UserCheck },
+      { label: "Inventory & Assets",   to: "/inventory",                 icon: Package },
+      { label: "Tasks",                to: "/tasks",                     icon: CheckSquare },
+      { label: "Department Requests",  to: "/department-requests",       icon: Inbox },
+      { label: "Department Budgets",   to: "/department-budgets",        icon: PiggyBank },
     ],
   },
   {
     label: "Marketing",
     roles: ["ADMIN", "MANAGER", "MARKETING"],
     items: [
-      { label: "Dashboard",        to: "/marketing/dashboard",   icon: LayoutGrid },
-      { label: "Prospects",        to: "/marketing/prospects",   icon: Target },
-      { label: "Activities",       to: "/marketing/activities",  icon: ClipboardCheck },
-      { label: "Field Visits",     to: "/marketing/field-visits",icon: Navigation },
-      { label: "Tasks",            to: "/tasks",                 icon: CheckSquare },
-      { label: "Targets",          to: "/marketing/targets",     icon: Flag },
-      { label: "Requests",         to: "/department-requests",   icon: Inbox },
-      { label: "Budgets",          to: "/department-budgets",    icon: PiggyBank },
-      { label: "Expenses",         to: "/marketing/expenses",    icon: DollarSign },
-      { label: "Reports",          to: "/marketing/reports",     icon: FileText },
-      { label: "Management View",  to: "/marketing/management",  icon: BarChart3 },
+      { label: "Dashboard",       to: "/marketing/dashboard",    icon: LayoutGrid },
+      { label: "Prospects",       to: "/marketing/prospects",    icon: Target },
+      { label: "Activities",      to: "/marketing/activities",   icon: ClipboardCheck },
+      { label: "Field Visits",    to: "/marketing/field-visits", icon: Navigation },
+      { label: "Tasks",           to: "/tasks",                  icon: CheckSquare },
+      { label: "Targets",         to: "/marketing/targets",      icon: Flag },
+      { label: "Requests",        to: "/department-requests",    icon: Inbox },
+      { label: "Budgets",         to: "/department-budgets",     icon: PiggyBank },
+      { label: "Expenses",        to: "/marketing/expenses",     icon: DollarSign },
+      { label: "Reports",         to: "/marketing/reports",      icon: FileText },
+      { label: "Management View", to: "/marketing/management",   icon: BarChart3 },
     ],
   },
   {
     label: "Finance",
     roles: ["ADMIN", "MANAGER", "PAYROLL"],
     items: [
-      { label: "Finance Overview",  to: "/finance",                  icon: TrendingUp },
-      { label: "Department Budgets",to: "/department-budgets",       icon: PiggyBank },
-      { label: "Payroll",           to: "/payroll",                  icon: Wallet },
-      { label: "Salary Advances",   to: "/finance/salary-advances",  icon: ClipboardList },
-      { label: "Invoices & Payments",to: "/invoices",                icon: Receipt },
-      { label: "Quotations",        to: "/quotations",               icon: FileText },
-      { label: "Expenses & Costs",  to: "/expenses",                 icon: DollarSign },
-      { label: "Inventory & Assets",to: "/inventory",               icon: Package },
+      { label: "Finance Overview",     to: "/finance",                 icon: TrendingUp },
+      { label: "Department Budgets",   to: "/department-budgets",      icon: PiggyBank },
+      { label: "Payroll",              to: "/payroll",                 icon: Wallet },
+      { label: "Salary Advances",      to: "/finance/salary-advances", icon: ClipboardList },
+      { label: "Invoices & Payments",  to: "/invoices",                icon: Receipt },
+      { label: "Quotations",           to: "/quotations",              icon: FileText },
+      { label: "Expenses & Costs",     to: "/expenses",                icon: DollarSign },
+      { label: "Inventory & Assets",   to: "/inventory",               icon: Package },
     ],
   },
   {
@@ -100,9 +99,6 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
 ];
-
-const COLLAPSE_STORAGE_KEY = "dg_sidebar_collapsed";
-const GROUPS_STORAGE_KEY   = "dg_sidebar_groups";
 
 interface SidebarProps {
   mobileOpen: boolean;
@@ -119,66 +115,6 @@ export default function Sidebar({ mobileOpen, onCloseMobile }: SidebarProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname]);
 
-  const [railCollapsed, setRailCollapsed] = useState(() => {
-    const stored = localStorage.getItem(COLLAPSE_STORAGE_KEY);
-    return stored === null ? true : stored === "true";
-  });
-
-  useEffect(() => {
-    localStorage.setItem(COLLAPSE_STORAGE_KEY, String(railCollapsed));
-  }, [railCollapsed]);
-
-  const [isMobile, setIsMobile] = useState(
-    () => typeof window !== "undefined" && window.innerWidth < 768
-  );
-  useEffect(() => {
-    const onResize = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
-
-  const effectiveCollapsed = railCollapsed && !isMobile;
-
-  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>(() => {
-    try {
-      const stored = localStorage.getItem(GROUPS_STORAGE_KEY);
-      if (stored) return JSON.parse(stored);
-    } catch { /* ignore */ }
-    const defaults: Record<string, boolean> = {};
-    NAV_GROUPS.forEach((g) => { defaults[g.label] = true; });
-    return defaults;
-  });
-
-  useEffect(() => {
-    const activeGroup = NAV_GROUPS.find((g) =>
-      g.items.some((item) => location.pathname === item.to)
-    );
-    if (activeGroup) {
-      setCollapsedGroups(() => {
-        const next: Record<string, boolean> = {};
-        NAV_GROUPS.forEach((g) => { next[g.label] = g.label !== activeGroup.label; });
-        return next;
-      });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.pathname]);
-
-  useEffect(() => {
-    localStorage.setItem(GROUPS_STORAGE_KEY, JSON.stringify(collapsedGroups));
-  }, [collapsedGroups]);
-
-  function toggleGroup(label: string) {
-    setCollapsedGroups((prev) => {
-      const isCurrentlyCollapsed = prev[label] ?? true;
-      if (isCurrentlyCollapsed) {
-        const next: Record<string, boolean> = {};
-        NAV_GROUPS.forEach((g) => { next[g.label] = g.label !== label; });
-        return next;
-      }
-      return { ...prev, [label]: true };
-    });
-  }
-
   const isDashboardActive = location.pathname === "/dashboard";
   const visibleGroups = NAV_GROUPS.filter((g) => !g.roles || g.roles.includes(role));
 
@@ -188,161 +124,116 @@ export default function Sidebar({ mobileOpen, onCloseMobile }: SidebarProps) {
       {mobileOpen && (
         <div
           className="fixed inset-0 z-30 md:hidden"
-          style={{ background: "rgba(0,0,0,0.35)", backdropFilter: "blur(2px)" }}
+          style={{ background: "rgba(0,0,0,0.4)", backdropFilter: "blur(2px)" }}
           onClick={onCloseMobile}
           aria-hidden="true"
         />
       )}
 
       <nav
-        className={cn(
-          "flex flex-col overflow-y-auto overflow-x-hidden transition-all duration-200 flex-shrink-0",
-          "fixed inset-y-0 left-0 z-40 w-64 -translate-x-full",
-          mobileOpen && "translate-x-0",
-          "md:static md:inset-auto md:h-full md:translate-x-0",
-          effectiveCollapsed ? "md:w-[62px]" : "md:w-56"
-        )}
-        style={{ background: "#FFFFFF", borderRight: "1px solid #E5E7EB" }}
+        className={[
+          "flex flex-col flex-shrink-0 overflow-y-auto overflow-x-hidden",
+          "fixed inset-y-0 left-0 z-40 w-56 -translate-x-full transition-transform duration-200",
+          mobileOpen ? "translate-x-0" : "",
+          "md:static md:inset-auto md:h-full md:translate-x-0 md:w-56",
+        ].join(" ")}
+        style={{ background: "#FFFFFF" }}
       >
-        {/* ── Logo row ── */}
-        <div
-          className={cn(
-            "flex items-center h-[60px] flex-shrink-0 px-4",
-            effectiveCollapsed ? "md:justify-center md:px-0" : "justify-between"
-          )}
-          style={{ borderBottom: "1px solid #F3F4F6" }}
-        >
-          {!effectiveCollapsed && (
-            <img src={dgLogoUrl} alt="Direct Guard" className="h-7 w-auto object-contain" />
-          )}
-
-          {/* Mobile close */}
+        {/* Logo row */}
+        <div className="flex items-center justify-between h-[64px] px-5 flex-shrink-0">
+          <img src={dgLogoUrl} alt="Direct Guard" className="h-7 w-auto object-contain" />
           <button
             onClick={onCloseMobile}
-            className="md:hidden w-8 h-8 flex items-center justify-center rounded-lg"
+            className="md:hidden w-8 h-8 flex items-center justify-center rounded-lg transition-colors"
             style={{ color: "#9CA3AF" }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#F9FAFB"; (e.currentTarget as HTMLButtonElement).style.color = "#374151"; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "transparent"; (e.currentTarget as HTMLButtonElement).style.color = "#9CA3AF"; }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.background = "#F9FAFB";
+              (e.currentTarget as HTMLButtonElement).style.color = "#374151";
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.background = "transparent";
+              (e.currentTarget as HTMLButtonElement).style.color = "#9CA3AF";
+            }}
           >
             <X size={16} />
           </button>
-
-          {/* Desktop collapse toggle */}
-          <button
-            onClick={() => setRailCollapsed((v) => !v)}
-            className="hidden md:flex w-8 h-8 items-center justify-center rounded-lg flex-shrink-0 transition-colors"
-            style={{ color: "#9CA3AF" }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#F9FAFB"; (e.currentTarget as HTMLButtonElement).style.color = "#374151"; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "transparent"; (e.currentTarget as HTMLButtonElement).style.color = "#9CA3AF"; }}
-            title={railCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-          >
-            {railCollapsed ? <ChevronRight size={15} /> : <ChevronLeft size={15} />}
-          </button>
         </div>
 
-        {/* ── Navigation ── */}
-        <div className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto overflow-x-hidden">
+        {/* Navigation */}
+        <div className="flex-1 px-3 py-2 space-y-0.5 overflow-y-auto overflow-x-hidden">
+          {/* Dashboard — always first */}
+          <NavLink to="/dashboard" label="Dashboard" icon={LayoutDashboard} isActive={isDashboardActive} />
 
-          {/* Dashboard */}
-          <NavLink
-            to="/dashboard"
-            label="Dashboard"
-            icon={LayoutDashboard}
-            isActive={isDashboardActive}
-            collapsed={effectiveCollapsed}
-          />
-
-          {!effectiveCollapsed ? (
-            <div className="pt-2 pb-1 px-1">
-              <div style={{ height: 1, background: "#F3F4F6" }} />
-            </div>
-          ) : <div className="py-1.5" />}
-
-          {/* Groups */}
-          {visibleGroups.map((group) => {
-            const isGroupCollapsed = collapsedGroups[group.label] ?? true;
-            return (
-              <div key={group.label}>
-                {!effectiveCollapsed ? (
-                  <button
-                    onClick={() => toggleGroup(group.label)}
-                    className="w-full flex items-center justify-between px-2 py-1.5 rounded-md transition-colors"
-                    style={{ color: "#9CA3AF" }}
-                    onMouseEnter={(e) => (e.currentTarget.style.color = "#6B7280")}
-                    onMouseLeave={(e) => (e.currentTarget.style.color = "#9CA3AF")}
-                  >
-                    <span className="text-[10px] font-bold uppercase tracking-widest">
-                      {group.label}
-                    </span>
-                    <ChevronDown
-                      size={11}
-                      className={cn("transition-transform duration-150", isGroupCollapsed && "-rotate-90")}
-                    />
-                  </button>
-                ) : (
-                  <div className="py-1 px-2">
-                    <div style={{ height: 1, background: "#F3F4F6" }} />
-                  </div>
-                )}
-
-                {(effectiveCollapsed || !isGroupCollapsed) && (
-                  <div className="space-y-0.5">
-                    {group.items.map((item) => (
-                      <NavLink
-                        key={item.to + item.label}
-                        to={item.to}
-                        label={item.label}
-                        icon={item.icon}
-                        isActive={location.pathname === item.to}
-                        collapsed={effectiveCollapsed}
-                      />
-                    ))}
-                  </div>
-                )}
+          {/* Groups — always expanded, no collapse */}
+          {visibleGroups.map((group) => (
+            <div key={group.label}>
+              <p
+                className="px-3 pt-5 pb-1.5 text-[10px] font-bold uppercase tracking-widest"
+                style={{ color: "#9CA3AF" }}
+              >
+                {group.label}
+              </p>
+              <div className="space-y-0.5">
+                {group.items.map((item) => (
+                  <NavLink
+                    key={item.to + item.label}
+                    to={item.to}
+                    label={item.label}
+                    icon={item.icon}
+                    isActive={location.pathname === item.to}
+                  />
+                ))}
               </div>
-            );
-          })}
+            </div>
+          ))}
         </div>
 
-        <div style={{ height: 12 }} />
+        {/* Bottom brand card */}
+        <div className="px-3 pb-4 pt-2 flex-shrink-0">
+          <div
+            className="rounded-2xl p-4 flex items-center gap-3"
+            style={{ background: "#1A1D2E" }}
+          >
+            <div
+              className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+              style={{ background: "rgba(67,97,238,0.3)" }}
+            >
+              <Shield size={16} style={{ color: "#818CF8" }} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-white truncate">Direct Guard Ltd</p>
+              <p className="text-[10px] truncate" style={{ color: "rgba(255,255,255,0.45)" }}>
+                Security Management
+              </p>
+            </div>
+          </div>
+        </div>
       </nav>
     </>
   );
 }
 
-/* ── NavLink ─────────────────────────────────────────────── */
+/* ── NavLink ──────────────────────────────────────────────────── */
 interface NavLinkProps {
   to: string;
   label: string;
   icon: React.ComponentType<{ size?: number; className?: string }>;
   isActive: boolean;
-  collapsed: boolean;
 }
 
-function NavLink({ to, label, icon: Icon, isActive, collapsed }: NavLinkProps) {
+function NavLink({ to, label, icon: Icon, isActive }: NavLinkProps) {
   return (
     <Link
       to={to}
-      title={collapsed ? label : undefined}
-      className={cn(
-        "relative flex items-center gap-2.5 py-2 text-sm rounded-lg transition-all duration-100 select-none",
-        collapsed ? "justify-center px-0 mx-0.5" : "px-3"
-      )}
+      className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all duration-100 select-none"
       style={
         isActive
-          ? {
-              background: "#FFF7E6",
-              color: "#B45309",
-              fontWeight: 600,
-            }
-          : {
-              color: "#6B7280",
-              fontWeight: 400,
-            }
+          ? { background: "#4361EE", color: "#FFFFFF", fontWeight: 600 }
+          : { color: "#6B7280", fontWeight: 400 }
       }
       onMouseEnter={(e) => {
         if (!isActive) {
-          (e.currentTarget as HTMLAnchorElement).style.background = "#F9FAFB";
+          (e.currentTarget as HTMLAnchorElement).style.background = "#EEF2FF";
           (e.currentTarget as HTMLAnchorElement).style.color = "#374151";
         }
       }}
@@ -353,15 +244,8 @@ function NavLink({ to, label, icon: Icon, isActive, collapsed }: NavLinkProps) {
         }
       }}
     >
-      {/* Active left accent bar */}
-      {isActive && (
-        <span
-          className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] rounded-full"
-          style={{ height: "60%", background: "#F0A830" }}
-        />
-      )}
       <Icon size={15} />
-      {!collapsed && <span className="truncate">{label}</span>}
+      <span className="truncate">{label}</span>
     </Link>
   );
 }

@@ -21,11 +21,11 @@ export default function AppLayout() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: "#F5F6FA" }}>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: "#F0F2F8" }}>
         <div className="flex flex-col items-center gap-4">
           <div
             className="w-9 h-9 rounded-full border-2 border-t-transparent animate-spin"
-            style={{ borderColor: "#E5E7EB", borderTopColor: "#F0A830" }}
+            style={{ borderColor: "#E5E7EB", borderTopColor: "#4361EE" }}
           />
           <span className="text-sm" style={{ color: "#6B7280" }}>Loading…</span>
         </div>
@@ -40,13 +40,13 @@ export default function AppLayout() {
   return (
     <ToastProvider>
       <ConfirmDialogProvider>
-        <div className="flex h-screen" style={{ background: "#F5F6FA" }}>
+        <div className="flex h-screen" style={{ background: "#F0F2F8" }}>
           <Sidebar mobileOpen={mobileNavOpen} onCloseMobile={() => setMobileNavOpen(false)} />
           <div className="flex-1 flex flex-col min-w-0">
             <Header onMenuClick={() => setMobileNavOpen(true)} />
             <main
               className="flex-1 p-4 sm:p-6 overflow-y-auto overflow-x-hidden"
-              style={{ background: "#F5F6FA" }}
+              style={{ background: "#F0F2F8" }}
             >
               <AnimatedOutlet />
             </main>

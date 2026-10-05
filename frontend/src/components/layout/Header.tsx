@@ -54,7 +54,7 @@ function ResultAvatar({ employee }: { employee: EmployeeHit }) {
   return (
     <div
       className="w-6 h-6 rounded-full text-[10px] font-semibold flex items-center justify-center overflow-hidden flex-shrink-0"
-      style={{ background: "#FFF7E6", color: "#B45309" }}
+      style={{ background: "#EEF2FF", color: "#4361EE" }}
     >
       {showPhoto
         ? <img src={photoSrc} alt={employee.fullName} className="w-full h-full object-cover" onError={() => setImgError(true)} />
@@ -118,46 +118,43 @@ export default function Header({ onMenuClick }: HeaderProps) {
 
   return (
     <header
-      className="h-[60px] flex items-center justify-between px-4 gap-4 flex-shrink-0"
-      style={{ background: "#FFFFFF", borderBottom: "1px solid #E5E7EB" }}
+      className="h-[64px] flex items-center justify-between px-5 gap-4 flex-shrink-0"
+      style={{ background: "transparent" }}
     >
-      {/* Left */}
+      {/* Left — hamburger on mobile */}
       <div className="flex items-center gap-3 min-w-0 flex-1">
         <button
           onClick={onMenuClick}
-          className="md:hidden w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0"
-          style={{ color: "#6B7280" }}
-          onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#F9FAFB"; }}
-          onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "transparent"; }}
+          className="md:hidden w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
+          style={{ background: "#FFFFFF", color: "#6B7280", boxShadow: "0 1px 4px rgba(0,0,0,0.08)" }}
         >
           <Menu size={18} />
         </button>
 
         {/* Search */}
-        <div className="relative w-full max-w-72 hidden sm:block" ref={searchBoxRef}>
+        <div className="relative w-full max-w-64 hidden sm:block" ref={searchBoxRef}>
           <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "#9CA3AF" }} />
           <input
             type="text"
-            placeholder="Search employees, clients, sites…"
+            placeholder="Search…"
             value={query}
             onChange={(e) => { setQuery(e.target.value); setIsOpen(true); }}
             onFocus={() => setIsOpen(true)}
             onBlur={() => setTimeout(() => setIsOpen(false), 150)}
-            className="w-full pl-8 pr-3 py-1.5 text-sm rounded-lg transition-all outline-none"
+            className="w-full pl-8 pr-3 py-2 text-sm rounded-xl transition-all outline-none"
             style={{
-              background: "#F9FAFB",
+              background: "#FFFFFF",
               border: "1px solid #E5E7EB",
               color: "#111827",
+              boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
             }}
             onFocusCapture={(e) => {
-              (e.target as HTMLInputElement).style.background = "#FFFFFF";
-              (e.target as HTMLInputElement).style.borderColor = "#F0A830";
-              (e.target as HTMLInputElement).style.boxShadow = "0 0 0 3px rgba(240,168,48,0.12)";
+              (e.target as HTMLInputElement).style.borderColor = "#4361EE";
+              (e.target as HTMLInputElement).style.boxShadow = "0 0 0 3px rgba(67,97,238,0.14)";
             }}
             onBlurCapture={(e) => {
-              (e.target as HTMLInputElement).style.background = "#F9FAFB";
               (e.target as HTMLInputElement).style.borderColor = "#E5E7EB";
-              (e.target as HTMLInputElement).style.boxShadow = "none";
+              (e.target as HTMLInputElement).style.boxShadow = "0 1px 4px rgba(0,0,0,0.06)";
             }}
           />
 
@@ -184,7 +181,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
                           key={e.id}
                           onClick={() => goTo("/employees")}
                           className="w-full flex items-center gap-2.5 px-4 py-1.5 text-sm text-left"
-                          onMouseEnter={(el) => (el.currentTarget.style.background = "#FFFBEB")}
+                          onMouseEnter={(el) => (el.currentTarget.style.background = "#EEF2FF")}
                           onMouseLeave={(el) => (el.currentTarget.style.background = "transparent")}
                         >
                           <ResultAvatar employee={e} />
@@ -204,7 +201,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
                           key={c.id}
                           onClick={() => goTo("/clients")}
                           className="w-full flex items-center gap-2.5 px-4 py-1.5 text-sm text-left"
-                          onMouseEnter={(el) => (el.currentTarget.style.background = "#FFFBEB")}
+                          onMouseEnter={(el) => (el.currentTarget.style.background = "#EEF2FF")}
                           onMouseLeave={(el) => (el.currentTarget.style.background = "transparent")}
                         >
                           <div className="min-w-0">
@@ -223,7 +220,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
                           key={s.id}
                           onClick={() => goTo("/sites")}
                           className="w-full flex items-center gap-2.5 px-4 py-1.5 text-sm text-left"
-                          onMouseEnter={(el) => (el.currentTarget.style.background = "#FFFBEB")}
+                          onMouseEnter={(el) => (el.currentTarget.style.background = "#EEF2FF")}
                           onMouseLeave={(el) => (el.currentTarget.style.background = "transparent")}
                         >
                           <div className="min-w-0">
@@ -241,17 +238,24 @@ export default function Header({ onMenuClick }: HeaderProps) {
         </div>
       </div>
 
-      {/* Right */}
-      <div className="flex items-center gap-1 flex-shrink-0">
+      {/* Right controls */}
+      <div className="flex items-center gap-2 flex-shrink-0">
+        {/* Bell */}
         <Link
           to="/alerts"
-          className="w-9 h-9 flex items-center justify-center rounded-lg transition-colors"
-          style={{ color: "#6B7280" }}
+          className="w-9 h-9 flex items-center justify-center rounded-xl transition-colors"
+          style={{ background: "#FFFFFF", color: "#6B7280", boxShadow: "0 1px 4px rgba(0,0,0,0.08)" }}
           title="Alerts"
-          onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = "#111827"; (e.currentTarget as HTMLAnchorElement).style.background = "#F9FAFB"; }}
-          onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = "#6B7280"; (e.currentTarget as HTMLAnchorElement).style.background = "transparent"; }}
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLAnchorElement).style.color = "#4361EE";
+            (e.currentTarget as HTMLAnchorElement).style.boxShadow = "0 1px 4px rgba(67,97,238,0.2)";
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLAnchorElement).style.color = "#6B7280";
+            (e.currentTarget as HTMLAnchorElement).style.boxShadow = "0 1px 4px rgba(0,0,0,0.08)";
+          }}
         >
-          <Bell size={17} />
+          <Bell size={16} />
         </Link>
 
         {/* User dropdown */}
@@ -259,15 +263,19 @@ export default function Header({ onMenuClick }: HeaderProps) {
           <button
             onClick={() => setMenuOpen((v) => !v)}
             onBlur={() => setTimeout(() => setMenuOpen(false), 150)}
-            className="flex items-center gap-2.5 pl-2 pr-3 py-1.5 rounded-lg transition-colors"
-            style={{ color: "#111827" }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = "#F9FAFB")}
-            onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+            className="flex items-center gap-2.5 pl-2 pr-3 py-1.5 rounded-xl transition-colors"
+            style={{
+              background: "#FFFFFF",
+              color: "#111827",
+              boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.boxShadow = "0 1px 4px rgba(67,97,238,0.2)")}
+            onMouseLeave={(e) => (e.currentTarget.style.boxShadow = "0 1px 4px rgba(0,0,0,0.08)")}
           >
             {/* Avatar */}
             <div
               className="w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center flex-shrink-0"
-              style={{ background: "#F0A830", color: "#FFFFFF" }}
+              style={{ background: "#4361EE", color: "#FFFFFF" }}
             >
               {user ? initials(user.fullName) : <User size={13} />}
             </div>

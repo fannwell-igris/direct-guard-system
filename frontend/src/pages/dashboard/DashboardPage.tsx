@@ -73,14 +73,11 @@ function fmt(n: number | null | undefined) {
 function fmtDate(s: string) {
   return new Date(s).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
-function greeting() {
-  const h = new Date().getHours();
-  if (h < 12) return "Good morning";
-  if (h < 17) return "Good afternoon";
-  return "Good evening";
+function todayLabel() {
+  return new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 }
 
-// ── SVG Donut chart ──────────────────────────────────────────
+// ── Donut chart ──────────────────────────────────────────────
 interface DonutSegment { value: number; color: string; label: string }
 
 function DonutChart({ segments, centerLabel, centerSub }: {
@@ -108,10 +105,8 @@ function DonutChart({ segments, centerLabel, centerSub }: {
         const offset = circumference * (1 - accumulated);
         const el = (
           <circle
-            key={i}
-            cx={cx} cy={cy} r={r}
-            fill="none"
-            stroke={seg.color}
+            key={i} cx={cx} cy={cy} r={r}
+            fill="none" stroke={seg.color}
             strokeWidth={sw}
             strokeDasharray={`${dash} ${circumference}`}
             strokeDashoffset={offset}
@@ -134,7 +129,7 @@ function DonutChart({ segments, centerLabel, centerSub }: {
   );
 }
 
-// ── Revenue bar chart ────────────────────────────────────────
+// ── Bar chart ────────────────────────────────────────────────
 function RevenueChart({ data }: { data: { month: string; revenue: number; expenses?: number }[] }) {
   const safe = data.map((d) => ({ ...d, revenue: Number(d.revenue ?? 0), expenses: Number(d.expenses ?? 0) }));
   const max = Math.max(...safe.flatMap((d) => [d.revenue, d.expenses]), 1);
@@ -148,7 +143,7 @@ function RevenueChart({ data }: { data: { month: string; revenue: number; expens
                 className="w-5 rounded-t-md"
                 style={{
                   height: `${Math.max((d.revenue / max) * 112, 4)}px`,
-                  background: "linear-gradient(to top, #D97706, #F0A830)",
+                  background: "linear-gradient(to top, #3451C7, #4361EE)",
                 }}
                 title={`Revenue: ${fmt(d.revenue)}`}
               />
@@ -156,7 +151,7 @@ function RevenueChart({ data }: { data: { month: string; revenue: number; expens
                 className="w-5 rounded-t-md"
                 style={{
                   height: `${Math.max((d.expenses / max) * 112, 4)}px`,
-                  background: "linear-gradient(to top, #9CA3AF, #D1D5DB)",
+                  background: "linear-gradient(to top, #C7D2FE, #E0E7FF)",
                 }}
                 title={`Expenses: ${fmt(d.expenses)}`}
               />
@@ -167,11 +162,11 @@ function RevenueChart({ data }: { data: { month: string; revenue: number; expens
       </div>
       <div className="flex items-center justify-center gap-5 mt-4 pt-3" style={{ borderTop: "1px solid #F3F4F6" }}>
         <span className="flex items-center gap-1.5 text-[11px]" style={{ color: "#6B7280" }}>
-          <span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: "#F0A830" }} />
+          <span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: "#4361EE" }} />
           Revenue
         </span>
         <span className="flex items-center gap-1.5 text-[11px]" style={{ color: "#6B7280" }}>
-          <span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: "#D1D5DB" }} />
+          <span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: "#C7D2FE" }} />
           Expenses
         </span>
       </div>
@@ -179,12 +174,12 @@ function RevenueChart({ data }: { data: { month: string; revenue: number; expens
   );
 }
 
-// ── Invoice status badge ─────────────────────────────────────
+// ── Invoice badge ────────────────────────────────────────────
 function InvoiceBadge({ status }: { status: string }) {
   const map: Record<string, { bg: string; color: string; border: string }> = {
     PAID:      { bg: "#ECFDF5", color: "#059669", border: "#A7F3D0" },
     OVERDUE:   { bg: "#FEF2F2", color: "#DC2626", border: "#FECACA" },
-    SENT:      { bg: "#EFF6FF", color: "#2563EB", border: "#BFDBFE" },
+    SENT:      { bg: "#EEF2FF", color: "#4361EE", border: "#C7D2FE" },
     CANCELLED: { bg: "#F9FAFB", color: "#6B7280", border: "#E5E7EB" },
     DRAFT:     { bg: "#FFFBEB", color: "#D97706", border: "#FDE68A" },
   };
@@ -220,16 +215,16 @@ function SectionCard({ title, action, onAction, children }: {
 }) {
   return (
     <div className="rounded-2xl overflow-hidden"
-      style={{ background: "#FFFFFF", border: "1px solid #E5E7EB", boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}>
+      style={{ background: "#FFFFFF", boxShadow: "0 1px 8px rgba(0,0,0,0.06)" }}>
       <div className="flex items-center justify-between px-5 py-3.5"
         style={{ borderBottom: "1px solid #F3F4F6" }}>
         <p className="text-sm font-semibold" style={{ color: "#111827" }}>{title}</p>
         {action && onAction && (
           <button onClick={onAction}
             className="flex items-center gap-1 text-xs font-semibold transition-colors"
-            style={{ color: "#D97706" }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = "#B45309")}
-            onMouseLeave={(e) => (e.currentTarget.style.color = "#D97706")}
+            style={{ color: "#4361EE" }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = "#3451C7")}
+            onMouseLeave={(e) => (e.currentTarget.style.color = "#4361EE")}
           >
             {action} <ArrowRight size={11} />
           </button>
@@ -240,7 +235,119 @@ function SectionCard({ title, action, onAction, children }: {
   );
 }
 
-// ── Featured stat card ───────────────────────────────────────
+// ── Featured blue card (primary revenue card) ────────────────
+function BlueFeaturedCard({ label, value, sub, trend, to }: {
+  label: string; value: string | number; sub?: string;
+  trend?: { value: number; label?: string } | null; to?: string;
+}) {
+  const navigate = useNavigate();
+  const isUp = trend && trend.value >= 0;
+  return (
+    <div
+      className="rounded-2xl p-5 cursor-pointer transition-all duration-150"
+      style={{
+        background: "linear-gradient(135deg, #3D5BE0 0%, #7A97FF 100%)",
+        boxShadow: "0 4px 20px rgba(67,97,238,0.35)",
+      }}
+      onClick={to ? () => navigate(to) : undefined}
+      onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.boxShadow = "0 8px 28px rgba(67,97,238,0.45)"; }}
+      onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.boxShadow = "0 4px 20px rgba(67,97,238,0.35)"; }}
+    >
+      <div className="flex items-start justify-between mb-4">
+        <div
+          className="w-10 h-10 rounded-xl flex items-center justify-center"
+          style={{ background: "rgba(255,255,255,0.2)" }}
+        >
+          <TrendingUp size={18} style={{ color: "#FFFFFF" }} />
+        </div>
+        {trend !== undefined && trend !== null && (
+          <span
+            className="flex items-center gap-1 text-[11px] font-bold px-2 py-1 rounded-full"
+            style={isUp
+              ? { background: "rgba(255,255,255,0.25)", color: "#FFFFFF" }
+              : { background: "rgba(255,255,255,0.2)", color: "#FFFFFF" }
+            }
+          >
+            {isUp ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+            {isUp ? "+" : ""}{trend.value}%
+          </span>
+        )}
+      </div>
+      <p className="text-2xl font-bold text-white tracking-tight">{value}</p>
+      <p className="text-sm mt-1" style={{ color: "rgba(255,255,255,0.75)" }}>{label}</p>
+      {sub && <p className="text-xs mt-0.5" style={{ color: "rgba(255,255,255,0.55)" }}>{sub}</p>}
+      {trend?.label && <p className="text-xs mt-0.5" style={{ color: "rgba(255,255,255,0.55)" }}>{trend.label}</p>}
+    </div>
+  );
+}
+
+// ── White stat card ──────────────────────────────────────────
+function StatCard({ label, value, sub, trend, to, icon: Icon, iconBg, iconColor }: {
+  label: string; value: string | number; sub?: string;
+  trend?: { value: number } | null;
+  to?: string;
+  icon: React.ElementType; iconBg: string; iconColor: string;
+}) {
+  const navigate = useNavigate();
+  const isUp = trend && trend.value >= 0;
+  return (
+    <div
+      className="rounded-2xl p-5 cursor-pointer transition-all duration-150"
+      style={{ background: "#FFFFFF", boxShadow: "0 1px 8px rgba(0,0,0,0.06)" }}
+      onClick={to ? () => navigate(to) : undefined}
+      onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.boxShadow = "0 4px 20px rgba(0,0,0,0.1)"; }}
+      onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.boxShadow = "0 1px 8px rgba(0,0,0,0.06)"; }}
+    >
+      <div className="flex items-start justify-between mb-4">
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: iconBg }}>
+          <Icon size={18} style={{ color: iconColor }} />
+        </div>
+        {trend !== undefined && trend !== null && (
+          <span
+            className="flex items-center gap-1 text-[11px] font-bold px-2 py-1 rounded-full"
+            style={isUp
+              ? { background: "#ECFDF5", color: "#059669" }
+              : { background: "#FEF2F2", color: "#DC2626" }
+            }
+          >
+            {isUp ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+            {isUp ? "+" : ""}{trend.value}%
+          </span>
+        )}
+      </div>
+      <p className="text-2xl font-bold tracking-tight" style={{ color: "#111827" }}>{value}</p>
+      <p className="text-sm mt-1" style={{ color: "#6B7280" }}>{label}</p>
+      {sub && <p className="text-xs mt-0.5" style={{ color: "#9CA3AF" }}>{sub}</p>}
+    </div>
+  );
+}
+
+// ── Count card (small) ───────────────────────────────────────
+function CountCard({ label, value, icon: Icon, iconBg, iconColor, to }: {
+  label: string; value: number; icon: React.ElementType;
+  iconBg: string; iconColor: string; to?: string;
+}) {
+  const navigate = useNavigate();
+  return (
+    <div
+      className="rounded-2xl p-4 flex items-center gap-3.5 cursor-pointer transition-all"
+      style={{ background: "#FFFFFF", boxShadow: "0 1px 8px rgba(0,0,0,0.06)" }}
+      onClick={to ? () => navigate(to) : undefined}
+      onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.boxShadow = "0 4px 20px rgba(0,0,0,0.1)"; }}
+      onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.boxShadow = "0 1px 8px rgba(0,0,0,0.06)"; }}
+    >
+      <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: iconBg }}>
+        <Icon size={18} style={{ color: iconColor }} />
+      </div>
+      <div>
+        <p className="text-xl font-bold" style={{ color: "#111827" }}>{value}</p>
+        <p className="text-xs" style={{ color: "#6B7280" }}>{label}</p>
+      </div>
+    </div>
+  );
+}
+
+// ── General stat card (for ops/hr) ───────────────────────────
 function FeaturedCard({ label, value, sub, trend, icon: Icon, accentBg, accentColor, to }: {
   label: string; value: string | number; sub?: string;
   trend?: { value: number; label?: string } | null;
@@ -251,14 +358,13 @@ function FeaturedCard({ label, value, sub, trend, icon: Icon, accentBg, accentCo
   return (
     <div
       className="rounded-2xl p-5 transition-all duration-150 cursor-pointer"
-      style={{ background: "#FFFFFF", border: "1px solid #E5E7EB", boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}
+      style={{ background: "#FFFFFF", boxShadow: "0 1px 8px rgba(0,0,0,0.06)" }}
       onClick={to ? () => navigate(to) : undefined}
-      onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.boxShadow = "0 4px 16px rgba(0,0,0,0.09)"; }}
-      onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.boxShadow = "0 1px 4px rgba(0,0,0,0.05)"; }}
+      onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.boxShadow = "0 4px 20px rgba(0,0,0,0.1)"; }}
+      onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.boxShadow = "0 1px 8px rgba(0,0,0,0.06)"; }}
     >
       <div className="flex items-start justify-between mb-4">
-        <div className="w-10 h-10 rounded-xl flex items-center justify-center"
-          style={{ background: accentBg }}>
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: accentBg }}>
           <Icon size={18} style={{ color: accentColor }} />
         </div>
         {trend !== undefined && trend !== null && (
@@ -282,38 +388,12 @@ function FeaturedCard({ label, value, sub, trend, icon: Icon, accentBg, accentCo
   );
 }
 
-// ── Small count card ─────────────────────────────────────────
-function CountCard({ label, value, icon: Icon, accentBg, accentColor, to }: {
-  label: string; value: number; icon: React.ElementType;
-  accentBg: string; accentColor: string; to?: string;
-}) {
-  const navigate = useNavigate();
-  return (
-    <div
-      className="rounded-2xl p-4 flex items-center gap-3.5 cursor-pointer transition-all"
-      style={{ background: "#FFFFFF", border: "1px solid #E5E7EB", boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}
-      onClick={to ? () => navigate(to) : undefined}
-      onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.boxShadow = "0 4px 16px rgba(0,0,0,0.09)"; }}
-      onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.boxShadow = "0 1px 4px rgba(0,0,0,0.05)"; }}
-    >
-      <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-        style={{ background: accentBg }}>
-        <Icon size={18} style={{ color: accentColor }} />
-      </div>
-      <div>
-        <p className="text-xl font-bold" style={{ color: "#111827" }}>{value}</p>
-        <p className="text-xs" style={{ color: "#6B7280" }}>{label}</p>
-      </div>
-    </div>
-  );
-}
-
 // ── Spinner ──────────────────────────────────────────────────
 function Spinner() {
   return (
     <div className="flex items-center gap-2.5 text-sm py-10 justify-center" style={{ color: "#9CA3AF" }}>
       <div className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin"
-        style={{ borderColor: "#E5E7EB", borderTopColor: "#F0A830" }} />
+        style={{ borderColor: "#E5E7EB", borderTopColor: "#4361EE" }} />
       Loading…
     </div>
   );
@@ -396,53 +476,36 @@ export default function DashboardPage() {
     ...(canSeeHR  ? [{ key: "hr"         as Tab, label: "HR"         }] : []),
   ];
 
-  // Invoice status donut — tally from recent invoices
+  // Invoice donut segments
   const invoiceDonut: DonutSegment[] = (() => {
     if (!main?.recentInvoices) return [];
     const tally: Record<string, number> = {};
     main.recentInvoices.forEach((inv) => { tally[inv.status] = (tally[inv.status] ?? 0) + 1; });
     const colors: Record<string, string> = {
-      PAID: "#059669", SENT: "#2563EB", OVERDUE: "#DC2626", DRAFT: "#D97706", CANCELLED: "#9CA3AF",
+      PAID: "#059669", SENT: "#4361EE", OVERDUE: "#DC2626", DRAFT: "#D97706", CANCELLED: "#9CA3AF",
     };
     return Object.entries(tally).map(([label, value]) => ({ label, value, color: colors[label] ?? "#9CA3AF" }));
   })();
 
   return (
-    <div className="space-y-5 max-w-7xl">
+    <div className="max-w-7xl">
 
-      {/* ── Welcome banner ── */}
-      <div
-        className="rounded-2xl px-6 py-5 flex items-center justify-between"
-        style={{ background: "linear-gradient(135deg, #B45309 0%, #D97706 50%, #F0A830 100%)" }}
-      >
-        <div>
-          <p className="text-sm font-medium" style={{ color: "rgba(255,255,255,0.75)" }}>{greeting()},</p>
-          <h1 className="text-xl font-bold text-white mt-0.5">{user?.fullName}</h1>
-          <p className="text-xs mt-0.5" style={{ color: "rgba(255,255,255,0.6)" }}>
-            {role} · Direct Guard Limited
-          </p>
-        </div>
-        <div
-          className="hidden sm:flex items-center gap-2.5 rounded-xl px-4 py-2.5"
-          style={{ background: "rgba(255,255,255,0.2)", backdropFilter: "blur(4px)" }}
-        >
-          <Shield size={15} className="text-white" />
-          <span className="text-sm font-semibold text-white">
-            {new Date().toLocaleDateString("en-GB", { weekday: "short", day: "2-digit", month: "short", year: "numeric" })}
-          </span>
-        </div>
+      {/* ── Page header ── */}
+      <div className="mb-5">
+        <h1 className="text-2xl font-bold" style={{ color: "#111827" }}>Dashboard</h1>
+        <p className="text-sm mt-0.5" style={{ color: "#9CA3AF" }}>{todayLabel()}</p>
       </div>
 
       {error && (
-        <div className="text-sm rounded-xl px-4 py-3"
+        <div className="text-sm rounded-xl px-4 py-3 mb-4"
           style={{ background: "#FEF2F2", color: "#DC2626", border: "1px solid #FECACA" }}>
           {error}
         </div>
       )}
 
       {/* ── Tabs ── */}
-      <div className="flex gap-1 w-fit rounded-xl p-1"
-        style={{ background: "#FFFFFF", border: "1px solid #E5E7EB", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
+      <div className="flex gap-1 w-fit rounded-xl p-1 mb-5"
+        style={{ background: "#FFFFFF", boxShadow: "0 1px 6px rgba(0,0,0,0.07)" }}>
         {tabs.map((t) => (
           <button
             key={t.key}
@@ -450,10 +513,10 @@ export default function DashboardPage() {
             className="px-4 py-1.5 text-sm font-semibold rounded-lg transition-all duration-150"
             style={
               tab === t.key
-                ? { background: "#F0A830", color: "#FFFFFF", boxShadow: "0 1px 4px rgba(240,168,48,0.35)" }
+                ? { background: "#4361EE", color: "#FFFFFF", boxShadow: "0 2px 8px rgba(67,97,238,0.3)" }
                 : { color: "#6B7280" }
             }
-            onMouseEnter={(e) => { if (tab !== t.key) (e.currentTarget as HTMLButtonElement).style.background = "#F9FAFB"; }}
+            onMouseEnter={(e) => { if (tab !== t.key) (e.currentTarget as HTMLButtonElement).style.background = "#EEF2FF"; }}
             onMouseLeave={(e) => { if (tab !== t.key) (e.currentTarget as HTMLButtonElement).style.background = "transparent"; }}
           >
             {t.label}
@@ -464,170 +527,263 @@ export default function DashboardPage() {
       {/* ══ OVERVIEW TAB ══ */}
       {tab === "overview" && (
         mainLoading ? <Spinner /> : main ? (
-          <div className="space-y-5">
+          <div className="flex gap-5 items-start">
 
-            {/* Finance featured cards */}
-            {canSeeFinance && main.revenue && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <FeaturedCard
-                  label="Revenue this month" value={fmt(main.revenue.thisMonth)}
-                  trend={main.revenue.changePercent !== null ? { value: main.revenue.changePercent, label: "vs last month" } : null}
-                  icon={TrendingUp} accentBg="#FFF7E6" accentColor="#D97706" to="/invoices"
-                />
-                <FeaturedCard
-                  label="Outstanding balance" value={fmt(main.outstandingBalance ?? 0)}
-                  sub={main.alerts.overdueInvoices ? `${main.alerts.overdueInvoices} overdue` : undefined}
-                  icon={AlertTriangle} accentBg="#FEF2F2" accentColor="#DC2626" to="/invoices"
-                />
-                {main.expenses && (
-                  <FeaturedCard
-                    label="Expenses this month" value={fmt(main.expenses.thisMonth)}
-                    sub="General + operational"
-                    icon={Briefcase} accentBg="#F3F4F6" accentColor="#6B7280" to="/expenses"
-                  />
-                )}
-                {main.payroll && (
-                  <FeaturedCard
-                    label="Payroll paid" value={fmt(main.payroll.paidThisMonth)}
-                    sub="Net pay this month"
-                    icon={Users} accentBg="#EFF6FF" accentColor="#2563EB" to="/payroll"
-                  />
-                )}
-              </div>
-            )}
+            {/* ── Left main column ── */}
+            <div className="flex-1 min-w-0 space-y-5">
 
-            {/* Count cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <CountCard label="Active Clients"   value={main.counts.activeClients}   icon={Building2} accentBg="#ECFDF5" accentColor="#059669" to="/clients"   />
-              <CountCard label="Active Sites"     value={main.counts.activeSites}     icon={MapPin}    accentBg="#EFF6FF" accentColor="#2563EB" to="/sites"     />
-              <CountCard label="Active Employees" value={main.counts.activeEmployees} icon={Users}     accentBg="#FFF7E6" accentColor="#D97706" to="/employees" />
+              {/* Alert pills */}
+              {((canSeeFinance && (main.alerts.overdueInvoices ?? 0) > 0) ||
+                main.alerts.expiringContracts > 0 ||
+                main.alerts.overdueTasks > 0) && (
+                <div className="flex flex-wrap gap-2">
+                  {canSeeFinance && (main.alerts.overdueInvoices ?? 0) > 0 && (
+                    <AlertPill text={`${main.alerts.overdueInvoices} overdue invoice${main.alerts.overdueInvoices !== 1 ? "s" : ""}`}
+                      bg="#FEF2F2" color="#DC2626" border="#FECACA" to="/invoices" navigate={navigate} />
+                  )}
+                  {main.alerts.expiringContracts > 0 && (
+                    <AlertPill text={`${main.alerts.expiringContracts} contract${main.alerts.expiringContracts !== 1 ? "s" : ""} expiring soon`}
+                      bg="#FFFBEB" color="#D97706" border="#FDE68A" to="/contracts" navigate={navigate} />
+                  )}
+                  {main.alerts.overdueTasks > 0 && (
+                    <AlertPill text={`${main.alerts.overdueTasks} overdue task${main.alerts.overdueTasks !== 1 ? "s" : ""}`}
+                      bg="#FFF7ED" color="#EA580C" border="#FED7AA" to="/tasks" navigate={navigate} />
+                  )}
+                </div>
+              )}
+
+              {/* 2×2 stat cards */}
+              {canSeeFinance && main.revenue ? (
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Featured blue card */}
+                  <BlueFeaturedCard
+                    label="Revenue this month"
+                    value={fmt(main.revenue.thisMonth)}
+                    trend={main.revenue.changePercent !== null ? { value: main.revenue.changePercent, label: "vs last month" } : null}
+                    to="/invoices"
+                  />
+                  {/* Outstanding balance */}
+                  <StatCard
+                    label="Outstanding balance"
+                    value={fmt(main.outstandingBalance ?? 0)}
+                    sub={main.alerts.overdueInvoices ? `${main.alerts.overdueInvoices} overdue` : undefined}
+                    icon={AlertTriangle} iconBg="#FEF2F2" iconColor="#DC2626"
+                    to="/invoices"
+                  />
+                  {/* Expenses */}
+                  {main.expenses ? (
+                    <StatCard
+                      label="Expenses this month"
+                      value={fmt(main.expenses.thisMonth)}
+                      sub="General + operational"
+                      icon={Briefcase} iconBg="#F3F4F6" iconColor="#6B7280"
+                      to="/expenses"
+                    />
+                  ) : (
+                    <StatCard
+                      label="Active Clients"
+                      value={main.counts.activeClients}
+                      icon={Building2} iconBg="#ECFDF5" iconColor="#059669"
+                      to="/clients"
+                    />
+                  )}
+                  {/* Payroll */}
+                  {main.payroll ? (
+                    <StatCard
+                      label="Payroll paid this month"
+                      value={fmt(main.payroll.paidThisMonth)}
+                      sub="Net pay"
+                      icon={Users} iconBg="#EEF2FF" iconColor="#4361EE"
+                      to="/payroll"
+                    />
+                  ) : (
+                    <StatCard
+                      label="Active Sites"
+                      value={main.counts.activeSites}
+                      icon={MapPin} iconBg="#EEF2FF" iconColor="#4361EE"
+                      to="/sites"
+                    />
+                  )}
+                </div>
+              ) : (
+                /* No finance access — show count cards in a 3-col */
+                <div className="grid grid-cols-3 gap-4">
+                  <CountCard label="Active Clients"   value={main.counts.activeClients}   icon={Building2} iconBg="#ECFDF5" iconColor="#059669" to="/clients"   />
+                  <CountCard label="Active Sites"     value={main.counts.activeSites}     icon={MapPin}    iconBg="#EEF2FF" iconColor="#4361EE" to="/sites"     />
+                  <CountCard label="Active Employees" value={main.counts.activeEmployees} icon={Users}     iconBg="#F3F4F6" iconColor="#6B7280" to="/employees" />
+                </div>
+              )}
+
+              {/* Bar chart */}
+              {canSeeFinance && main.monthlyRevenue && (
+                <SectionCard title="Revenue vs Expenses — last 6 months">
+                  <div className="p-5">
+                    <RevenueChart data={main.monthlyRevenue} />
+                  </div>
+                </SectionCard>
+              )}
+
+              {/* Recent invoices */}
+              {canSeeFinance && main.recentInvoices && main.recentInvoices.length > 0 && (
+                <SectionCard title="Recent invoices" action="View all" onAction={() => navigate("/invoices")}>
+                  <table className="w-full text-xs">
+                    <thead style={{ background: "#F9FAFB", borderBottom: "1px solid #F3F4F6" }}>
+                      <tr>
+                        {["Invoice", "Client", "Amount", "Status"].map((h, i) => (
+                          <th key={h} className={`px-5 py-3 text-[10px] font-bold uppercase tracking-wider ${i === 2 ? "text-right" : "text-left"}`}
+                            style={{ color: "#6B7280" }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {main.recentInvoices.map((inv, i) => (
+                        <tr key={inv.id}
+                          style={{ borderTop: i > 0 ? "1px solid #F9FAFB" : undefined }}
+                          onMouseEnter={(e) => ((e.currentTarget as HTMLTableRowElement).style.background = "#EEF2FF")}
+                          onMouseLeave={(e) => ((e.currentTarget as HTMLTableRowElement).style.background = "transparent")}
+                        >
+                          <td className="px-5 py-3 font-semibold" style={{ color: "#111827" }}>{inv.invoiceNumber}</td>
+                          <td className="px-5 py-3" style={{ color: "#6B7280" }}>{inv.client?.name ?? "—"}</td>
+                          <td className="px-5 py-3 text-right font-semibold" style={{ color: "#374151" }}>{fmt(Number(inv.amount))}</td>
+                          <td className="px-5 py-3"><InvoiceBadge status={inv.status} /></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </SectionCard>
+              )}
+
+              {/* Recent payments */}
+              {canSeeFinance && main.recentPayments && main.recentPayments.length > 0 && (
+                <SectionCard title="Recent payments" action="View invoices" onAction={() => navigate("/invoices")}>
+                  <table className="w-full text-xs">
+                    <thead style={{ background: "#F9FAFB", borderBottom: "1px solid #F3F4F6" }}>
+                      <tr>
+                        {["Date", "Client", "Invoice", "Method", "Amount"].map((h, i) => (
+                          <th key={h} className={`px-5 py-3 text-[10px] font-bold uppercase tracking-wider ${i === 4 ? "text-right" : "text-left"}`}
+                            style={{ color: "#6B7280" }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {main.recentPayments.map((p, i) => (
+                        <tr key={p.id}
+                          style={{ borderTop: i > 0 ? "1px solid #F9FAFB" : undefined }}
+                          onMouseEnter={(e) => ((e.currentTarget as HTMLTableRowElement).style.background = "#EEF2FF")}
+                          onMouseLeave={(e) => ((e.currentTarget as HTMLTableRowElement).style.background = "transparent")}
+                        >
+                          <td className="px-5 py-3" style={{ color: "#6B7280" }}>{fmtDate(p.paymentDate)}</td>
+                          <td className="px-5 py-3" style={{ color: "#374151" }}>{p.invoice?.client?.name ?? "—"}</td>
+                          <td className="px-5 py-3" style={{ color: "#6B7280" }}>{p.invoice?.invoiceNumber ?? "—"}</td>
+                          <td className="px-5 py-3" style={{ color: "#6B7280" }}>{p.paymentMethod}</td>
+                          <td className="px-5 py-3 text-right font-semibold" style={{ color: "#059669" }}>{fmt(Number(p.amount))}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </SectionCard>
+              )}
+
+              {!canSeeFinance && (
+                <div className="flex items-center gap-3 rounded-xl px-4 py-3"
+                  style={{ background: "#F9FAFB", border: "1px solid #E5E7EB" }}>
+                  <Briefcase size={14} style={{ color: "#9CA3AF" }} />
+                  <p className="text-sm" style={{ color: "#6B7280" }}>Financial data is not available for your role.</p>
+                </div>
+              )}
             </div>
 
-            {!canSeeFinance && (
-              <div className="flex items-center gap-3 rounded-xl px-4 py-3"
-                style={{ background: "#F9FAFB", border: "1px solid #E5E7EB" }}>
-                <Briefcase size={14} style={{ color: "#9CA3AF" }} />
-                <p className="text-sm" style={{ color: "#6B7280" }}>Financial data is not available for your role.</p>
-              </div>
-            )}
+            {/* ── Right panel ── */}
+            <div className="w-72 flex-shrink-0 space-y-5 hidden xl:flex xl:flex-col">
 
-            {/* Alert pills */}
-            {((canSeeFinance && (main.alerts.overdueInvoices ?? 0) > 0) ||
-              main.alerts.expiringContracts > 0 ||
-              main.alerts.overdueTasks > 0) && (
-              <div className="flex flex-wrap gap-2">
-                {canSeeFinance && (main.alerts.overdueInvoices ?? 0) > 0 && (
-                  <AlertPill text={`${main.alerts.overdueInvoices} overdue invoice${main.alerts.overdueInvoices !== 1 ? "s" : ""}`}
-                    bg="#FEF2F2" color="#DC2626" border="#FECACA" to="/invoices" navigate={navigate} />
-                )}
-                {main.alerts.expiringContracts > 0 && (
-                  <AlertPill text={`${main.alerts.expiringContracts} contract${main.alerts.expiringContracts !== 1 ? "s" : ""} expiring soon`}
-                    bg="#FFFBEB" color="#D97706" border="#FDE68A" to="/contracts" navigate={navigate} />
-                )}
-                {main.alerts.overdueTasks > 0 && (
-                  <AlertPill text={`${main.alerts.overdueTasks} overdue task${main.alerts.overdueTasks !== 1 ? "s" : ""}`}
-                    bg="#FFF7ED" color="#EA580C" border="#FED7AA" to="/tasks" navigate={navigate} />
-                )}
-              </div>
-            )}
-
-            {/* Charts row */}
-            {canSeeFinance && main.monthlyRevenue && (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                <div className="lg:col-span-2">
-                  <SectionCard title="Revenue vs Expenses — last 6 months">
-                    <div className="p-5">
-                      <RevenueChart data={main.monthlyRevenue} />
-                    </div>
-                  </SectionCard>
+              {/* Company banner */}
+              <div
+                className="rounded-2xl p-5"
+                style={{ background: "linear-gradient(135deg, #1A1D2E 0%, #2A3050 100%)", boxShadow: "0 1px 8px rgba(0,0,0,0.12)" }}
+              >
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center"
+                    style={{ background: "rgba(67,97,238,0.3)" }}>
+                    <Shield size={16} style={{ color: "#818CF8" }} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-white">Direct Guard Ltd</p>
+                    <p className="text-[11px]" style={{ color: "rgba(255,255,255,0.5)" }}>Security Management</p>
+                  </div>
                 </div>
-                <div>
-                  <SectionCard title="Invoice breakdown">
-                    <div className="p-5 flex flex-col items-center gap-4">
-                      <div style={{ width: 140, height: 140 }}>
-                        <DonutChart
-                          segments={invoiceDonut}
-                          centerLabel={String(main.recentInvoices?.length ?? 0)}
-                          centerSub="invoices"
-                        />
-                      </div>
-                      <div className="w-full space-y-2">
-                        {invoiceDonut.map((seg) => (
-                          <div key={seg.label} className="flex items-center justify-between text-xs">
-                            <span className="flex items-center gap-1.5" style={{ color: "#6B7280" }}>
-                              <span className="w-2 h-2 rounded-full inline-block" style={{ background: seg.color }} />
-                              {seg.label}
-                            </span>
-                            <span className="font-semibold" style={{ color: "#111827" }}>{seg.value}</span>
-                          </div>
-                        ))}
-                      </div>
+                <div className="grid grid-cols-3 gap-2 mt-3">
+                  {[
+                    { label: "Clients",   value: main.counts.activeClients,   to: "/clients"   },
+                    { label: "Sites",     value: main.counts.activeSites,     to: "/sites"     },
+                    { label: "Employees", value: main.counts.activeEmployees, to: "/employees" },
+                  ].map((item) => (
+                    <div
+                      key={item.label}
+                      className="rounded-xl p-2.5 text-center cursor-pointer transition-all"
+                      style={{ background: "rgba(255,255,255,0.08)" }}
+                      onClick={() => navigate(item.to)}
+                      onMouseEnter={(e) => ((e.currentTarget as HTMLDivElement).style.background = "rgba(255,255,255,0.14)")}
+                      onMouseLeave={(e) => ((e.currentTarget as HTMLDivElement).style.background = "rgba(255,255,255,0.08)")}
+                    >
+                      <p className="text-lg font-bold text-white">{item.value}</p>
+                      <p className="text-[10px] mt-0.5" style={{ color: "rgba(255,255,255,0.5)" }}>{item.label}</p>
                     </div>
-                  </SectionCard>
+                  ))}
                 </div>
               </div>
-            )}
 
-            {/* Recent invoices */}
-            {canSeeFinance && main.recentInvoices && main.recentInvoices.length > 0 && (
-              <SectionCard title="Recent invoices" action="View all" onAction={() => navigate("/invoices")}>
-                <table className="w-full text-xs">
-                  <thead style={{ background: "#F9FAFB", borderBottom: "1px solid #F3F4F6" }}>
-                    <tr>
-                      {["Invoice", "Client", "Amount", "Status"].map((h, i) => (
-                        <th key={h} className={`px-5 py-3 text-[10px] font-bold uppercase tracking-wider ${i === 2 ? "text-right" : "text-left"}`}
-                          style={{ color: "#6B7280" }}>{h}</th>
+              {/* Invoice breakdown */}
+              {canSeeFinance && invoiceDonut.length > 0 && (
+                <SectionCard title="Invoice breakdown">
+                  <div className="p-5 flex flex-col items-center gap-4">
+                    <div style={{ width: 140, height: 140 }}>
+                      <DonutChart
+                        segments={invoiceDonut}
+                        centerLabel={String(main.recentInvoices?.length ?? 0)}
+                        centerSub="invoices"
+                      />
+                    </div>
+                    <div className="w-full space-y-2">
+                      {invoiceDonut.map((seg) => (
+                        <div key={seg.label} className="flex items-center justify-between text-xs">
+                          <span className="flex items-center gap-1.5" style={{ color: "#6B7280" }}>
+                            <span className="w-2 h-2 rounded-full inline-block" style={{ background: seg.color }} />
+                            {seg.label}
+                          </span>
+                          <span className="font-semibold" style={{ color: "#111827" }}>{seg.value}</span>
+                        </div>
                       ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {main.recentInvoices.map((inv, i) => (
-                      <tr key={inv.id}
-                        style={{ borderTop: i > 0 ? "1px solid #F9FAFB" : undefined }}
-                        onMouseEnter={(e) => ((e.currentTarget as HTMLTableRowElement).style.background = "#FFFBEB")}
-                        onMouseLeave={(e) => ((e.currentTarget as HTMLTableRowElement).style.background = "transparent")}
-                      >
-                        <td className="px-5 py-3 font-semibold" style={{ color: "#111827" }}>{inv.invoiceNumber}</td>
-                        <td className="px-5 py-3" style={{ color: "#6B7280" }}>{inv.client?.name ?? "—"}</td>
-                        <td className="px-5 py-3 text-right font-semibold" style={{ color: "#374151" }}>{fmt(Number(inv.amount))}</td>
-                        <td className="px-5 py-3"><InvoiceBadge status={inv.status} /></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </SectionCard>
-            )}
+                    </div>
+                  </div>
+                </SectionCard>
+              )}
 
-            {/* Recent payments */}
-            {canSeeFinance && main.recentPayments && main.recentPayments.length > 0 && (
-              <SectionCard title="Recent payments" action="View invoices" onAction={() => navigate("/invoices")}>
-                <table className="w-full text-xs">
-                  <thead style={{ background: "#F9FAFB", borderBottom: "1px solid #F3F4F6" }}>
-                    <tr>
-                      {["Date", "Client", "Invoice", "Method", "Amount"].map((h, i) => (
-                        <th key={h} className={`px-5 py-3 text-[10px] font-bold uppercase tracking-wider ${i === 4 ? "text-right" : "text-left"}`}
-                          style={{ color: "#6B7280" }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {main.recentPayments.map((p, i) => (
-                      <tr key={p.id}
-                        style={{ borderTop: i > 0 ? "1px solid #F9FAFB" : undefined }}
-                        onMouseEnter={(e) => ((e.currentTarget as HTMLTableRowElement).style.background = "#FFFBEB")}
-                        onMouseLeave={(e) => ((e.currentTarget as HTMLTableRowElement).style.background = "transparent")}
-                      >
-                        <td className="px-5 py-3" style={{ color: "#6B7280" }}>{fmtDate(p.paymentDate)}</td>
-                        <td className="px-5 py-3" style={{ color: "#374151" }}>{p.invoice?.client?.name ?? "—"}</td>
-                        <td className="px-5 py-3" style={{ color: "#6B7280" }}>{p.invoice?.invoiceNumber ?? "—"}</td>
-                        <td className="px-5 py-3" style={{ color: "#6B7280" }}>{p.paymentMethod}</td>
-                        <td className="px-5 py-3 text-right font-semibold" style={{ color: "#059669" }}>{fmt(Number(p.amount))}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              {/* Quick links */}
+              <SectionCard title="Quick access">
+                <div className="p-3 space-y-1">
+                  {[
+                    { label: "View Clients",   to: "/clients",   color: "#4361EE", bg: "#EEF2FF" },
+                    { label: "View Sites",     to: "/sites",     color: "#059669", bg: "#ECFDF5" },
+                    { label: "View Employees", to: "/employees", color: "#4361EE", bg: "#EEF2FF" },
+                    ...(canSeeFinance ? [
+                      { label: "Invoices",     to: "/invoices",  color: "#D97706", bg: "#FFFBEB" },
+                    ] : []),
+                  ].map((item) => (
+                    <button
+                      key={item.to}
+                      onClick={() => navigate(item.to)}
+                      className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm font-medium transition-all"
+                      style={{ color: item.color, background: "transparent" }}
+                      onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = item.bg; }}
+                      onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "transparent"; }}
+                    >
+                      {item.label}
+                      <ArrowRight size={13} />
+                    </button>
+                  ))}
+                </div>
               </SectionCard>
-            )}
+            </div>
           </div>
         ) : null
       )}
@@ -637,9 +793,9 @@ export default function DashboardPage() {
         opsLoading ? <Spinner /> : ops ? (
           <div className="space-y-5">
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <FeaturedCard label="Active Sites"     value={ops.roster.activeSitesTotal}    icon={MapPin}      accentBg="#EFF6FF" accentColor="#2563EB" to="/sites"      />
+              <FeaturedCard label="Active Sites"     value={ops.roster.activeSitesTotal}    icon={MapPin}      accentBg="#EEF2FF" accentColor="#4361EE" to="/sites"      />
               <FeaturedCard label="Rostered Today"   value={ops.roster.sitesRosteredToday}  icon={CheckCircle} accentBg="#ECFDF5" accentColor="#059669" to="/roster"     />
-              <FeaturedCard label="Officers on Duty" value={ops.roster.officersOnDutyToday} icon={Users}       accentBg="#FFF7E6" accentColor="#D97706" to="/operations" />
+              <FeaturedCard label="Officers on Duty" value={ops.roster.officersOnDutyToday} icon={Users}       accentBg="#F3F4F6" accentColor="#6B7280" to="/operations" />
               <FeaturedCard label="Pending Review"   value={ops.operations.pendingReview}   icon={Clock}       accentBg="#FFFBEB" accentColor="#D97706" to="/operations" />
             </div>
 
@@ -661,7 +817,6 @@ export default function DashboardPage() {
             )}
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {/* Site coverage donut */}
               <SectionCard title="Site coverage today">
                 <div className="p-5 flex items-center gap-6">
                   <div style={{ width: 120, height: 120, flexShrink: 0 }}>
@@ -678,9 +833,9 @@ export default function DashboardPage() {
                   </div>
                   <div className="space-y-3 flex-1">
                     {[
-                      { label: "Rostered",         value: ops.roster.sitesRosteredToday, color: "#059669" },
-                      { label: "With gaps",         value: Math.max(ops.roster.activeSitesTotal - ops.roster.sitesRosteredToday, 0), color: "#DC2626" },
-                      { label: "Officers on duty",  value: ops.roster.officersOnDutyToday, color: "#D97706" },
+                      { label: "Rostered",        value: ops.roster.sitesRosteredToday, color: "#059669" },
+                      { label: "With gaps",        value: Math.max(ops.roster.activeSitesTotal - ops.roster.sitesRosteredToday, 0), color: "#DC2626" },
+                      { label: "Officers on duty", value: ops.roster.officersOnDutyToday, color: "#4361EE" },
                     ].map((row) => (
                       <div key={row.label} className="flex items-center justify-between text-sm">
                         <span className="flex items-center gap-2" style={{ color: "#6B7280" }}>
@@ -702,7 +857,7 @@ export default function DashboardPage() {
                     {ops.recentOperations.map((r, i) => (
                       <div key={r.id} className="px-5 py-3 flex items-center justify-between text-xs"
                         style={{ borderTop: i > 0 ? "1px solid #F9FAFB" : undefined }}
-                        onMouseEnter={(e) => ((e.currentTarget as HTMLDivElement).style.background = "#FFFBEB")}
+                        onMouseEnter={(e) => ((e.currentTarget as HTMLDivElement).style.background = "#EEF2FF")}
                         onMouseLeave={(e) => ((e.currentTarget as HTMLDivElement).style.background = "transparent")}
                       >
                         <div>
@@ -713,7 +868,7 @@ export default function DashboardPage() {
                           style={
                             r.reviewStatus === "APPROVED" ? { background: "#ECFDF5", color: "#059669", border: "1px solid #A7F3D0" } :
                             r.reviewStatus === "REJECTED" ? { background: "#FEF2F2", color: "#DC2626", border: "1px solid #FECACA" } :
-                            { background: "#FFFBEB", color: "#D97706", border: "1px solid #FDE68A" }
+                            { background: "#EEF2FF", color: "#4361EE", border: "1px solid #C7D2FE" }
                           }
                         >
                           {r.reviewStatus}
@@ -757,14 +912,13 @@ export default function DashboardPage() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              {/* Workforce donut */}
               <SectionCard title="Workforce breakdown">
                 <div className="p-5 flex flex-col items-center gap-4">
                   <div style={{ width: 140, height: 140 }}>
                     <DonutChart
                       segments={[
                         { label: "Active",     value: hr.employees.active,     color: "#059669" },
-                        { label: "Inactive",   value: hr.employees.inactive,   color: "#D97706" },
+                        { label: "Inactive",   value: hr.employees.inactive,   color: "#4361EE" },
                         { label: "Terminated", value: hr.employees.terminated, color: "#DC2626" },
                       ]}
                       centerLabel={String(hr.employees.active + hr.employees.inactive + hr.employees.terminated)}
@@ -774,7 +928,7 @@ export default function DashboardPage() {
                   <div className="w-full space-y-2">
                     {[
                       { label: "Active",     value: hr.employees.active,     color: "#059669" },
-                      { label: "Inactive",   value: hr.employees.inactive,   color: "#D97706" },
+                      { label: "Inactive",   value: hr.employees.inactive,   color: "#4361EE" },
                       { label: "Terminated", value: hr.employees.terminated, color: "#DC2626" },
                     ].map((row) => (
                       <div key={row.label} className="flex items-center justify-between text-xs">
@@ -806,7 +960,7 @@ export default function DashboardPage() {
                                 <span className="font-bold" style={{ color: "#111827" }}>{d.count}</span>
                               </div>
                               <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "#F3F4F6" }}>
-                                <div className="h-full rounded-full" style={{ width: `${pct}%`, background: "#F0A830" }} />
+                                <div className="h-full rounded-full" style={{ width: `${pct}%`, background: "#4361EE" }} />
                               </div>
                             </div>
                           );
@@ -826,7 +980,7 @@ export default function DashboardPage() {
                 )}
                 {hr.openDepartmentRequests > 0 && (
                   <AlertPill text={`${hr.openDepartmentRequests} open department request${hr.openDepartmentRequests !== 1 ? "s" : ""}`}
-                    bg="#EFF6FF" color="#2563EB" border="#BFDBFE" to="/department-requests" navigate={navigate} />
+                    bg="#EEF2FF" color="#4361EE" border="#C7D2FE" to="/department-requests" navigate={navigate} />
                 )}
               </div>
             )}
@@ -840,7 +994,7 @@ export default function DashboardPage() {
                     {hr.expiringContracts.map((c, i) => (
                       <div key={c.id} className="px-5 py-3 flex items-center justify-between text-xs"
                         style={{ borderTop: i > 0 ? "1px solid #F9FAFB" : undefined }}
-                        onMouseEnter={(e) => ((e.currentTarget as HTMLDivElement).style.background = "#FFFBEB")}
+                        onMouseEnter={(e) => ((e.currentTarget as HTMLDivElement).style.background = "#EEF2FF")}
                         onMouseLeave={(e) => ((e.currentTarget as HTMLDivElement).style.background = "transparent")}
                       >
                         <div>
@@ -862,7 +1016,7 @@ export default function DashboardPage() {
                     {hr.tasks.topOverdue.map((t, i) => (
                       <div key={t.id} className="px-5 py-3 text-xs"
                         style={{ borderTop: i > 0 ? "1px solid #F9FAFB" : undefined }}
-                        onMouseEnter={(e) => ((e.currentTarget as HTMLDivElement).style.background = "#FFFBEB")}
+                        onMouseEnter={(e) => ((e.currentTarget as HTMLDivElement).style.background = "#EEF2FF")}
                         onMouseLeave={(e) => ((e.currentTarget as HTMLDivElement).style.background = "transparent")}
                       >
                         <div className="flex items-center justify-between">
@@ -888,11 +1042,11 @@ export default function DashboardPage() {
                   {hr.recentHires.map((e, i) => (
                     <div key={e.id} className="px-5 py-3 flex items-center gap-3 text-xs"
                       style={{ borderTop: i >= 1 ? "1px solid #F9FAFB" : undefined }}
-                      onMouseEnter={(el) => ((el.currentTarget as HTMLDivElement).style.background = "#FFFBEB")}
+                      onMouseEnter={(el) => ((el.currentTarget as HTMLDivElement).style.background = "#EEF2FF")}
                       onMouseLeave={(el) => ((el.currentTarget as HTMLDivElement).style.background = "transparent")}
                     >
                       <div className="w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center flex-shrink-0"
-                        style={{ background: "#FFF7E6", color: "#B45309" }}>
+                        style={{ background: "#EEF2FF", color: "#4361EE" }}>
                         {e.fullName.split(" ").map((p) => p[0]).join("").toUpperCase().slice(0, 2)}
                       </div>
                       <div className="min-w-0">
